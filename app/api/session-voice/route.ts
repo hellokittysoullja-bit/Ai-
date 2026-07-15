@@ -1,5 +1,7 @@
 import { generateText } from 'ai'
+import { google } from '@ai-sdk/google'
 import { personaBase } from '@/lib/companion'
+import { sessionVoicePresets } from '@/lib/scripted-companion'
 
 export const maxDuration = 15
 
@@ -30,19 +32,26 @@ export async function POST(req: Request) {
       return Response.json({ text: null }, { status: 400 })
     }
 
-    const { text } = await generateText({
-      model: 'openai/gpt-5.4-nano',
-      instructions: `${personaBase}
+    try {
+      const { text } = await generateText({
+        model: process.env.GOOGLE_GENERATIVE_AI_API_KEY
+          ? google('gemini-2.5-flash-lite')
+          : 'openai/gpt-5.4-nano',
+        instructions: `${personaBase}
 
 Режим: ФОКУС-СЕССИЯ. Человек работает над: «${task}»${
-        minutes ? ` (сессия ${minutes} минут)` : ''
-      }. Отвечай ТОЛЬКО самой фразой, без кавычек и пояснений.`,
-      prompt,
-    })
-
-    return Response.json({ text: text.trim() })
+          minutes ? ` (сессия ${minutes} минут)` : ''
+        }. Отвечай ТОЛЬКО самой фразой, без кавычек и пояснений.`,
+        prompt,
+      })
+      return Response.json({ text: text.trim() })
+    } catch {
+      // LLM недоступен — скриптовый пресет вместо молчания
+      const presets = sessionVoicePresets[moment]
+      const fallback = presets ? presets[task.length % presets.length] : null
+      return Response.json({ text: fallback })
+    }
   } catch {
-    // Клиент упадёт на пресеты
     return Response.json({ text: null }, { status: 500 })
   }
 }
