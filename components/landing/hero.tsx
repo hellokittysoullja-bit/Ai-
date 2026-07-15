@@ -74,9 +74,7 @@ export function Hero() {
 
   // Rule of 40s: первая реплика стартует почти сразу после загрузки
   useEffect(() => {
-    console.log('[v0] Hero mounted, scheduling opening line')
     const id = setTimeout(() => {
-      console.log('[v0] Opening line fired')
       setSteps([{ kind: 'companion', text: OPENING_LINE }])
     }, 400)
     return () => clearTimeout(id)
