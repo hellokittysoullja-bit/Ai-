@@ -240,8 +240,13 @@ export function FocusSession() {
         >
           Ещё одна сессия
         </Button>
-        <Button asChild variant="ghost" className="text-muted-foreground">
-          <Link href="/app/world">Посмотреть, как вырос мир</Link>
+        <Button
+          render={<Link href="/app/world" />}
+          nativeButton={false}
+          variant="ghost"
+          className="text-muted-foreground"
+        >
+          Посмотреть, как вырос мир
         </Button>
       </div>
     </div>

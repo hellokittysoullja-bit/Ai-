@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);

@@ -25,11 +25,16 @@ export function Hero() {
             Без стриков. Без красных цифр. Без стыда.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Button asChild size="lg" className="font-semibold">
-              <Link href="/plan">Познакомиться с напарником</Link>
+            <Button
+              render={<Link href="/app" />}
+              nativeButton={false}
+              size="lg"
+              className="font-semibold"
+            >
+              Познакомиться с напарником
             </Button>
             <span className="font-mono text-xs text-muted-foreground">
-              7 дней бесплатно, карта не нужна
+              бесплатно, без карты и регистрации
             </span>
           </div>
         </div>

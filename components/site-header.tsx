@@ -12,11 +12,22 @@ export function SiteHeader() {
           <span className="text-sm font-bold tracking-tight">напарник</span>
         </Link>
         <nav className="flex items-center gap-2">
-          <Button asChild size="sm" variant="ghost" className="text-muted-foreground">
-            <Link href="#how">Как это работает</Link>
+          <Button
+            render={<Link href="#how" />}
+            nativeButton={false}
+            size="sm"
+            variant="ghost"
+            className="text-muted-foreground"
+          >
+            Как это работает
           </Button>
-          <Button asChild size="sm" className="font-semibold">
-            <Link href="/plan">Начать</Link>
+          <Button
+            render={<Link href="/app" />}
+            nativeButton={false}
+            size="sm"
+            className="font-semibold"
+          >
+            Начать
           </Button>
         </nav>
       </div>
