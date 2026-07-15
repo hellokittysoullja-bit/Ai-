@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 
 const included = [
@@ -9,15 +12,25 @@ const included = [
 ]
 
 export function Pricing() {
+  const reduceMotion = useReducedMotion()
+
   return (
     <section className="mx-auto max-w-5xl px-4 py-16 md:py-24">
-      <div className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-primary/40 bg-card p-8">
+      <motion.div
+        className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-primary/40 bg-card p-8"
+        initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.96 }}
+        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        viewport={{ once: true, margin: '-80px' }}
+        transition={{ type: 'spring', stiffness: 160, damping: 20 }}
+      >
         <div className="flex flex-col gap-2">
           <p className="font-mono text-xs uppercase tracking-widest text-primary">
             [ ранний доступ ]
           </p>
           <div className="flex items-baseline gap-2">
-            <span className="text-5xl font-bold tracking-tight">Бесплатно</span>
+            <span className="font-hand text-6xl font-bold tracking-tight text-primary">
+              Бесплатно
+            </span>
           </div>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Пока напарник растёт — всё открыто. Без карты, без регистрации,
@@ -43,7 +56,7 @@ export function Pricing() {
         >
           Познакомиться с напарником
         </Button>
-      </div>
+      </motion.div>
     </section>
   )
 }

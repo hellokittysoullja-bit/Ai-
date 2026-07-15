@@ -1,18 +1,27 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Play } from 'lucide-react'
 import { CompanionChat } from '@/components/companion-chat'
+import { Mascot, type MascotPose } from '@/components/mascot'
 import { getPatterns, getPlan, todayKey, type Patterns, type Plan } from '@/lib/memory'
 
 type FirstWord = {
   greeting: string
   /** Есть план на сегодня — показываем кнопку «Начинаю» */
   actionStep: string | null
+  /** Новичок без стартов — показываем чипы мгновенного первого старта */
+  showStarterChips?: boolean
 }
+
+/** Готовые крошечные шаги: ноль решений до первого старта */
+const starterChips = [
+  'Открыть нужный файл',
+  'Убрать одну вещь со стола',
+  'Написать одно предложение',
+]
 
 function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): FirstWord {
   const hour = now.getHours()
@@ -28,10 +37,10 @@ function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): First
     }
   }
 
-  // План на завтра уже положен, сейчас вечер — подтверждение
+  // План на завтра уже положен, сейчас день — подтверждение
   if (plan && !isEvening) {
     return {
-      greeting: `На ${plan.forDate} у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
+      greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
       actionStep: null,
     }
   }
@@ -54,8 +63,9 @@ function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): First
   if (patterns.totalStarts === 0) {
     return {
       greeting:
-        'Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Назови одно дело, которое висит, и я раздроблю его до смешного маленького шага.',
+        'Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши, что висит.',
       actionStep: null,
+      showStarterChips: true,
     }
   }
 
@@ -70,6 +80,14 @@ export function HomeScreen() {
   const router = useRouter()
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null)
   const [stats, setStats] = useState<Patterns | null>(null)
+
+  // Поза маскота по контексту: есть шаг — зовёт работать, вечер — сонный, иначе машет
+  const hour = new Date().getHours()
+  const mascotPose: MascotPose = firstWord?.actionStep
+    ? 'working'
+    : hour >= 22 || hour < 5
+      ? 'sleeping'
+      : 'waves'
 
   async function refresh() {
     const [plan, patterns] = await Promise.all([getPlan(), getPatterns()])
@@ -90,20 +108,12 @@ export function HomeScreen() {
       <section className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
-            <div className="relative size-12 shrink-0 overflow-hidden rounded-2xl">
-              <Image
-                src="/images/naparnik-hero.png"
-                alt="Напарник"
-                fill
-                sizes="48px"
-                className="object-cover"
-              />
-            </div>
+            <Mascot pose={mascotPose} alt="Напарник" size={48} className="rounded-2xl" />
             <div className="flex flex-col gap-1">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 он написал первым
               </p>
-              <p className="text-sm leading-relaxed">
+              <p className="font-hand text-xl leading-snug">
                 {firstWord ? firstWord.greeting : '…'}
               </p>
             </div>
@@ -118,6 +128,28 @@ export function HomeScreen() {
               <Play className="size-4" aria-hidden="true" />
               Начинаю
             </Button>
+          )}
+
+          {firstWord?.showStarterChips && (
+            <div className="flex flex-col gap-2">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                первый старт за 15 минут — тап и всё
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {starterChips.map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() =>
+                      router.push(`/app/session?step=${encodeURIComponent(chip)}&d=15`)
+                    }
+                    className="rounded-full border border-primary/40 bg-card px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
 
           {stats && stats.totalStarts > 0 && (
