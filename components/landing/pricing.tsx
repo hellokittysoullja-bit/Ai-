@@ -3,12 +3,18 @@
 import Link from 'next/link'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
+import { MascotSvg } from '@/components/mascot-svg'
 
-const included = [
-  'Напарник, который помнит твой план и пишет первым',
-  'Вечерний разбор дня: одна задача, один первый шаг',
-  'Фокус-сессии с живым напарником рядом',
-  'Остров, который растёт от каждого старта — и не откатывается',
+/**
+ * Не прайсинг-карточка с чеклистом, а договор, написанный напарником от руки.
+ * Обещания — его голосом, от первого лица: доверие важнее списка фич.
+ */
+
+const promises = [
+  'Я помню твой план и пишу первым — тебе не нужно себя заставлять открыть меня.',
+  'Я никогда не стыжу. Пропустил день — я просто рыбачил и ждал.',
+  'Остров не откатывается. Что выросло — выросло навсегда.',
+  'Всё это бесплатно, без карты и регистрации. Если появится подписка — скажу прямо, первым.',
 ]
 
 export function Pricing() {
@@ -17,37 +23,49 @@ export function Pricing() {
   return (
     <section className="mx-auto max-w-5xl px-4 py-16 md:py-24">
       <motion.div
-        className="mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-primary/40 bg-card p-8"
-        initial={reduceMotion ? false : { opacity: 0, y: 28, scale: 0.96 }}
-        whileInView={{ opacity: 1, y: 0, scale: 1 }}
+        className="relative mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-primary/40 bg-card p-8"
+        initial={reduceMotion ? false : { opacity: 0, y: 28, rotate: -0.6 }}
+        whileInView={{ opacity: 1, y: 0, rotate: -0.6 }}
         viewport={{ once: true, margin: '-80px' }}
         transition={{ type: 'spring', stiffness: 160, damping: 20 }}
       >
-        <div className="flex flex-col gap-2">
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">
-            [ ранний доступ ]
-          </p>
-          <div className="flex items-baseline gap-2">
-            <span className="font-hand text-6xl font-bold tracking-tight text-primary">
-              Бесплатно
-            </span>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <p className="font-mono text-xs uppercase tracking-widest text-primary">
+              [ наш договор ]
+            </p>
+            <h2 className="font-hand text-4xl leading-tight">Я обещаю:</h2>
           </div>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Пока напарник растёт — всё открыто. Без карты, без регистрации,
-            без скрытых условий. Подписка появится позже, и мы скажем об этом
-            прямо, а не мелким шрифтом.
-          </p>
+          <MascotSvg expression="happy" size={56} label="Напарник" className="shrink-0" />
         </div>
-        <ul className="flex flex-col gap-2">
-          {included.map((item) => (
-            <li key={item} className="flex items-start gap-2 text-sm leading-relaxed">
-              <span aria-hidden="true" className="mt-0.5 font-mono text-primary">
-                ✓
-              </span>
-              {item}
+
+        <ul className="flex flex-col gap-4">
+          {promises.map((item, i) => (
+            <li
+              key={item}
+              className={`font-hand text-xl leading-snug ${
+                i % 2 === 0 ? '-rotate-[0.4deg]' : 'rotate-[0.35deg]'
+              }`}
+            >
+              — {item}
             </li>
           ))}
         </ul>
+
+        <div className="flex items-end justify-between border-t border-dashed border-border pt-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            подпись: напарник
+          </p>
+          {/* лапка вместо подписи */}
+          <svg width="44" height="30" viewBox="0 0 44 30" aria-hidden="true">
+            <ellipse cx="22" cy="21" rx="9" ry="7" fill="var(--color-primary)" opacity="0.9" />
+            <circle cx="10" cy="12" r="3.5" fill="var(--color-primary)" opacity="0.75" />
+            <circle cx="18" cy="7" r="3.5" fill="var(--color-primary)" opacity="0.8" />
+            <circle cx="27" cy="7" r="3.5" fill="var(--color-primary)" opacity="0.8" />
+            <circle cx="35" cy="12" r="3.5" fill="var(--color-primary)" opacity="0.75" />
+          </svg>
+        </div>
+
         <Button
           render={<Link href="/app" />}
           nativeButton={false}

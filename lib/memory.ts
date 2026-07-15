@@ -44,12 +44,15 @@ export type Patterns = {
   /** Час суток, в который человек чаще всего реально начинает (0-23), или null */
   favoriteHour: number | null
   lastStartDate: string | null
+  /** Полных дней с последнего старта (0 = стартовал сегодня), null если стартов не было */
+  daysAway: number | null
 }
 
 const KEYS = {
   plan: 'naparnik:plan',
   starts: 'naparnik:starts',
   notes: 'naparnik:notes',
+  finds: 'naparnik:finds',
 } as const
 
 function isBrowser() {
@@ -148,6 +151,32 @@ export async function updateStartMinutes(id: string, minutes: number): Promise<v
   write(KEYS.starts, starts)
 }
 
+// ---------- Находки острова (старты сверх карты ориентиров) ----------
+
+export type IslandFindEntry = {
+  /** Ключ элемента из пула (lib/island-elements) */
+  key: string
+  name: string
+  rarity: 'common' | 'uncommon' | 'rare'
+  /** Сид позиции на карте — находка навсегда стоит там, где выросла */
+  seed: number
+  /** YYYY-MM-DD */
+  date: string
+  /** id старта, за который получена */
+  startId: string
+}
+
+export async function getFinds(): Promise<IslandFindEntry[]> {
+  return read<IslandFindEntry[]>(KEYS.finds, [])
+}
+
+export async function addFind(find: IslandFindEntry): Promise<void> {
+  const finds = await getFinds()
+  if (finds.some((f) => f.startId === find.startId)) return
+  finds.push(find)
+  write(KEYS.finds, finds)
+}
+
 // ---------- Заметки напарника ----------
 
 const MAX_NOTES = 6
@@ -170,7 +199,7 @@ export async function addNote(text: string): Promise<void> {
 export async function getPatterns(): Promise<Patterns> {
   const starts = await getStarts()
   if (starts.length === 0) {
-    return { totalStarts: 0, runningDays: 0, favoriteHour: null, lastStartDate: null }
+    return { totalStarts: 0, runningDays: 0, favoriteHour: null, lastStartDate: null, daysAway: null }
   }
 
   const dates = Array.from(new Set(starts.map((s) => s.date))).sort()
@@ -207,7 +236,16 @@ export async function getPatterns(): Promise<Patterns> {
     }
   }
 
-  return { totalStarts: starts.length, runningDays, favoriteHour, lastStartDate }
+  const msPerDay = 24 * 60 * 60 * 1000
+  const daysAway = Math.max(
+    0,
+    Math.floor(
+      (new Date(today + 'T12:00:00').getTime() - new Date(lastStartDate + 'T12:00:00').getTime()) /
+        msPerDay,
+    ),
+  )
+
+  return { totalStarts: starts.length, runningDays, favoriteHour, lastStartDate, daysAway }
 }
 
 // ---------- Компактный контекст для LLM ----------
@@ -217,14 +255,17 @@ export type MemoryContext = {
   recentStarts: Array<Pick<StartEntry, 'date' | 'label' | 'minutes' | 'fromPlan'>>
   patterns: Patterns
   notes: string[]
+  /** Последние находки острова — напарник может вспоминать их в разговоре */
+  recentFinds: Array<Pick<IslandFindEntry, 'name' | 'rarity' | 'date'>>
 }
 
 export async function buildMemoryContext(): Promise<MemoryContext> {
-  const [plan, starts, patterns, notes] = await Promise.all([
+  const [plan, starts, patterns, notes, finds] = await Promise.all([
     getPlan(),
     getStarts(),
     getPatterns(),
     getNotes(),
+    getFinds(),
   ])
   return {
     plan,
@@ -236,5 +277,6 @@ export async function buildMemoryContext(): Promise<MemoryContext> {
     })),
     patterns,
     notes: notes.map((n) => n.text),
+    recentFinds: finds.slice(-3).map(({ name, rarity, date }) => ({ name, rarity, date })),
   }
 }

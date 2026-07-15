@@ -27,8 +27,10 @@ export type MemoryContextPayload = {
     runningDays: number
     favoriteHour: number | null
     lastStartDate: string | null
+    daysAway?: number | null
   }
   notes: string[]
+  recentFinds?: Array<{ name: string; rarity: string; date: string }>
 }
 
 function formatMemory(memory: MemoryContextPayload | null | undefined): string {
@@ -61,6 +63,22 @@ function formatMemory(memory: MemoryContextPayload | null | undefined): string {
         (p.favoriteHour !== null
           ? ` Чаще всего человек реально начинает около ${p.favoriteHour}:00.`
           : ''),
+    )
+  }
+
+  if (typeof p.daysAway === 'number' && p.daysAway >= 3) {
+    lines.push(
+      `Человек не появлялся ${p.daysAway} дн. НИКОГДА не стыди за это и не считай упущенное. ` +
+        'Вместо этого одной фразой расскажи, чем ты занимался на острове без него (рыбачил, смотрел на волны, следил за костром), и спроси, как он. Возврат — уже победа.',
+    )
+  }
+
+  if (memory.recentFinds && memory.recentFinds.length > 0) {
+    const finds = memory.recentFinds
+      .map((f) => `«${f.name}»${f.rarity === 'rare' ? ' (редкая!)' : ''}`)
+      .join(', ')
+    lines.push(
+      `Последние находки на острове: ${finds}. Можешь естественно вспомнить их в разговоре — это ваша общая история.`,
     )
   }
 
