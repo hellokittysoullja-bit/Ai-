@@ -315,9 +315,10 @@ function findPosition(find: IslandFindEntry, index: number): { x: number; y: num
     return { x: 46 + t * 240, y: 26 + jitter * 34, s: 1.05 + jitter * 0.4 }
   }
   if (zone === 'water') {
-    // только по краям, чтобы не залезать на остров
-    const x = t < 0.5 ? 16 + t * 2 * 44 : 322 + (t - 0.5) * 2 * 44
-    return { x, y: 170 + jitter * 10, s: 1.0 + jitter * 0.35 }
+    // только по краям, чтобы не залезать на остров;
+    // правый край ограничен, чтобы спрайт (до ~24 ед.) не резался viewBox=380
+    const x = t < 0.5 ? 26 + t * 2 * 36 : 306 + (t - 0.5) * 2 * 28
+    return { x, y: 166 + jitter * 8, s: 1.0 + jitter * 0.3 }
   }
   return { x: 58 + t * 264, y: 138 + jitter * 18, s: 1.0 + jitter * 0.5 }
 }
