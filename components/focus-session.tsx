@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
+import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
-import { Sprout } from 'lucide-react'
+import { ChevronRight, Sprout } from 'lucide-react'
 import {
   addFind,
   clearPlan,
@@ -76,10 +77,12 @@ export function FocusSession() {
     rarity: Rarity | 'landmark'
   } | null>(null)
 
-  // Ритуал завершения: план на завтра на пике дофамина
+  // Ритуал завершения: план на завтра на пике дофамина.
+  // Форма свёрнута: пик отдан находке, план — по желанию (не обязанность).
   const [tomorrowTask, setTomorrowTask] = useState('')
   const [tomorrowStep, setTomorrowStep] = useState('')
   const [planSaved, setPlanSaved] = useState(false)
+  const [planFormOpen, setPlanFormOpen] = useState(false)
 
   const totalRef = useRef(0)
   const startIdRef = useRef<string | null>(null)
@@ -164,6 +167,7 @@ export function FocusSession() {
     setEndedEarly(early)
     setDoneVoice(null)
     setPlanSaved(false)
+    setPlanFormOpen(false)
     setTomorrowTask('')
     setTomorrowStep('')
     setPhase('done')
@@ -254,7 +258,7 @@ export function FocusSession() {
           />
         </div>
         <div className="flex items-center gap-3">
-          <MascotSvg expression="focused" label="Напарник работает рядом" size={44} className="shrink-0" />
+          <MascotSvg expression="focused" label="Напарник работает рядом" size={64} className="shrink-0" />
           <p className="max-w-56 rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
             {voice}
           </p>
@@ -286,58 +290,77 @@ export function FocusSession() {
         </p>
       </div>
 
+      {/* Пик дофамина — находка. Появляется с паузой и пружиной: предвкушение → награда */}
       {grownElement && (
-        <Link
-          href="/app/world"
-          className={`flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 transition-colors hover:border-primary ${
-            grownElement.rarity === 'rare'
-              ? 'border-primary shadow-[0_0_24px_-6px_var(--color-primary)]'
-              : 'border-primary/40'
-          }`}
+        <motion.div
+          className="w-full"
+          initial={{ opacity: 0, y: 18, scale: 0.92 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.5, type: 'spring', stiffness: 260, damping: 18 }}
         >
-          <Sprout className="size-5 shrink-0 text-primary" aria-hidden="true" />
-          <span className="flex flex-col text-left">
+          <Link
+            href="/app/world"
+            className={`flex w-full flex-col items-center gap-2 rounded-2xl border bg-card px-5 py-5 text-center transition-colors hover:border-primary ${
+              grownElement.rarity === 'rare'
+                ? 'border-primary shadow-[0_0_32px_-4px_var(--color-primary)]'
+                : grownElement.rarity === 'uncommon'
+                  ? 'border-primary/70'
+                  : 'border-primary/40'
+            }`}
+          >
+            <Sprout className="size-8 text-primary" aria-hidden="true" />
             <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
               {grownElement.rarity === 'landmark'
                 ? 'на острове появилось'
-                : `на острове появилась ${RARITY_LABEL[grownElement.rarity]}`}
+                : `${RARITY_LABEL[grownElement.rarity]} находка`}
             </span>
-            <span className="text-sm font-semibold">{grownElement.name}</span>
-          </span>
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            смотреть
-          </span>
-        </Link>
+            <span className="text-balance text-xl font-bold">{grownElement.name}</span>
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              смотреть на острове
+            </span>
+          </Link>
+        </motion.div>
       )}
 
       {!planSaved ? (
-        <div className="flex w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-          <p className="text-sm font-semibold">Договоримся с завтрашним собой?</p>
-          <input
-            value={tomorrowTask}
-            onChange={(e) => setTomorrowTask(e.target.value)}
-            placeholder="Что завтра важно"
-            aria-label="Дело на завтра"
-            className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <input
-            value={tomorrowStep}
-            onChange={(e) => setTomorrowStep(e.target.value)}
-            placeholder="Первый крошечный шаг"
-            aria-label="Первый шаг завтрашнего дела"
-            className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-          <Button
-            onClick={saveTomorrowPlan}
-            disabled={!tomorrowTask.trim() || !tomorrowStep.trim()}
-            className="font-semibold"
+        !planFormOpen ? (
+          <button
+            type="button"
+            onClick={() => setPlanFormOpen(true)}
+            className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary"
           >
-            Положить план
-          </Button>
-          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            можно пропустить — это не обязанность
-          </p>
-        </div>
+            <span className="text-sm font-semibold">Договориться с завтрашним собой</span>
+            <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+          </button>
+        ) : (
+          <div className="flex w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+            <p className="text-sm font-semibold">Договоримся с завтрашним собой?</p>
+            <input
+              value={tomorrowTask}
+              onChange={(e) => setTomorrowTask(e.target.value)}
+              placeholder="Что завтра важно"
+              aria-label="Дело на завтра"
+              className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <input
+              value={tomorrowStep}
+              onChange={(e) => setTomorrowStep(e.target.value)}
+              placeholder="Первый крошечный шаг"
+              aria-label="Первый шаг завтрашнего дела"
+              className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <Button
+              onClick={saveTomorrowPlan}
+              disabled={!tomorrowTask.trim() || !tomorrowStep.trim()}
+              className="font-semibold"
+            >
+              Положить план
+            </Button>
+            <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              можно пропустить — это не обязанность
+            </p>
+          </div>
+        )
       ) : (
         <div className="flex w-full flex-col gap-1 rounded-2xl border border-primary/40 bg-card p-4 text-center">
           <p className="text-sm font-semibold">План лежит. Утром напишу первым.</p>

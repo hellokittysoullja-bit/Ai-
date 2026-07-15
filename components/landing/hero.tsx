@@ -198,6 +198,17 @@ export function Hero() {
           Помогает начать, сидит рядом во время работы и растит остров из твоих стартов. Без
           стриков. Без стыда.
         </p>
+        {/* Постоянный путь вперёд: не все отвечают на чипы сцены */}
+        {!answered && (
+          <Button
+            render={<Link href="/app" />}
+            nativeButton={false}
+            size="lg"
+            className="mt-2 font-semibold"
+          >
+            Попробовать
+          </Button>
+        )}
         <span className="pt-1 font-mono text-xs text-muted-foreground">
           бесплатно, без карты и регистрации
         </span>

@@ -312,14 +312,15 @@ function findPosition(find: IslandFindEntry, index: number): { x: number; y: num
   const jitter = ((find.seed >> 4) % 100) / 100
 
   if (zone === 'sky') {
-    return { x: 46 + t * 240, y: 26 + jitter * 34, s: 0.85 + jitter * 0.3 }
+    return { x: 46 + t * 240, y: 26 + jitter * 34, s: 1.05 + jitter * 0.4 }
   }
   if (zone === 'water') {
-    // только по краям, чтобы не залезать на остров
-    const x = t < 0.5 ? 14 + t * 2 * 40 : 326 + (t - 0.5) * 2 * 40
-    return { x, y: 170 + jitter * 10, s: 0.8 + jitter * 0.3 }
+    // только по краям, чтобы не залезать на остров;
+    // правый край ограничен, чтобы спрайт (до ~24 ед.) не резался viewBox=380
+    const x = t < 0.5 ? 26 + t * 2 * 36 : 306 + (t - 0.5) * 2 * 28
+    return { x, y: 166 + jitter * 8, s: 1.0 + jitter * 0.3 }
   }
-  return { x: 62 + t * 256, y: 140 + jitter * 16, s: 0.75 + jitter * 0.45 }
+  return { x: 58 + t * 264, y: 138 + jitter * 18, s: 1.0 + jitter * 0.5 }
 }
 
 // ---------- Дневник ----------
@@ -420,7 +421,7 @@ export function Island() {
   const rareCount = finds.filter((f) => f.rarity === 'rare').length
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-6">
       <div className="flex flex-col gap-1">
         <p className="font-mono text-xs uppercase tracking-widest text-primary">[ мир напарника ]</p>
         <h1 className="text-2xl font-bold tracking-tight">Остров</h1>
@@ -466,6 +467,17 @@ export function Island() {
                 style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
                 transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}
               >
+                {/* Редкая находка светится на карте постоянно — она должна быть видна гостю */}
+                {find.rarity === 'rare' && (
+                  <circle cx="0" cy="-10" r="20" fill={c.green} opacity="0.12">
+                    <animate
+                      attributeName="opacity"
+                      values="0.08;0.2;0.08"
+                      dur="3.2s"
+                      repeatCount="indefinite"
+                    />
+                  </circle>
+                )}
                 {sprite}
               </g>
             )
