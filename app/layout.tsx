@@ -1,11 +1,11 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
-import { Space_Grotesk, JetBrains_Mono } from 'next/font/google'
+import { Manrope, JetBrains_Mono } from 'next/font/google'
 import './globals.css'
 
-const spaceGrotesk = Space_Grotesk({
+const manrope = Manrope({
   subsets: ['latin', 'cyrillic'],
-  variable: '--font-space-grotesk',
+  variable: '--font-manrope',
 })
 
 const jetbrainsMono = JetBrains_Mono({
@@ -33,7 +33,7 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
-      className={`bg-background ${spaceGrotesk.variable} ${jetbrainsMono.variable}`}
+      className={`bg-background ${manrope.variable} ${jetbrainsMono.variable}`}
     >
       <body className="antialiased font-sans">
         {children}
