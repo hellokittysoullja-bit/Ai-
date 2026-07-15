@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
+import { MascotSvg } from '@/components/mascot-svg'
 import { ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
 import {
   addNote,
@@ -22,16 +22,10 @@ type CompanionChatProps = {
   onPlanSaved?: () => void
 }
 
-function CompanionAvatar({ size = 'size-8' }: { size?: string }) {
+function CompanionAvatar() {
   return (
-    <div className={`relative ${size} shrink-0 overflow-hidden rounded-full`}>
-      <Image
-        src="/images/naparnik-hero.png"
-        alt=""
-        fill
-        sizes="40px"
-        className="object-cover"
-      />
+    <div className="flex size-8 shrink-0 items-center justify-center">
+      <MascotSvg expression="calm" size={34} />
     </div>
   )
 }

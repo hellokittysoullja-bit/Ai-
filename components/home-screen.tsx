@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Play } from 'lucide-react'
 import { CompanionChat } from '@/components/companion-chat'
-import { Mascot, type MascotPose } from '@/components/mascot'
+import { MascotSvg, type MascotExpression } from '@/components/mascot-svg'
 import { getPatterns, getPlan, todayKey, type Patterns, type Plan } from '@/lib/memory'
 
 type FirstWord = {
@@ -81,13 +81,13 @@ export function HomeScreen() {
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null)
   const [stats, setStats] = useState<Patterns | null>(null)
 
-  // Поза маскота по контексту: есть шаг — зовёт работать, вечер — сонный, иначе машет
+  // Выражение маскота по контексту: есть шаг — собран, поздний вечер — сонный, иначе спокоен
   const hour = new Date().getHours()
-  const mascotPose: MascotPose = firstWord?.actionStep
-    ? 'working'
+  const mascotExpression: MascotExpression = firstWord?.actionStep
+    ? 'focused'
     : hour >= 22 || hour < 5
-      ? 'sleeping'
-      : 'waves'
+      ? 'sleepy'
+      : 'calm'
 
   async function refresh() {
     const [plan, patterns] = await Promise.all([getPlan(), getPatterns()])
@@ -108,7 +108,7 @@ export function HomeScreen() {
       <section className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
-            <Mascot pose={mascotPose} alt="Напарник" size={48} className="rounded-2xl" />
+            <MascotSvg expression={mascotExpression} label="Напарник" size={52} className="shrink-0" />
             <div className="flex flex-col gap-1">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 он написал первым

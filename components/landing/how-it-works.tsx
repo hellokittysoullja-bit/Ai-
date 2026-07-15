@@ -2,30 +2,35 @@
 
 import { motion, useReducedMotion } from 'motion/react'
 
-const steps = [
+/**
+ * Не «4 фичи в сетке», а один день из жизни с напарником —
+ * вертикальная лента времени с его живыми репликами.
+ */
+
+const day = [
   {
-    num: '01',
+    time: '21:40',
     title: 'Вечером — 3 минуты',
-    text: 'Напарник разбирает с тобой завтрашний день и сам превращает «поработать над проектом» в «открыть файл X». Одно физическое действие.',
-    tilt: '-rotate-[0.6deg]',
+    text: 'Напарник разбирает с тобой завтра и превращает «поработать над проектом» в одно физическое действие.',
+    quote: 'Значит, завтра просто открываешь файл диплома. Всё, больше ничего не планируем.',
   },
   {
-    num: '02',
+    time: '09:12',
     title: 'Утром он пишет первым',
-    text: 'Не пуш «пора работать», а сообщение от живого существа: «Я тут. Просто открой файл, больше ничего». Начать — легче, чем отказать.',
-    tilt: 'rotate-[0.5deg]',
+    text: 'Не пуш «пора работать», а сообщение от живого существа. Начать — легче, чем отказать.',
+    quote: 'Я тут. Помнишь — просто открыть файл. Я рядом.',
   },
   {
-    num: '03',
+    time: '09:31',
     title: 'Сессия вдвоём',
-    text: 'Ты работаешь — он рядом. Body doubling без второго человека. Отвлёкся? Он мягко вернёт, без нотаций.',
-    tilt: 'rotate-[0.7deg]',
+    text: 'Ты работаешь — он рядом. Body doubling без второго человека. Отвлёкся? Мягко вернёт.',
+    quote: 'Полёт нормальный. Я никуда не ухожу.',
   },
   {
-    num: '04',
+    time: '10:04',
     title: 'Его мир растёт',
-    text: 'Каждая сессия — новый кусочек его острова. Провалил день? Ничего не сгорает и не откатывается. Ноль, не минус.',
-    tilt: '-rotate-[0.5deg]',
+    text: 'Каждый старт — новый кусочек острова. Провалил день? Ничего не сгорает. Ноль, не минус.',
+    quote: 'Смотри, у нас вырос первый росток. Это твой.',
   },
 ]
 
@@ -33,41 +38,59 @@ export function HowItWorks() {
   const reduceMotion = useReducedMotion()
 
   return (
-    <section id="how" className="mx-auto max-w-5xl scroll-mt-20 px-4 py-16 md:py-24">
-      <motion.div
-        className="mb-10 flex flex-col gap-3"
-        initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: '-80px' }}
-        transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-      >
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">
-          [ как это работает ]
-        </p>
-        <h2 className="text-balance text-2xl font-bold tracking-tight md:text-4xl">
-          Продукт, который приходит сам
-        </h2>
-      </motion.div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {steps.map((step, i) => (
-          <motion.div
-            key={step.num}
-            className={`flex flex-col gap-3 rounded-2xl border border-border bg-card p-6 ${step.tilt} transition-transform duration-300 hover:rotate-0`}
-            initial={reduceMotion ? false : { opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-60px' }}
-            transition={{
-              type: 'spring',
-              stiffness: 180,
-              damping: 20,
-              delay: reduceMotion ? 0 : i * 0.1,
-            }}
-          >
-            <span className="font-hand text-2xl text-primary">{step.num}</span>
-            <h3 className="text-lg font-bold">{step.title}</h3>
-            <p className="text-sm leading-relaxed text-muted-foreground">{step.text}</p>
-          </motion.div>
-        ))}
+    <section id="how" className="grain relative scroll-mt-20 border-y border-border bg-card">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-24 md:py-36">
+        <motion.div
+          className="mb-16 flex flex-col gap-3"
+          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: '-80px' }}
+          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+        >
+          <p className="font-mono text-xs uppercase tracking-widest text-primary">
+            [ один день вдвоём ]
+          </p>
+          <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
+            Как проходит день с напарником
+          </h2>
+        </motion.div>
+
+        {/* Вертикальная лента: нить времени слева, события справа */}
+        <div className="relative flex flex-col gap-14 border-l-2 border-border pl-8 md:pl-12">
+          {day.map((step, i) => (
+            <motion.article
+              key={step.time}
+              className="relative flex flex-col gap-3"
+              initial={reduceMotion ? false : { opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true, margin: '-80px' }}
+              transition={{
+                type: 'spring',
+                stiffness: 160,
+                damping: 22,
+                delay: reduceMotion ? 0 : 0.08,
+              }}
+            >
+              {/* узел на нити */}
+              <span
+                aria-hidden="true"
+                className="absolute -left-8 top-1.5 size-3 -translate-x-1/2 rounded-full border-2 border-primary bg-background md:-left-12"
+              />
+              <span className="font-mono text-xs tracking-widest text-muted-foreground">
+                {step.time}
+              </span>
+              <h3 className="text-xl font-bold">{step.title}</h3>
+              <p className="leading-relaxed text-muted-foreground">{step.text}</p>
+              <p
+                className={`font-hand text-xl leading-snug text-primary md:text-2xl ${
+                  i % 2 === 0 ? '-rotate-[0.7deg]' : 'rotate-[0.6deg]'
+                }`}
+              >
+                «{step.quote}»
+              </p>
+            </motion.article>
+          ))}
+        </div>
       </div>
     </section>
   )
