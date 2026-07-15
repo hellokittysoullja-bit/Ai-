@@ -157,8 +157,8 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
             <circle cx={x + 5} cy={y - 7} r={3} fill={WHITE} opacity={0.95} />
             <circle cx={x - 4} cy={y + 6} r={1.4} fill={WHITE} opacity={0.55} />
           </motion.g>
-          {/* прикрытые веки в фокусе */}
-          {focused && <rect x={x - EYE_RX} y={y - EYE_RY} width={EYE_RX * 2} height={EYE_RY * 0.72} fill={FUR} />}
+          {/* прикрытые веки в фокусе: чуть опущены, но зрачки видны даже в мелком размере */}
+          {focused && <rect x={x - EYE_RX} y={y - EYE_RY} width={EYE_RX * 2} height={EYE_RY * 0.45} fill={FUR} />}
           {/* моргание: веко опускается сверху */}
           <motion.rect
             x={x - EYE_RX - 1}

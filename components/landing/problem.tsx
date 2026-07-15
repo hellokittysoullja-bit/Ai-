@@ -35,7 +35,7 @@ export function Problem() {
           {failedTools.map((tool, i) => (
             <motion.li
               key={tool}
-              className="text-lg leading-relaxed text-muted-foreground line-through decoration-destructive/60 decoration-2 md:text-xl"
+              className="text-lg leading-relaxed text-foreground/75 line-through decoration-destructive decoration-2 md:text-xl"
               initial={reduceMotion ? false : { opacity: 0 }}
               whileInView={{ opacity: 1 }}
               viewport={{ once: true, margin: '-60px' }}

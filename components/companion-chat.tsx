@@ -7,7 +7,8 @@ import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } fro
 import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
-import { ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
+import { ArrowRight, ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
+import Link from 'next/link'
 import {
   addNote,
   buildMemoryContext,
@@ -160,6 +161,42 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
               {greeting}
             </div>
           </motion.div>
+
+          {messages.length === 0 && (
+            <motion.div
+              className="ml-10 flex flex-col gap-2"
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 22 }}
+            >
+              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                можно просто нажать
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  'Не могу заставить себя начать',
+                  'Раздроби мне задачу',
+                  'Просто тяжело сегодня',
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => sendMessage({ text: chip })}
+                    className="rounded-full border border-border bg-card px-3.5 py-2 text-sm text-foreground transition-colors hover:border-primary hover:text-primary"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+              <Link
+                href="/app/focus"
+                className="mt-1 inline-flex w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
+              >
+                или сразу к делу
+                <ArrowRight className="size-3.5" aria-hidden="true" />
+              </Link>
+            </motion.div>
+          )}
 
           {messages.map((message) => (
             <div
