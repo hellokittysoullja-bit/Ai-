@@ -189,7 +189,7 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
                 ))}
               </div>
               <Link
-                href="/app/focus"
+                href="/app/session"
                 className="mt-1 inline-flex w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
               >
                 или сразу к делу
