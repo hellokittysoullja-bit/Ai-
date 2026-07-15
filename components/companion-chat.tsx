@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
+import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
 import {
@@ -115,12 +116,17 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-md flex-col gap-3 px-4 py-4">
-          <div className="flex items-start gap-2">
+          <motion.div
+            className="flex items-start gap-2"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+          >
             <CompanionAvatar />
-            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3 py-2 text-sm leading-relaxed">
+            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
               {greeting}
             </div>
-          </div>
+          </motion.div>
 
           {messages.map((message) => (
             <div
@@ -132,18 +138,24 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
               {message.parts.map((part, i) => {
                 if (part.type === 'text') {
                   return (
-                    <div key={i} className="flex w-full items-start gap-2">
+                    <motion.div
+                      key={i}
+                      className="flex w-full items-start gap-2"
+                      initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                    >
                       {message.role !== 'user' && <CompanionAvatar />}
                       <div
-                        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed ${
+                        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           message.role === 'user'
-                            ? 'ml-auto rounded-tr-sm bg-primary text-primary-foreground'
-                            : 'rounded-tl-sm bg-secondary text-secondary-foreground'
+                            ? 'ml-auto rounded-tr-sm bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground'
+                            : 'rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
                         }`}
                       >
                         {part.text}
                       </div>
-                    </div>
+                    </motion.div>
                   )
                 }
 

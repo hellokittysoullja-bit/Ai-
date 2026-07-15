@@ -1,10 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
+import { Mascot } from '@/components/mascot'
 import { Sprout } from 'lucide-react'
 import {
   clearPlan,
@@ -157,10 +157,8 @@ export function FocusSession() {
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
         <div className="flex items-center gap-3">
-          <div className="relative size-14 shrink-0 overflow-hidden rounded-2xl">
-            <Image src="/images/naparnik-hero.png" alt="Напарник" fill sizes="56px" className="object-cover" />
-          </div>
-          <p className="rounded-2xl rounded-tl-sm bg-secondary px-3 py-2 text-sm leading-relaxed">
+          <Mascot pose="waves" alt="Напарник" size={56} className="rounded-2xl" />
+          <p className="rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
             {prefilledStep
               ? 'Шаг уже выбран. Просто жми — я рядом.'
               : 'Что делаем? Назови первый шаг — не всю задачу.'}
@@ -229,10 +227,8 @@ export function FocusSession() {
           />
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative size-10 shrink-0 overflow-hidden rounded-full">
-            <Image src="/images/naparnik-hero.png" alt="" fill sizes="40px" className="object-cover" />
-          </div>
-          <p className="max-w-56 rounded-2xl rounded-tl-sm bg-secondary px-3 py-2 text-sm leading-relaxed">
+          <Mascot pose="working" alt="Напарник работает рядом" size={40} className="rounded-full" />
+          <p className="max-w-56 rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
             {voice}
           </p>
         </div>
@@ -250,12 +246,10 @@ export function FocusSession() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 px-4 py-8">
-      <div className="relative size-24 overflow-hidden rounded-3xl">
-        <Image src="/images/naparnik-hero.png" alt="Напарник радуется" fill sizes="96px" className="object-cover" />
-      </div>
+      <Mascot pose="celebrates" alt="Напарник радуется" size={96} />
       <div className="flex flex-col gap-2 text-center">
         <h2 className="text-2xl font-bold">{endedEarly ? 'Ты начал.' : 'Сделано.'}</h2>
-        <p className="leading-relaxed text-muted-foreground">
+        <p className="font-hand text-xl leading-snug text-muted-foreground">
           {doneVoice ?? fallbackVoice[endedEarly ? 'early-exit' : 'done']}
         </p>
       </div>

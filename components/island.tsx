@@ -220,7 +220,15 @@ export function Island() {
           <ellipse cx="190" cy="152" rx="140" ry="26" fill={c.ground} />
           <ellipse cx="190" cy="147" rx="128" ry="20" fill={c.groundDark} opacity="0.55" />
           {elements.map((element, i) => (
-            <g key={element.key} className={i === newTodayIndex ? 'island-new-element' : undefined}>
+            <g
+              key={element.key}
+              className={
+                i < count
+                  ? `island-grow${i === newTodayIndex ? ' island-new-element' : ''}`
+                  : undefined
+              }
+              style={i < count ? { animationDelay: `${Math.min(i, 11) * 0.06}s` } : undefined}
+            >
               {element.render(i < count)}
             </g>
           ))}

@@ -1,11 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Play } from 'lucide-react'
 import { CompanionChat } from '@/components/companion-chat'
+import { Mascot, type MascotPose } from '@/components/mascot'
 import { getPatterns, getPlan, todayKey, type Patterns, type Plan } from '@/lib/memory'
 
 type FirstWord = {
@@ -81,6 +81,14 @@ export function HomeScreen() {
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null)
   const [stats, setStats] = useState<Patterns | null>(null)
 
+  // Поза маскота по контексту: есть шаг — зовёт работать, вечер — сонный, иначе машет
+  const hour = new Date().getHours()
+  const mascotPose: MascotPose = firstWord?.actionStep
+    ? 'working'
+    : hour >= 22 || hour < 5
+      ? 'sleeping'
+      : 'waves'
+
   async function refresh() {
     const [plan, patterns] = await Promise.all([getPlan(), getPatterns()])
     setFirstWord(buildFirstWord(plan, patterns, new Date()))
@@ -100,20 +108,12 @@ export function HomeScreen() {
       <section className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
-            <div className="relative size-12 shrink-0 overflow-hidden rounded-2xl">
-              <Image
-                src="/images/naparnik-hero.png"
-                alt="Напарник"
-                fill
-                sizes="48px"
-                className="object-cover"
-              />
-            </div>
+            <Mascot pose={mascotPose} alt="Напарник" size={48} className="rounded-2xl" />
             <div className="flex flex-col gap-1">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 он написал первым
               </p>
-              <p className="text-sm leading-relaxed">
+              <p className="font-hand text-xl leading-snug">
                 {firstWord ? firstWord.greeting : '…'}
               </p>
             </div>

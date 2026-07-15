@@ -7,6 +7,7 @@
 @theme inline {
   --font-sans: var(--font-manrope), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), monospace;
+  --font-hand: var(--font-caveat), cursive;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -93,6 +94,37 @@
   }
 }
 
+/* Плёночное зерно поверх тёмных секций — снимает стерильность плоских заливок */
+.grain::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* Каракуля-подчёркивание под ключевым словом */
+.scribble-underline {
+  position: relative;
+  white-space: nowrap;
+}
+.scribble-underline > svg {
+  position: absolute;
+  left: -2%;
+  bottom: -0.18em;
+  width: 104%;
+  height: 0.32em;
+  overflow: visible;
+}
+.scribble-underline path {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
 /* Новый элемент острова: мягкая пульсация, 3 цикла, затем покой */
 @keyframes island-new-pulse {
   0%,
@@ -108,8 +140,39 @@
   animation: island-new-pulse 1.6s ease-in-out 3;
 }
 
+/* Прорастание элемента острова: пружинный вход снизу с overshoot */
+@keyframes island-grow {
+  0% {
+    transform: scale(0);
+  }
+  62% {
+    transform: scale(1.12);
+  }
+  82% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.island-grow {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards;
+}
+
+/* Новый элемент: и прорастает, и пульсирует (оба класса задают animation) */
+.island-grow.island-new-element {
+  animation:
+    island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards,
+    island-new-pulse 1.6s ease-in-out 0.7s 3;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .island-new-element {
+  .island-new-element,
+  .island-grow,
+  .island-grow.island-new-element {
     animation: none;
   }
 }
