@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Mascot } from '@/components/mascot'
+import { MascotSvg } from '@/components/mascot-svg'
 import { Sprout } from 'lucide-react'
 import {
   clearPlan,
@@ -157,7 +157,7 @@ export function FocusSession() {
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
         <div className="flex items-center gap-3">
-          <Mascot pose="waves" alt="Напарник" size={56} className="rounded-2xl" />
+          <MascotSvg expression="calm" label="Напарник" size={56} className="shrink-0" />
           <p className="rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
             {prefilledStep
               ? 'Шаг уже выбран. Просто жми — я рядом.'
@@ -227,7 +227,7 @@ export function FocusSession() {
           />
         </div>
         <div className="flex items-center gap-3">
-          <Mascot pose="working" alt="Напарник работает рядом" size={40} className="rounded-full" />
+          <MascotSvg expression="focused" label="Напарник работает рядом" size={44} className="shrink-0" />
           <p className="max-w-56 rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
             {voice}
           </p>
@@ -246,7 +246,7 @@ export function FocusSession() {
 
   return (
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 px-4 py-8">
-      <Mascot pose="celebrates" alt="Напарник радуется" size={96} />
+      <MascotSvg expression="excited" label="Напарник радуется" size={110} />
       <div className="flex flex-col gap-2 text-center">
         <h2 className="text-2xl font-bold">{endedEarly ? 'Ты начал.' : 'Сделано.'}</h2>
         <p className="font-hand text-xl leading-snug text-muted-foreground">
