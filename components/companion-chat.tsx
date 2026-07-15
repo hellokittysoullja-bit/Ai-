@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
+import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
 import { Button } from '@/components/ui/button'
-import { ArrowUp, CalendarCheck, Sparkles } from 'lucide-react'
+import { ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
 import {
   addNote,
   buildMemoryContext,
@@ -35,6 +36,7 @@ function CompanionAvatar({ size = 'size-8' }: { size?: string }) {
 }
 
 export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: CompanionChatProps) {
+  const router = useRouter()
   const [input, setInput] = useState('')
   const memoryRef = useRef<MemoryContext | null>(null)
 
@@ -83,6 +85,15 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
             toolCallId: toolCall.toolCallId,
             output: 'Запомнил.',
           })
+        })
+      }
+
+      if (toolCall.toolName === 'startFocus') {
+        // Карточку с кнопкой рисует разметка ниже; здесь просто подтверждаем
+        addToolOutput({
+          tool: 'startFocus',
+          toolCallId: toolCall.toolCallId,
+          output: 'Кнопка «Начинаю» показана в чате.',
         })
       }
     },
@@ -156,6 +167,37 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
                         Первый шаг: {plan.firstStep}
                         {plan.startTime ? ` — ${plan.startTime}` : ''}
                       </span>
+                    </div>
+                  )
+                }
+
+                if (part.type === 'tool-startFocus' && part.state === 'output-available') {
+                  const { firstStep, minutes } = part.input as {
+                    firstStep: string
+                    minutes?: number
+                  }
+                  const d = minutes && [15, 25, 45].includes(minutes) ? minutes : 15
+                  return (
+                    <div
+                      key={i}
+                      className="ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl border border-primary/40 bg-card px-4 py-3"
+                    >
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                        готов к старту · {d} мин
+                      </span>
+                      <span className="text-sm font-semibold">{firstStep}</span>
+                      <Button
+                        size="sm"
+                        className="gap-1.5 font-semibold"
+                        onClick={() =>
+                          router.push(
+                            `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,
+                          )
+                        }
+                      >
+                        <Play className="size-3.5" aria-hidden="true" />
+                        Начинаю
+                      </Button>
                     </div>
                   )
                 }

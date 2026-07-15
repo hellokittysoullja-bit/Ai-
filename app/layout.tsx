@@ -18,6 +18,11 @@ export const metadata: Metadata = {
   description:
     'Не ещё один планировщик. Напарник пишет тебе первым, помогает начать и растит свой мир из твоих фокус-сессий. Без стриков. Без стыда.',
   generator: 'v0.app',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Напарник',
+  },
 }
 
 export const viewport: Viewport = {

@@ -92,3 +92,24 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Новый элемент острова: мягкая пульсация, 3 цикла, затем покой */
+@keyframes island-new-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.island-new-element {
+  animation: island-new-pulse 1.6s ease-in-out 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island-new-element {
+    animation: none;
+  }
+}

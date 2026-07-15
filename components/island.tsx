@@ -1,7 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { getPatterns, getStarts, type Patterns, type StartEntry } from '@/lib/memory'
+import { getPatterns, getStarts, todayKey, type Patterns, type StartEntry } from '@/lib/memory'
+import { ISLAND_ELEMENT_NAMES } from '@/lib/island-elements'
 
 /**
  * Остров — дневник стартов.
@@ -10,7 +11,7 @@ import { getPatterns, getStarts, type Patterns, type StartEntry } from '@/lib/me
 
 type IslandElement = {
   key: string
-  name: string
+  name: (typeof ISLAND_ELEMENT_NAMES)[number]
   render: (unlocked: boolean) => React.ReactNode
 }
 
@@ -189,6 +190,12 @@ export function Island() {
   const unlockedCount = Math.min(count, elements.length)
   const extraStarts = Math.max(0, count - elements.length)
 
+  // Последний открытый элемент подсвечиваем, если старт был сегодня:
+  // награда должна быть видна в момент, когда она заработана.
+  const lastStart = starts && starts.length > 0 ? starts[starts.length - 1] : null
+  const newTodayIndex =
+    lastStart && lastStart.date === todayKey() && count <= elements.length ? count - 1 : -1
+
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-6">
       <div className="flex flex-col gap-1">
@@ -213,7 +220,9 @@ export function Island() {
           <ellipse cx="190" cy="152" rx="140" ry="26" fill={c.ground} />
           <ellipse cx="190" cy="147" rx="128" ry="20" fill={c.groundDark} opacity="0.55" />
           {elements.map((element, i) => (
-            <g key={element.key}>{element.render(i < count)}</g>
+            <g key={element.key} className={i === newTodayIndex ? 'island-new-element' : undefined}>
+              {element.render(i < count)}
+            </g>
           ))}
         </svg>
       </div>
@@ -234,10 +243,19 @@ export function Island() {
             .map((start, i) => (
               <li
                 key={start.id}
-                className="flex items-start justify-between gap-3 rounded-xl border border-border bg-card px-4 py-3"
+                className={`flex items-start justify-between gap-3 rounded-xl border bg-card px-4 py-3 ${
+                  i === newTodayIndex ? 'border-primary/50' : 'border-border'
+                }`}
               >
                 <div className="flex flex-col gap-0.5">
-                  <span className="text-sm font-semibold">{elements[i].name}</span>
+                  <span className="flex items-center gap-2 text-sm font-semibold">
+                    {elements[i].name}
+                    {i === newTodayIndex && (
+                      <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+                        новое
+                      </span>
+                    )}
+                  </span>
                   <span className="text-sm leading-relaxed text-muted-foreground">
                     {formatDate(start.date)} — ты начал «{start.label}»
                   </span>
