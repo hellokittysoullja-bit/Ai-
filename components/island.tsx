@@ -382,8 +382,10 @@ export function Island() {
 
   // Подсветка последней награды, если она заработана сегодня
   const newLandmarkIndex = startedToday && count <= LANDMARK_COUNT ? count - 1 : -1
-  const newFindIndex =
-    startedToday && count > LANDMARK_COUNT && finds.length > 0 ? finds.length - 1 : -1
+  const newFindStartId =
+    startedToday && count > LANDMARK_COUNT && lastStart
+      ? finds.find((f) => f.startId === lastStart.id)?.startId ?? null
+      : null
 
   // Дневник: ориентиры + находки одной лентой, свежее сверху
   const diary: DiaryEntry[] = []
@@ -399,7 +401,8 @@ export function Island() {
           isNewToday: i === newLandmarkIndex,
         })
       } else {
-        const find = finds[i - LANDMARK_COUNT]
+        // Находка привязана к старту навсегда — сопоставляем по id, не по позиции
+        const find = finds.find((f) => f.startId === start.id)
         if (find) {
           diary.push({
             id: start.id,
@@ -407,7 +410,7 @@ export function Island() {
             rarity: find.rarity,
             date: start.date,
             label: start.label,
-            isNewToday: i - LANDMARK_COUNT === newFindIndex,
+            isNewToday: find.startId === newFindStartId,
           })
         }
       }
@@ -459,7 +462,7 @@ export function Island() {
             return (
               <g
                 key={find.startId}
-                className={`island-grow${i === newFindIndex ? ' island-new-element' : ''}`}
+                className={`island-grow${find.startId === newFindStartId ? ' island-new-element' : ''}`}
                 style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
                 transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}
               >
