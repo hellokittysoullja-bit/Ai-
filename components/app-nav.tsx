@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation'
 import { MessageCircle, Timer, Sprout } from 'lucide-react'
 
 const tabs = [
-  { href: '/plan', label: 'План', icon: MessageCircle },
-  { href: '/focus', label: 'Фокус', icon: Timer },
-  { href: '/world', label: 'Мир', icon: Sprout },
+  { href: '/app', label: 'Дом', icon: MessageCircle, exact: true },
+  { href: '/app/session', label: 'Фокус', icon: Timer, exact: false },
+  { href: '/app/world', label: 'Мир', icon: Sprout, exact: false },
 ]
 
 export function AppNav() {
@@ -19,7 +19,7 @@ export function AppNav() {
     >
       <div className="mx-auto flex max-w-md items-center justify-around py-2">
         {tabs.map((tab) => {
-          const active = pathname.startsWith(tab.href)
+          const active = tab.exact ? pathname === tab.href : pathname.startsWith(tab.href)
           const Icon = tab.icon
           return (
             <Link
