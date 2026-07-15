@@ -6,6 +6,7 @@ import {
   toUIMessageStream,
 } from 'ai'
 import { z } from 'zod'
+import { google } from '@ai-sdk/google'
 import {
   buildInstructions,
   type CompanionMode,
@@ -13,6 +14,18 @@ import {
 } from '@/lib/companion'
 
 export const maxDuration = 30
+
+/**
+ * Гибридный мозг: бесплатный ключ Google (GOOGLE_GENERATIVE_AI_API_KEY) —
+ * основной путь; AI Gateway — когда подключён; при любом сбое клиент
+ * переходит на скриптовые ответы (lib/scripted-companion).
+ */
+function pickModel() {
+  if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
+    return google('gemini-2.5-flash')
+  }
+  return 'openai/gpt-5.5'
+}
 
 export async function POST(req: Request) {
   const {
@@ -28,7 +41,7 @@ export async function POST(req: Request) {
   } = await req.json()
 
   const result = streamText({
-    model: 'openai/gpt-5.5',
+    model: pickModel(),
     instructions: buildInstructions({ mode, memory, clientHour }),
     messages: await convertToModelMessages(messages),
     tools: {
@@ -74,8 +87,9 @@ export async function POST(req: Request) {
     stream: toUIMessageStream({
       stream: result.stream,
       onError: (error) => {
+        // Логируем на сервере; клиенту — только маркер, он перейдёт на скрипт
         console.error('[companion] stream error:', error)
-        return error instanceof Error ? error.message : String(error)
+        return 'companion-unavailable'
       },
     }),
   })

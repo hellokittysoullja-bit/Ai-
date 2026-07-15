@@ -14,6 +14,7 @@ import {
   savePlan,
   type MemoryContext,
 } from '@/lib/memory'
+import { scriptedReply } from '@/lib/scripted-companion'
 
 type CompanionChatProps = {
   mode: 'companion' | 'focus'
@@ -41,7 +42,7 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
     })
   }, [])
 
-  const { messages, sendMessage, status, addToolOutput } = useChat({
+  const { messages, sendMessage, status, addToolOutput, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: '/api/companion',
       body: () => ({
@@ -51,6 +52,41 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
       }),
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
+    // Graceful degradation: LLM недоступен (нет ключа, лимит, сеть) —
+    // напарник отвечает скриптовым мозгом из своей памяти. Никогда не молчит.
+    onError() {
+      setMessages((prev) => {
+        const lastUser = [...prev].reverse().find((m) => m.role === 'user')
+        const userText =
+          lastUser?.parts
+            .filter((p) => p.type === 'text')
+            .map((p) => (p.type === 'text' ? p.text : ''))
+            .join(' ') ?? ''
+        const reply = scriptedReply(userText, memoryRef.current, new Date().getHours())
+
+        const parts: (typeof prev)[number]['parts'] = [{ type: 'text', text: reply.text }]
+        if (reply.startStep) {
+          parts.push({
+            type: 'tool-startFocus',
+            toolCallId: `scripted-${Date.now()}`,
+            state: 'output-available',
+            input: { firstStep: reply.startStep, minutes: reply.minutes ?? 15 },
+            output: 'Кнопка «Начинаю» показана в чате.',
+          } as (typeof prev)[number]['parts'][number])
+        }
+
+        // Убираем возможный пустой/оборванный ответ ассистента после ошибки
+        const cleaned =
+          prev.length > 0 && prev[prev.length - 1].role === 'assistant'
+            ? prev.slice(0, -1)
+            : prev
+
+        return [
+          ...cleaned,
+          { id: `scripted-${Date.now()}`, role: 'assistant' as const, parts },
+        ]
+      })
+    },
     async onToolCall({ toolCall }) {
       if (toolCall.dynamic) return
 
@@ -100,8 +136,11 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
+  // После скриптового ответа статус может быть 'error' — чат должен жить дальше
+  const canSend = status === 'ready' || status === 'error'
+
   function submit() {
-    if (!input.trim() || status !== 'ready') return
+    if (!input.trim() || !canSend) return
     sendMessage({ text: input })
     setInput('')
   }
@@ -265,7 +304,7 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
           <Button
             type="submit"
             size="icon"
-            disabled={status !== 'ready' || !input.trim()}
+            disabled={!canSend || !input.trim()}
             aria-label="Отправить"
             className="size-11 rounded-xl"
           >
