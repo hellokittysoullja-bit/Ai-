@@ -71,6 +71,12 @@ export async function POST(req: Request) {
   })
 
   return createUIMessageStreamResponse({
-    stream: toUIMessageStream({ stream: result.stream }),
+    stream: toUIMessageStream({
+      stream: result.stream,
+      onError: (error) => {
+        console.error('[companion] stream error:', error)
+        return error instanceof Error ? error.message : String(error)
+      },
+    }),
   })
 }
