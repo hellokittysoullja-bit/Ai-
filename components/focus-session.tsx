@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
 import { Sprout } from 'lucide-react'
 import {
+  addFind,
   clearPlan,
+  getFinds,
   getPlan,
   getStarts,
   recordStart,
@@ -15,7 +17,13 @@ import {
   todayKey,
   updateStartMinutes,
 } from '@/lib/memory'
-import { elementNameForStartNumber } from '@/lib/island-elements'
+import {
+  drawFind,
+  elementNameForStartNumber,
+  LANDMARK_COUNT,
+  RARITY_LABEL,
+  type Rarity,
+} from '@/lib/island-elements'
 
 const durations = [15, 25, 45]
 
@@ -61,8 +69,12 @@ export function FocusSession() {
   const [doneVoice, setDoneVoice] = useState<string | null>(null)
   const [endedEarly, setEndedEarly] = useState(false)
 
-  // Награда: что выросло на острове после этого старта
-  const [grownElement, setGrownElement] = useState<string | null>(null)
+  // Награда: что выросло на острове после этого старта.
+  // Ориентир (старты 1-10) или находка из пула с редкостью (старты 11+).
+  const [grownElement, setGrownElement] = useState<{
+    name: string
+    rarity: Rarity | 'landmark'
+  } | null>(null)
 
   // Ритуал завершения: план на завтра на пике дофамина
   const [tomorrowTask, setTomorrowTask] = useState('')
@@ -83,18 +95,18 @@ export function FocusSession() {
   useEffect(() => {
     if (phase !== 'running') return
     const id = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(id)
-          finish(false)
-          return 0
-        }
-        return s - 1
-      })
+      setSecondsLeft((s) => Math.max(0, s - 1))
     }, 1000)
     return () => clearInterval(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
+
+  // Завершение по нулю — отдельным эффектом, а не изнутри setState-апдейтера
+  useEffect(() => {
+    if (phase === 'running' && secondsLeft === 0 && totalRef.current > 0) {
+      finish(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [secondsLeft, phase])
 
   // Реплики по ходу сессии
   useEffect(() => {
@@ -133,7 +145,22 @@ export function FocusSession() {
     }
     // Награда должна быть видна в момент, когда она заработана
     const starts = await getStarts()
-    setGrownElement(elementNameForStartNumber(starts.length))
+    const n = starts.length
+    if (n <= LANDMARK_COUNT) {
+      // Первые 10 стартов — предсказуемые ориентиры: новичку нужна ясная история
+      const name = elementNameForStartNumber(n)
+      setGrownElement(name ? { name, rarity: 'landmark' } : null)
+    } else {
+      // Дальше — вероятностный пул. Полная сессия повышает шанс редкого.
+      const finds = await getFinds()
+      let pity = 0
+      for (let i = finds.length - 1; i >= 0 && finds[i].rarity === 'common'; i--) pity++
+      const find = drawFind(!early, pity)
+      if (startIdRef.current) {
+        await addFind({ ...find, date: todayKey(), startId: startIdRef.current })
+      }
+      setGrownElement({ name: find.name, rarity: find.rarity })
+    }
     setEndedEarly(early)
     setDoneVoice(null)
     setPlanSaved(false)
@@ -232,14 +259,19 @@ export function FocusSession() {
             {voice}
           </p>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => finish(true)}
-          className="text-muted-foreground"
-        >
-          Закончить раньше
-        </Button>
+        <div className="flex flex-col items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => finish(true)}
+            className="text-muted-foreground"
+          >
+            Закончить раньше
+          </Button>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            старт уже засчитан · полная сессия повышает шанс редкой находки
+          </p>
+        </div>
       </div>
     )
   }
@@ -257,14 +289,20 @@ export function FocusSession() {
       {grownElement && (
         <Link
           href="/app/world"
-          className="flex w-full items-center gap-3 rounded-2xl border border-primary/40 bg-card px-4 py-3 transition-colors hover:border-primary"
+          className={`flex w-full items-center gap-3 rounded-2xl border bg-card px-4 py-3 transition-colors hover:border-primary ${
+            grownElement.rarity === 'rare'
+              ? 'border-primary shadow-[0_0_24px_-6px_var(--color-primary)]'
+              : 'border-primary/40'
+          }`}
         >
           <Sprout className="size-5 shrink-0 text-primary" aria-hidden="true" />
           <span className="flex flex-col text-left">
             <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
-              на острове появилось
+              {grownElement.rarity === 'landmark'
+                ? 'на острове появилось'
+                : `на острове появилась ${RARITY_LABEL[grownElement.rarity]}`}
             </span>
-            <span className="text-sm font-semibold">{grownElement}</span>
+            <span className="text-sm font-semibold">{grownElement.name}</span>
           </span>
           <span className="ml-auto font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
             смотреть

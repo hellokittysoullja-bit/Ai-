@@ -23,16 +23,40 @@ const starterChips = [
   'Написать одно предложение',
 ]
 
+/**
+ * Дневник отсутствия: напарник жил на острове, пока человека не было.
+ * Возврат через любопытство и привязанность, никогда — через вину.
+ * Выбор события детерминированный, чтобы не менялся при каждом рендере.
+ */
+const awayDiary = [
+  'Пока тебя не было, я рыбачил у причала. Море было тихое. Остров стоит, ничего не сгорело.',
+  'Я тут пересчитал всё, что выросло на острове, — всё на месте. Пауза — это пауза, не откат.',
+  'Без тебя я смотрел на волны и гадал, что вырастет от твоего следующего старта.',
+  'Я развёл костёр и просто ждал. Это не упрёк — я рад, что ты зашёл.',
+]
+
 function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): FirstWord {
   const hour = now.getHours()
   const isEvening = hour >= 18 || hour < 4
   const today = todayKey(now)
 
+  // Человек долго не заходил — сначала жизнь острова, потом всё остальное
+  const awayLine =
+    patterns.daysAway !== null && patterns.daysAway >= 3
+      ? awayDiary[(patterns.totalStarts + patterns.daysAway) % awayDiary.length] + ' '
+      : ''
+
+  // Совпадение с личным часом стартов: мягкий, честный толчок из данных
+  const hourLine =
+    patterns.favoriteHour !== null && patterns.totalStarts >= 3 && hour === patterns.favoriteHour
+      ? ` Сейчас ${hour}:00 — обычно именно в это время ты реально начинаешь.`
+      : ''
+
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : ''
     return {
-      greeting: `Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}. Я рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} Я рядом, жми кнопку.`,
       actionStep: plan.firstStep,
     }
   }
@@ -70,8 +94,7 @@ function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): First
   }
 
   return {
-    greeting:
-      'Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.',
+    greeting: `${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   }
 }
