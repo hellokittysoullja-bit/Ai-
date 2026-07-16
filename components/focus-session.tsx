@@ -29,6 +29,7 @@ import {
   type Rarity,
 } from '@/lib/island-elements'
 import { playRewardChime, playStartSigh } from '@/lib/reward-sound'
+import { startCampfire, stopCampfire } from '@/lib/ambient'
 import { hapticDone, hapticReward, hapticStart } from '@/lib/haptics'
 
 const durations = [15, 25, 45]
@@ -37,6 +38,7 @@ const durations = [15, 25, 45]
 const stepChips = ['Открыть документ', 'Убрать одну вещь', 'Ответить на одно сообщение']
 
 const HIDE_DIGITS_KEY = 'naparnik:hideDigits'
+const AMBIENT_KEY = 'naparnik:ambient'
 
 type Moment = 'start' | 'middle' | 'late' | 'done' | 'early-exit'
 
@@ -75,6 +77,31 @@ export function FocusSession() {
 
   const [phase, setPhase] = useState<Phase>('setup')
   const [task, setTask] = useState(prefilledStep)
+
+  // «Раздроби мне задачу»: человек пишет большое пугающее дело —
+  // AI возвращает 3 крошечных шага. Task initiation — главный
+  // bottleneck СДВГ; выбор готового микрошага снимает стену.
+  const [brokenSteps, setBrokenSteps] = useState<string[] | null>(null)
+  const [breaking, setBreaking] = useState(false)
+  async function breakDown() {
+    if (!task.trim() || breaking) return
+    setBreaking(true)
+    try {
+      const res = await fetch('/api/breakdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ task: task.trim() }),
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { steps: string[] | null }
+        if (data.steps) setBrokenSteps(data.steps)
+      }
+    } catch {
+      /* сеть недоступна — кнопка просто отпустится */
+    } finally {
+      setBreaking(false)
+    }
+  }
   const [minutes, setMinutes] = useState(initialMinutes)
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [voice, setVoice] = useState(fallbackVoice.start)
@@ -109,6 +136,32 @@ export function FocusSession() {
       /* приватный режим */
     }
   }, [])
+  // Эмбиент костра: опт-ин, паттерн Calm — тихий фон снижает
+  // perceived effort. Играет только пока идёт сессия.
+  const [ambientOn, setAmbientOn] = useState(false)
+  useEffect(() => {
+    try {
+      setAmbientOn(localStorage.getItem(AMBIENT_KEY) === '1')
+    } catch {
+      /* приватный режим */
+    }
+  }, [])
+  useEffect(() => {
+    if (phase === 'running' && ambientOn) startCampfire()
+    else stopCampfire()
+    return () => stopCampfire()
+  }, [phase, ambientOn])
+  function toggleAmbient() {
+    setAmbientOn((v) => {
+      try {
+        localStorage.setItem(AMBIENT_KEY, v ? '0' : '1')
+      } catch {
+        /* приватный режим */
+      }
+      return !v
+    })
+  }
+
   function toggleDigits() {
     setHideDigits((v) => {
       try {
@@ -364,11 +417,48 @@ export function FocusSession() {
             </div>
             <input
               value={task}
-              onChange={(e) => setTask(e.target.value)}
+              onChange={(e) => {
+                setTask(e.target.value)
+                setBrokenSteps(null)
+              }}
               placeholder="Открыть файл презентации"
               className="h-12 rounded-xl border border-input bg-card px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
           </label>
+
+          {/* Дробление своей задачи: написал большое — получил 3 крошечных */}
+          {task.trim().length >= 8 && !stepChips.includes(task) && !brokenSteps && (
+            <button
+              type="button"
+              onClick={breakDown}
+              disabled={breaking}
+              className="self-start font-mono text-[11px] uppercase tracking-widest text-primary underline-offset-4 hover:underline disabled:opacity-50"
+            >
+              {breaking ? 'дроблю…' : 'звучит крупно? раздробить на микрошаги'}
+            </button>
+          )}
+          {brokenSteps && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                выбери первый — остальное потом
+              </p>
+              <div className="flex flex-col gap-1.5" role="group" aria-label="Микрошаги">
+                {brokenSteps.map((step) => (
+                  <button
+                    key={step}
+                    type="button"
+                    onClick={() => {
+                      setTask(step)
+                      setBrokenSteps(null)
+                    }}
+                    className="rounded-xl border border-primary/40 bg-secondary px-3 py-2 text-left text-sm font-medium transition-colors hover:border-primary"
+                  >
+                    {step}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
               Длительность
@@ -491,13 +581,25 @@ export function FocusSession() {
               style={{ width: `${progress * 100}%` }}
             />
           </div>
-          <button
-            type="button"
-            onClick={toggleDigits}
-            className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
-          >
-            {hideDigits ? 'показать цифры' : 'спрятать цифры'}
-          </button>
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={toggleDigits}
+              className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
+            >
+              {hideDigits ? 'показать цифры' : 'спрятать цифры'}
+            </button>
+            <button
+              type="button"
+              onClick={toggleAmbient}
+              aria-pressed={ambientOn}
+              className={`font-mono text-[10px] uppercase tracking-widest underline-offset-2 hover:underline ${
+                ambientOn ? 'text-primary' : 'text-muted-foreground'
+              }`}
+            >
+              {ambientOn ? 'костёр горит' : 'зажечь костёр'}
+            </button>
+          </div>
         </div>
         <div className="flex flex-col items-center gap-1">
           <Button
@@ -538,18 +640,37 @@ export function FocusSession() {
               : { delay: 0.5, type: 'spring', stiffness: 260, damping: 18 }
           }
         >
+          {/* Rare = золото: тёплый жёлтый — визуальный триггер RPE.
+              Обычные находки остаются в лаймовом — редкое ДОЛЖНО отличаться */}
           <Link
             href="/app/world"
-            className={`flex w-full flex-col items-center gap-2 rounded-2xl border bg-card px-5 py-5 text-center transition-colors hover:border-primary ${
+            className={`relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl border bg-card px-5 py-5 text-center transition-colors ${
               grownElement.rarity === 'rare'
-                ? 'border-primary shadow-[0_0_32px_-4px_var(--color-primary)]'
+                ? 'border-reward shadow-[0_0_44px_-4px_var(--color-reward)] hover:border-reward'
                 : grownElement.rarity === 'uncommon'
-                  ? 'border-primary/70'
-                  : 'border-primary/40'
+                  ? 'border-primary/70 hover:border-primary'
+                  : 'border-primary/40 hover:border-primary'
             }`}
           >
-            <Sprout className="size-8 text-primary" aria-hidden="true" />
-            <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
+            {grownElement.rarity === 'rare' && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    'radial-gradient(ellipse at 50% 0%, color-mix(in oklch, var(--color-reward) 18%, transparent), transparent 70%)',
+                }}
+              />
+            )}
+            <Sprout
+              className={`size-8 ${grownElement.rarity === 'rare' ? 'text-reward' : 'text-primary'}`}
+              aria-hidden="true"
+            />
+            <span
+              className={`font-mono text-[10px] uppercase tracking-widest ${
+                grownElement.rarity === 'rare' ? 'text-reward' : 'text-primary'
+              }`}
+            >
               {grownElement.rarity === 'landmark'
                 ? 'на острове появилось'
                 : `${RARITY_LABEL[grownElement.rarity]} находка`}

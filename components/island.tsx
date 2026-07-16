@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   addFind,
   getFinds,
@@ -440,6 +440,31 @@ export function Island() {
   const recentDiary = diary.slice(-8).reverse()
   const rareCount = finds.filter((f) => f.rarity === 'rare').length
 
+  // Тёплый отклик на прикосновение: остров — место, а не картинка.
+  // Тап — существо вспоминает историю случайного выращенного элемента.
+  const [lore, setLore] = useState<string | null>(null)
+  const loreTimerRef = useRef<number | null>(null)
+  function tapIsland() {
+    if (diary.length === 0) {
+      setLore('Пока тут тихо. Первый же старт — и у этого места появится первая история.')
+    } else {
+      const entry = diary[Math.floor(Math.random() * diary.length)]
+      const templates = [
+        `${entry.name} — это был твой старт «${entry.label}». Я помню.`,
+        `Видишь? ${entry.name}. Появилось, когда ты взялся за «${entry.label}».`,
+        `${entry.name} выросло не само. Это был ты: «${entry.label}».`,
+      ]
+      setLore(templates[Math.floor(Math.random() * templates.length)])
+    }
+    if (loreTimerRef.current) window.clearTimeout(loreTimerRef.current)
+    loreTimerRef.current = window.setTimeout(() => setLore(null), 6000)
+  }
+  useEffect(() => {
+    return () => {
+      if (loreTimerRef.current) window.clearTimeout(loreTimerRef.current)
+    }
+  }, [])
+
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-6">
       <div className="flex flex-col gap-1">
@@ -449,7 +474,12 @@ export function Island() {
         </p>
       </div>
 
-      <div className="overflow-hidden rounded-3xl border border-border bg-card">
+      <button
+        type="button"
+        onClick={tapIsland}
+        aria-label="Коснуться острова — напарник вспомнит историю"
+        className="cursor-pointer overflow-hidden rounded-3xl border border-border bg-card text-left transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+      >
         <svg
           viewBox="0 0 380 216"
           role="img"
@@ -555,9 +585,9 @@ export function Island() {
                 style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
                 transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}
               >
-                {/* Редкая находка светится на карте постоянно — она должна быть видна гостю */}
-                {find.rarity === 'rare' && (
-                  <circle cx="0" cy="-10" r="20" fill={c.green} opacity="0.12">
+          {/* Редкая находка светится золотом — тёплый жёлтый закреплён за rare */}
+          {find.rarity === 'rare' && (
+            <circle cx="0" cy="-10" r="20" fill="var(--color-reward)" opacity="0.16">
                     <animate
                       attributeName="opacity"
                       values="0.08;0.2;0.08"
@@ -571,7 +601,17 @@ export function Island() {
             )
           })}
         </svg>
-      </div>
+      </button>
+
+      {/* Голос острова: живёт 6 секунд после прикосновения */}
+      {lore && (
+        <p
+          aria-live="polite"
+          className="rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-lg leading-snug"
+        >
+          {lore}
+        </p>
+      )}
 
       {starts !== null && count === 0 && (
         <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
@@ -602,7 +642,7 @@ export function Island() {
                 <div
                   key={rare.key}
                   className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center ${
-                    found ? 'border-primary/50' : 'border-border'
+                    found ? 'border-reward/60 shadow-[0_0_14px_-4px_var(--color-reward)]' : 'border-border'
                   }`}
                 >
                   <svg viewBox="-32 -44 64 56" className="h-9 w-12" aria-hidden="true">
@@ -639,8 +679,8 @@ export function Island() {
               <div className="flex flex-col gap-0.5">
                 <span className="flex items-center gap-2 text-sm font-semibold">
                   {entry.name}
-                  {entry.rarity === 'rare' && (
-                    <span className="rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+                    {entry.rarity === 'rare' && (
+                      <span className="rounded-full bg-reward/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-widest text-reward">
                       {RARITY_LABEL.rare}
                     </span>
                   )}
