@@ -23,6 +23,7 @@ import {
   type CheckinState,
 } from '@/lib/checkin'
 import { Bell } from 'lucide-react'
+import { InstallPrompt } from '@/components/install-prompt'
 
 type FirstWord = {
   greeting: string
@@ -73,9 +74,11 @@ function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): First
 
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
-    const time = plan.startTime ? ` в ${plan.startTime}` : ''
+    // Якорь может быть событием («после первого кофе») или временем («09:00»)
+    const t = plan.startTime
+    const anchor = t ? (/^\d/.test(t) ? ` в ${t}` : `, старт — ${t}`) : ''
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} Я рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${anchor}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} Я рядом, жми кнопку.`,
       actionStep: plan.firstStep,
     }
   }
@@ -228,6 +231,12 @@ export function HomeScreen() {
                 </Button>
               </div>
             </form>
+          )}
+
+          {/* Иконка на домашнем экране — протез object permanence:
+              предлагаем после первого старта, когда ценность уже прожита */}
+          {stats !== null && stats.totalStarts >= 1 && (
+            <InstallPrompt companionName={companionName} />
           )}
 
           {/* Весточки от напарника: предлагаем один раз, после того как

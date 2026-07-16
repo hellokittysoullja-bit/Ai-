@@ -24,7 +24,8 @@ function pickModel() {
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     return google('gemini-2.5-flash')
   }
-  return 'openai/gpt-5.5'
+  // Быстрый mini-класс: для СДВГ-петли латентность ответа важнее глубины
+  return 'openai/gpt-5.4-mini'
 }
 
 export async function POST(req: Request) {
@@ -57,7 +58,9 @@ export async function POST(req: Request) {
           startTime: z
             .string()
             .optional()
-            .describe('Примерное время старта, например «09:00» или «после обеда»'),
+            .describe(
+              'Якорь старта — СОБЫТИЕ, а не время: «когда налью первый кофе», «как только сяду за стол», «после обеда». Точное время («09:00») — только если человек сам настоял.',
+            ),
         }),
       },
       rememberFact: {

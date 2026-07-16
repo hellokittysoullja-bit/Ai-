@@ -42,6 +42,22 @@ const AMBIENT_KEY = 'naparnik:ambient'
 
 type Moment = 'start' | 'middle' | 'late' | 'done' | 'early-exit'
 
+// Микро-события: один непредсказуемый тёплый момент за сессию.
+// Variable-interval подкрепление: мозг не знает, когда именно, —
+// тоническая поддержка дофамина без отвлечения от дела.
+const microEvents = [
+  'О. К нам бабочка прилетала. Посидела рядом и улетела.',
+  'Слышал? Где-то плеснула рыба. Хороший знак.',
+  'Ветер принёс запах костра с острова. Уютно тут с тобой.',
+  'Мимо проплыло облако, похожее на кита. Я загадал желание.',
+  'Птица села на причал и смотрит, как ты работаешь. Одобряет.',
+  'Я тут мурлыкал в такт твоей работе. Незаметно, но факт.',
+]
+
+// Якоря для завтрашнего плана: событие не промахивается, время — почти всегда.
+// Time blindness: «в 09:00» превращается в вину в 11:40, «после кофе» — нет.
+const anchorChips = ['после первого кофе', 'как только сяду за стол', 'после обеда']
+
 const fallbackVoice: Record<Moment, string> = {
   start: 'Я рядом. Одно действие за раз.',
   middle: 'Половина есть. Ты реально в игре.',
@@ -107,18 +123,24 @@ export function FocusSession() {
   const [voice, setVoice] = useState(fallbackVoice.start)
   const [doneVoice, setDoneVoice] = useState<string | null>(null)
   const [endedEarly, setEndedEarly] = useState(false)
+  // Сколько минут реально отработано — показываем при раннем выходе:
+  // короткая сессия празднуется так же честно, как полная
+  const [workedMinutes, setWorkedMinutes] = useState(0)
 
   // Награда: что выросло на острове после этого старта.
   // Ориентир (старты 1-10) или находка из пула с редкостью (старты 11+).
   const [grownElement, setGrownElement] = useState<{
     name: string
     rarity: Rarity | 'landmark'
+    /** Какой это по счёту экземпляр (2+ = остров густеет, старт всё равно виден) */
+    repeat?: number
   } | null>(null)
 
   // Ритуал завершения: план на завтра на пике дофамина.
   // Форма свёрнута: пик отдан находке, план — по желанию (не обязанность).
   const [tomorrowTask, setTomorrowTask] = useState('')
   const [tomorrowStep, setTomorrowStep] = useState('')
+  const [tomorrowAnchor, setTomorrowAnchor] = useState('')
   const [planSaved, setPlanSaved] = useState(false)
   const [planFormOpen, setPlanFormOpen] = useState(false)
 
@@ -288,6 +310,22 @@ export function FocusSession() {
     }
   }, [secondsLeft, phase])
 
+  // Микро-событие: один раз за сессию, в случайный момент между 20% и 75%.
+  // Непредсказуемость — суть: заранее неизвестно, когда остров оживёт.
+  const microEventAtRef = useRef(0.2 + Math.random() * 0.55)
+  const microEventFiredRef = useRef(false)
+  const [microEvent, setMicroEvent] = useState<string | null>(null)
+  useEffect(() => {
+    if (phase !== 'running' || totalRef.current === 0 || microEventFiredRef.current) return
+    const progress = 1 - secondsLeft / totalRef.current
+    if (progress >= microEventAtRef.current) {
+      microEventFiredRef.current = true
+      setMicroEvent(microEvents[Math.floor(Math.random() * microEvents.length)])
+      const t = window.setTimeout(() => setMicroEvent(null), 7000)
+      return () => window.clearTimeout(t)
+    }
+  }, [secondsLeft, phase])
+
   // Реплики по ходу сессии
   useEffect(() => {
     if (phase !== 'running' || totalRef.current === 0) return
@@ -304,6 +342,8 @@ export function FocusSession() {
     setSecondsLeft(minutes * 60)
     firedMomentsRef.current = new Set()
     lastQuarterRef.current = 0
+    microEventFiredRef.current = false
+    microEventAtRef.current = 0.2 + Math.random() * 0.55
     setVoice(fallbackVoice.start)
     // Хореография: интерфейс растворяется, существо садится рядом,
     // таймер проявляется. При reduced-motion — сразу к делу.
@@ -341,6 +381,7 @@ export function FocusSession() {
     if (startIdRef.current) {
       await updateStartMinutes(startIdRef.current, workedMin)
     }
+    setWorkedMinutes(Math.floor(workedMin))
     // Награда должна быть видна в момент, когда она заработана
     const starts = await getStarts()
     const n = starts.length
@@ -357,7 +398,10 @@ export function FocusSession() {
       if (startIdRef.current) {
         await addFind({ ...find, date: todayKey(), startId: startIdRef.current })
       }
-      setGrownElement({ name: find.name, rarity: find.rarity })
+      // Дубликат — не пустышка: каждый экземпляр встаёт на остров,
+      // и человек видит, что остров густеет, а не «опять то же самое»
+      const repeat = finds.filter((f) => f.key === find.key).length + 1
+      setGrownElement({ name: find.name, rarity: find.rarity, repeat })
     }
     hapticDone()
     setEndedEarly(early)
@@ -367,13 +411,19 @@ export function FocusSession() {
     setRestRevealed(false)
     setTomorrowTask('')
     setTomorrowStep('')
+    setTomorrowAnchor('')
+    setMicroEvent(null)
     setPhase('done')
     fetchVoice(early ? 'early-exit' : 'done', task, minutes).then(setDoneVoice)
   }
 
   async function saveTomorrowPlan() {
     if (!tomorrowTask.trim() || !tomorrowStep.trim()) return
-    await savePlan({ task: tomorrowTask.trim(), firstStep: tomorrowStep.trim() })
+    await savePlan({
+      task: tomorrowTask.trim(),
+      firstStep: tomorrowStep.trim(),
+      startTime: tomorrowAnchor.trim() || undefined,
+    })
     setPlanSaved(true)
   }
 
@@ -548,7 +598,7 @@ export function FocusSession() {
           transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
         >
           <MascotSvg
-            expression={cheering || backFromDrift ? 'happy' : 'focused'}
+            expression={cheering || backFromDrift || microEvent ? 'happy' : 'focused'}
             label="Напарник работает рядом"
             size={130}
           />
@@ -556,9 +606,11 @@ export function FocusSession() {
         <p className="max-w-72 text-balance rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-xl leading-snug">
           {backFromDrift
             ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
-            : cheering
-              ? 'Четверть пути позади. Идём.'
-              : voice}
+            : microEvent
+              ? microEvent
+              : cheering
+                ? 'Четверть пути позади. Идём.'
+                : voice}
         </p>
         <div className="flex flex-col items-center gap-3">
           <p className="text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
@@ -623,6 +675,13 @@ export function FocusSession() {
       <MascotSvg expression="excited" label="Напарник радуется" size={110} />
       <div className="flex flex-col gap-2 text-center">
         <h2 className="text-2xl font-bold">{endedEarly ? 'Ты начал.' : 'Сделано.'}</h2>
+        {/* Короткая сессия празднуется так же честно, как полная:
+            минуты — настоящие, а не «неполный» результат */}
+        {endedEarly && workedMinutes >= 1 && (
+          <p className="font-mono text-xs uppercase tracking-widest text-primary">
+            {workedMinutes} мин в копилке — настоящие
+          </p>
+        )}
         <p className="font-hand text-xl leading-snug text-muted-foreground">
           {doneVoice ?? fallbackVoice[endedEarly ? 'early-exit' : 'done']}
         </p>
@@ -676,6 +735,12 @@ export function FocusSession() {
                 : `${RARITY_LABEL[grownElement.rarity]} находка`}
             </span>
             <span className="text-balance text-xl font-bold">{grownElement.name}</span>
+            {/* Дубликат — не повтор, а рост: остров густеет с каждым стартом */}
+            {(grownElement.repeat ?? 1) > 1 && (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                уже {grownElement.repeat}-я на острове — он густеет
+              </span>
+            )}
             <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
               смотреть на острове
             </span>
@@ -719,6 +784,36 @@ export function FocusSession() {
               aria-label="Первый шаг завтрашнего дела"
               className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
+            {/* Якорь-событие вместо времени: «в 09:00» промахивается
+                (time blindness), «после кофе» — нет */}
+            <div className="flex flex-col gap-1.5">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                когда начнёшь? привяжи к событию
+              </p>
+              <div className="flex flex-wrap gap-1.5" role="group" aria-label="Якорь старта">
+                {anchorChips.map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => setTomorrowAnchor(chip)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      tomorrowAnchor === chip
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+              <input
+                value={tomorrowAnchor}
+                onChange={(e) => setTomorrowAnchor(e.target.value)}
+                placeholder="или своё: «когда открою ноутбук»"
+                aria-label="Свой якорь старта"
+                className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            </div>
             <Button
               onClick={saveTomorrowPlan}
               disabled={!tomorrowTask.trim() || !tomorrowStep.trim()}
