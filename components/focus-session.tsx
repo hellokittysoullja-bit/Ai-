@@ -33,6 +33,11 @@ import { hapticDone, hapticReward, hapticStart } from '@/lib/haptics'
 
 const durations = [15, 25, 45]
 
+// Готовые шаги: пустое поле для СДВГ — стена. Нажал чип — поехали.
+const stepChips = ['Открыть документ', 'Убрать одну вещь', 'Ответить на одно сообщение']
+
+const HIDE_DIGITS_KEY = 'naparnik:hideDigits'
+
 type Moment = 'start' | 'middle' | 'late' | 'done' | 'early-exit'
 
 const fallbackVoice: Record<Moment, string> = {
@@ -94,6 +99,27 @@ export function FocusSession() {
   // (пик без конкурентов), потом появляются план и кнопки
   const [restRevealed, setRestRevealed] = useState(false)
 
+  // Обратный отсчёт для СДВГ — давление дедлайна. Цифры можно спрятать:
+  // остаются существо и полоска. Выбор запоминается.
+  const [hideDigits, setHideDigits] = useState(false)
+  useEffect(() => {
+    try {
+      setHideDigits(localStorage.getItem(HIDE_DIGITS_KEY) === '1')
+    } catch {
+      /* приватный режим */
+    }
+  }, [])
+  function toggleDigits() {
+    setHideDigits((v) => {
+      try {
+        localStorage.setItem(HIDE_DIGITS_KEY, v ? '0' : '1')
+      } catch {
+        /* приватный режим */
+      }
+      return !v
+    })
+  }
+
   useEffect(() => {
     if (phase !== 'done') return
     if (!grownElement) {
@@ -123,6 +149,11 @@ export function FocusSession() {
     fetchVoice(moment, taskLabel, mins).then(setVoice)
   }, [])
 
+  // Мягкий возврат из отвлечения: СДВГ-мозг уходит в другую вкладку —
+  // это норма, а не провал. Вернулся — встречаем без упрёка.
+  const hiddenAtRef = useRef<number | null>(null)
+  const [backFromDrift, setBackFromDrift] = useState(false)
+
   // Честный таймер: остаток вычисляется от абсолютного времени старта,
   // а не тиками — фоновая вкладка и троттлинг браузера не искажают часы.
   useEffect(() => {
@@ -135,7 +166,17 @@ export function FocusSession() {
     const id = setInterval(update, 1000)
     // Возврат во вкладку — мгновенная синхронизация, без ожидания тика
     const onVisible = () => {
-      if (!document.hidden) update()
+      if (document.hidden) {
+        hiddenAtRef.current = Date.now()
+        return
+      }
+      update()
+      // Отходил дольше 2 минут — встречаем тепло, а не молчанием
+      if (hiddenAtRef.current && Date.now() - hiddenAtRef.current > 120_000) {
+        setBackFromDrift(true)
+        window.setTimeout(() => setBackFromDrift(false), 6000)
+      }
+      hiddenAtRef.current = null
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => {
@@ -305,6 +346,22 @@ export function FocusSession() {
             <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
               Первый шаг
             </span>
+            <div className="flex flex-wrap gap-1.5" role="group" aria-label="Готовые шаги">
+              {stepChips.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => setTask(chip)}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    task === chip
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
             <input
               value={task}
               onChange={(e) => setTask(e.target.value)}
@@ -391,32 +448,56 @@ export function FocusSession() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.6 }}
       >
-        {/* Существо — центр сцены. Радуется на каждой четверти пути */}
-        <MascotSvg
-          expression={cheering ? 'happy' : 'focused'}
-          label="Напарник работает рядом"
-          size={130}
-        />
+        {/* Существо — центр сцены: дышит, радуется четвертям, встречает из отвлечения */}
+        <motion.div
+          animate={
+            reducedMotion
+              ? undefined
+              : { y: [0, -4, 0], rotate: [0, 0, -1.5, 0, 1.5, 0, 0] }
+          }
+          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <MascotSvg
+            expression={cheering || backFromDrift ? 'happy' : 'focused'}
+            label="Напарник работает рядом"
+            size={130}
+          />
+        </motion.div>
         <p className="max-w-72 text-balance rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-xl leading-snug">
-          {cheering ? 'Четверть пути позади. Идём.' : voice}
+          {backFromDrift
+            ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
+            : cheering
+              ? 'Четверть пути позади. Идём.'
+              : voice}
         </p>
         <div className="flex flex-col items-center gap-3">
           <p className="text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
             {task}
           </p>
-          <div
-            role="timer"
-            aria-live="polite"
-            className="text-7xl font-bold tabular-nums tracking-tight"
-          >
-            {mm}:{ss}
-          </div>
+          {hideDigits ? (
+            <p className="font-hand text-3xl text-muted-foreground">время идёт — я слежу</p>
+          ) : (
+            <div
+              role="timer"
+              aria-live="polite"
+              className="text-7xl font-bold tabular-nums tracking-tight"
+            >
+              {mm}:{ss}
+            </div>
+          )}
           <div className="h-1.5 w-64 overflow-hidden rounded-full bg-secondary">
             <div
               className="h-full rounded-full bg-primary transition-all duration-1000"
               style={{ width: `${progress * 100}%` }}
             />
           </div>
+          <button
+            type="button"
+            onClick={toggleDigits}
+            className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
+          >
+            {hideDigits ? 'показать цифры' : 'спрятать цифры'}
+          </button>
         </div>
         <div className="flex flex-col items-center gap-1">
           <Button
