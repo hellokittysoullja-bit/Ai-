@@ -139,14 +139,9 @@ export function HomeScreen() {
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
             <MascotSvg expression={mascotExpression} label="Напарник" size={52} className="shrink-0" />
-            <div className="flex flex-col gap-1">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                он написал первым
-              </p>
-              <p className="font-hand text-xl leading-snug">
-                {firstWord ? firstWord.greeting : '…'}
-              </p>
-            </div>
+            <p className="pt-1 font-hand text-xl leading-snug">
+              {firstWord ? firstWord.greeting : '…'}
+            </p>
           </div>
 
           {firstWord?.actionStep && (
@@ -162,8 +157,8 @@ export function HomeScreen() {
 
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                первый старт за 15 минут — тап и всё
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Первый старт за 15 минут — тап и всё:
               </p>
               <div className="flex flex-wrap gap-2">
                 {starterChips.map((chip) => (
@@ -182,23 +177,19 @@ export function HomeScreen() {
             </div>
           )}
 
+          {/* Одна служебная строка на экран: предвкушение находки — или тихий итог.
+              Обещание без таймера сгорания: не сделал — ничего не потерял. */}
           {stats && stats.totalStarts > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {/* Предвкушение вместо нормы: обещание награды без таймера сгорания.
-                  Не сделал сегодня — ничего не потерял, завтра тоже будет. */}
+            <p className="text-xs leading-relaxed text-muted-foreground">
               {stats.lastStartDate !== todayKey(new Date()) ? (
-                <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
-                  первый старт дня ещё впереди — за ним находка для острова
-                </p>
+                <span className="text-primary">
+                  Первый старт дня ещё впереди — за ним находка для острова.
+                </span>
               ) : (
-                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                  сегодня уже был старт — остров вырос
-                </p>
-              )}
-              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                стартов: {stats.totalStarts} · дней подряд: {stats.runningDays}
-              </p>
-            </div>
+                'Сегодня уже был старт — остров вырос.'
+              )}{' '}
+              Всего стартов: {stats.totalStarts}.
+            </p>
           )}
         </div>
       </section>

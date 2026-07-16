@@ -128,9 +128,6 @@ export function WorldSection() {
           viewport={{ once: true, margin: '-80px' }}
           transition={{ type: 'spring', stiffness: 120, damping: 20 }}
         >
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">
-            [ безопасно для стыда ]
-          </p>
           <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
             Ты растишь его мир. Он не даёт твоему рухнуть.
           </h2>
@@ -140,18 +137,76 @@ export function WorldSection() {
           </p>
         </motion.div>
 
-        {/* Остров, прорастающий при скролле */}
+        {/* Остров, прорастающий при скролле — та же живая сцена, что в /app/world */}
         <div className="overflow-hidden rounded-3xl border border-border bg-card">
           <svg
-            viewBox="0 0 380 200"
+            viewBox="0 0 380 216"
             role="img"
             aria-label="Остров напарника, который растёт от твоих стартов"
             className="block w-full"
           >
-            <rect x="0" y="0" width="380" height="200" fill="var(--color-background)" />
-            <ellipse cx="190" cy="184" rx="180" ry="18" fill="var(--color-accent)" opacity="0.5" />
-            <ellipse cx="190" cy="152" rx="140" ry="26" fill={c.ground} />
-            <ellipse cx="190" cy="147" rx="128" ry="20" fill={c.groundDark} opacity="0.55" />
+            <defs>
+              <linearGradient id="lsky" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-background)" />
+                <stop offset="72%" stopColor="var(--color-background)" />
+                <stop offset="100%" stopColor="var(--color-secondary)" />
+              </linearGradient>
+              <linearGradient id="lsea" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--color-secondary)" />
+                <stop offset="100%" stopColor="var(--color-background)" />
+              </linearGradient>
+            </defs>
+            <rect x="0" y="0" width="380" height="162" fill="url(#lsky)" />
+            {[
+              [24, 18, 1.1], [58, 40, 0.8], [96, 14, 1.3], [132, 52, 0.7],
+              [168, 24, 1.0], [242, 12, 1.2], [292, 30, 1.0], [348, 20, 1.1],
+            ].map(([x, y, r], i) => (
+              <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.5">
+                {!reduceMotion && (
+                  <animate
+                    attributeName="opacity"
+                    values="0.25;0.75;0.25"
+                    dur={`${2.6 + (i % 5) * 0.9}s`}
+                    begin={`${(i % 7) * 0.5}s`}
+                    repeatCount="indefinite"
+                  />
+                )}
+              </circle>
+            ))}
+            <rect x="0" y="158" width="380" height="58" fill="url(#lsea)" />
+            <ellipse cx="190" cy="182" rx="130" ry="12" fill="var(--color-accent)" opacity="0.28" />
+            {[
+              [52, 190, 26], [136, 198, 34], [230, 192, 22], [312, 200, 30],
+            ].map(([x, y, w], i) => (
+              <line
+                key={i}
+                x1={x} y1={y} x2={x + w} y2={y}
+                stroke="var(--color-muted-foreground)"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                opacity="0.25"
+              >
+                {!reduceMotion && (
+                  <animate
+                    attributeName="opacity"
+                    values="0.1;0.35;0.1"
+                    dur={`${3.4 + i * 0.7}s`}
+                    begin={`${i * 0.8}s`}
+                    repeatCount="indefinite"
+                  />
+                )}
+              </line>
+            ))}
+            <ellipse cx="190" cy="156" rx="146" ry="26" fill={c.ground} />
+            <path
+              d="M50 156
+                 Q66 132 108 136 Q128 124 160 130 Q190 118 222 130
+                 Q254 122 276 134 Q312 130 330 156
+                 Q300 172 190 174 Q80 172 50 156 Z"
+              fill={c.groundDark}
+              opacity="0.7"
+            />
+            <ellipse cx="190" cy="160" rx="140" ry="17" fill={c.groundDark} opacity="0.35" />
             {sprouts.map((s, i) => (
               <g key={s.key} className={i < shown ? 'island-grow' : undefined} opacity={i < shown ? 1 : 0}>
                 {s.node}

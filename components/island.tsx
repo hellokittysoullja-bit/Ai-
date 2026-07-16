@@ -92,7 +92,14 @@ const landmarks: Landmark[] = [
         <>
           <line x1="238" y1="148" x2="252" y2="140" stroke={c.groundDark} strokeWidth="4" strokeLinecap="round" />
           <line x1="252" y1="148" x2="238" y2="140" stroke={c.groundDark} strokeWidth="4" strokeLinecap="round" />
-          <path d="M245 138 q-6 -8 0 -16 q2 6 5 8 q3 -4 2 -8 q7 8 -1 16 q-3 2 -6 0z" fill={c.warm} />
+          {/* тёплый ореол костра дышит */}
+          <circle cx="245" cy="134" r="18" fill={c.warm} opacity="0.12">
+            <animate attributeName="opacity" values="0.07;0.18;0.07" dur="2.4s" repeatCount="indefinite" />
+            <animate attributeName="r" values="15;19;15" dur="2.4s" repeatCount="indefinite" />
+          </circle>
+          <path d="M245 138 q-6 -8 0 -16 q2 6 5 8 q3 -4 2 -8 q7 8 -1 16 q-3 2 -6 0z" fill={c.warm}>
+            <animate attributeName="opacity" values="1;0.75;1" dur="1.6s" repeatCount="indefinite" />
+          </path>
         </>,
       ),
   },
@@ -130,7 +137,9 @@ const landmarks: Landmark[] = [
         <>
           <line x1="212" y1="152" x2="212" y2="118" stroke={c.soft} strokeWidth="2.5" strokeLinecap="round" />
           <circle cx="212" cy="112" r="6" fill={c.warm} />
-          <circle cx="212" cy="112" r="11" fill={c.warm} opacity="0.25" />
+          <circle cx="212" cy="112" r="11" fill={c.warm} opacity="0.25">
+            <animate attributeName="opacity" values="0.15;0.35;0.15" dur="3.6s" repeatCount="indefinite" />
+          </circle>
         </>,
       ),
   },
@@ -428,7 +437,6 @@ export function Island() {
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-6">
       <div className="flex flex-col gap-1">
-        <p className="font-mono text-xs uppercase tracking-widest text-primary">[ мир напарника ]</p>
         <h1 className="text-2xl font-bold tracking-tight">Остров</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
           Каждый старт — новый кусочек. Ничего не сгорает и не откатывается.
@@ -437,17 +445,86 @@ export function Island() {
 
       <div className="overflow-hidden rounded-3xl border border-border bg-card">
         <svg
-          viewBox="0 0 380 200"
+          viewBox="0 0 380 216"
           role="img"
           aria-label={`Остров напарника: ${count} стартов, ${finds.length} находок`}
           className="block w-full"
         >
+          <defs>
+            {/* Ночное небо: глубина сверху, тёплая дымка у горизонта */}
+            <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-background)" />
+              <stop offset="72%" stopColor="var(--color-background)" />
+              <stop offset="100%" stopColor="var(--color-secondary)" />
+            </linearGradient>
+            <linearGradient id="sea" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-secondary)" />
+              <stop offset="100%" stopColor="var(--color-background)" />
+            </linearGradient>
+            <radialGradient id="moonhaze" cx="0.5" cy="0.5" r="0.5">
+              <stop offset="0%" stopColor={c.warm} stopOpacity="0.14" />
+              <stop offset="100%" stopColor={c.warm} stopOpacity="0" />
+            </radialGradient>
+          </defs>
+
+          {/* небо */}
+          <rect x="0" y="0" width="380" height="162" fill="url(#sky)" />
+          {/* звёзды: живут своей жизнью, каждая мерцает в своём ритме */}
+          {[
+            [24, 18, 1.1], [58, 40, 0.8], [96, 14, 1.3], [132, 52, 0.7],
+            [168, 24, 1.0], [205, 44, 0.8], [242, 12, 1.2], [262, 56, 0.7],
+            [292, 30, 1.0], [348, 20, 1.1], [362, 58, 0.8], [30, 66, 0.7],
+          ].map(([x, y, r], i) => (
+            <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.5">
+              <animate
+                attributeName="opacity"
+                values="0.25;0.75;0.25"
+                dur={`${2.6 + (i % 5) * 0.9}s`}
+                begin={`${(i % 7) * 0.5}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          ))}
+          {/* дымка вокруг луны-ориентира — появляется вместе с ней (10-й старт) */}
+          {count >= LANDMARK_COUNT && <circle cx="320" cy="44" r="42" fill="url(#moonhaze)" />}
+
           {/* вода */}
-          <rect x="0" y="0" width="380" height="200" fill="var(--color-background)" />
-          <ellipse cx="190" cy="184" rx="180" ry="18" fill="var(--color-accent)" opacity="0.5" />
-          {/* остров */}
-          <ellipse cx="190" cy="152" rx="140" ry="26" fill={c.ground} />
-          <ellipse cx="190" cy="147" rx="128" ry="20" fill={c.groundDark} opacity="0.55" />
+          <rect x="0" y="158" width="380" height="58" fill="url(#sea)" />
+          {/* отражение острова */}
+          <ellipse cx="190" cy="182" rx="130" ry="12" fill="var(--color-accent)" opacity="0.28" />
+          {/* блики на воде: медленно дышат */}
+          {[
+            [52, 190, 26], [136, 198, 34], [230, 192, 22], [312, 200, 30], [180, 206, 40],
+          ].map(([x, y, w], i) => (
+            <line
+              key={i}
+              x1={x} y1={y} x2={x + w} y2={y}
+              stroke="var(--color-muted-foreground)"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              opacity="0.25"
+            >
+              <animate
+                attributeName="opacity"
+                values="0.1;0.35;0.1"
+                dur={`${3.4 + i * 0.7}s`}
+                begin={`${i * 0.8}s`}
+                repeatCount="indefinite"
+              />
+            </line>
+          ))}
+
+          {/* остров: песчаная кромка, объёмный холм травы, тень берега */}
+          <ellipse cx="190" cy="156" rx="146" ry="26" fill={c.ground} />
+          <path
+            d="M50 156
+               Q66 132 108 136 Q128 124 160 130 Q190 118 222 130
+               Q254 122 276 134 Q312 130 330 156
+               Q300 172 190 174 Q80 172 50 156 Z"
+            fill={c.groundDark}
+            opacity="0.7"
+          />
+          <ellipse cx="190" cy="160" rx="140" ry="17" fill={c.groundDark} opacity="0.35" />
           {landmarks.map((landmark, i) => (
             <g
               key={landmark.key}
@@ -503,9 +580,7 @@ export function Island() {
           Цель на горизонте: человек с первого дня видит, что есть что искать. */}
       {starts !== null && (
         <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            редкие события острова
-          </p>
+          <p className="text-sm font-semibold">Редкие события</p>
           <div className="grid grid-cols-4 gap-2">
             {ISLAND_POOL.filter((e) => e.rarity === 'rare').map((rare) => {
               const found = finds.some((f) => f.key === rare.key)
@@ -533,8 +608,8 @@ export function Island() {
               )
             })}
           </div>
-          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            полная сессия повышает шанс редкой находки
+          <p className="text-center text-xs leading-relaxed text-muted-foreground">
+            Полная сессия повышает шанс редкой находки
           </p>
         </div>
       )}
@@ -578,8 +653,8 @@ export function Island() {
       )}
 
       {patterns && patterns.totalStarts > 0 && (
-        <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          всего стартов: {patterns.totalStarts}
+        <p className="text-center text-xs leading-relaxed text-muted-foreground">
+          Всего стартов: {patterns.totalStarts}
           {rareCount > 0 ? ` · редких находок: ${rareCount}` : ''} · дней подряд:{' '}
           {patterns.runningDays}
           {patterns.runningDays === 0 ? ' (пауза, не обнуление)' : ''}
