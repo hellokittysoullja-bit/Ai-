@@ -56,6 +56,7 @@ const KEYS = {
   worldSeen: 'naparnik:worldSeen',
   activeSession: 'naparnik:activeSession',
   chat: 'naparnik:chat',
+  companionName: 'naparnik:companionName',
 } as const
 
 function isBrowser() {
@@ -202,6 +203,18 @@ export async function clearActiveSession(): Promise<void> {
   write(KEYS.activeSession, null)
 }
 
+// ---------- Имя существа (endowment: названное — становится своим) ----------
+
+export async function getCompanionName(): Promise<string | null> {
+  return read<string | null>(KEYS.companionName, null)
+}
+
+export async function saveCompanionName(name: string): Promise<void> {
+  const trimmed = name.trim().slice(0, 24)
+  if (!trimmed) return
+  write(KEYS.companionName, trimmed)
+}
+
 // ---------- Память разговора (котик помнит, о чём говорили) ----------
 
 const MAX_CHAT_MESSAGES = 30
@@ -313,17 +326,20 @@ export type MemoryContext = {
   recentStarts: Array<Pick<StartEntry, 'date' | 'label' | 'minutes' | 'fromPlan'>>
   patterns: Patterns
   notes: string[]
-  /** Последние находки острова — напарник может вспоминать их �� разговоре */
+  /** Последние находки острова — напарник может вспоминать их в разговоре */
   recentFinds: Array<Pick<IslandFindEntry, 'name' | 'rarity' | 'date'>>
+  /** Имя, которое человек дал существу (null — ещё не назвал) */
+  companionName: string | null
 }
 
 export async function buildMemoryContext(): Promise<MemoryContext> {
-  const [plan, starts, patterns, notes, finds] = await Promise.all([
+  const [plan, starts, patterns, notes, finds, companionName] = await Promise.all([
     getPlan(),
     getStarts(),
     getPatterns(),
     getNotes(),
     getFinds(),
+    getCompanionName(),
   ])
   return {
     plan,
@@ -336,5 +352,6 @@ export async function buildMemoryContext(): Promise<MemoryContext> {
     patterns,
     notes: notes.map((n) => n.text),
     recentFinds: finds.slice(-3).map(({ name, rarity, date }) => ({ name, rarity, date })),
+    companionName,
   }
 }

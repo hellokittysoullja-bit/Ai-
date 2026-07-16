@@ -31,12 +31,20 @@ export type MemoryContextPayload = {
   }
   notes: string[]
   recentFinds?: Array<{ name: string; rarity: string; date: string }>
+  /** Имя, которое человек дал существу */
+  companionName?: string | null
 }
 
 function formatMemory(memory: MemoryContextPayload | null | undefined): string {
   if (!memory) return 'Ты пока ничего не знаешь об этом человеке — это ваш первый разговор.'
 
   const lines: string[] = []
+
+  if (memory.companionName) {
+    lines.push(
+      `Человек дал тебе имя — «${memory.companionName}». Ты этим именем дорожишь: откликаешься на него и изредка называешь себя им. Это знак вашей близости.`,
+    )
+  }
 
   if (memory.plan) {
     const time = memory.plan.startTime ? ` в ${memory.plan.startTime}` : ''

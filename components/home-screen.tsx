@@ -6,7 +6,15 @@ import { Button } from '@/components/ui/button'
 import { Play } from 'lucide-react'
 import { CompanionChat } from '@/components/companion-chat'
 import { MascotSvg, type MascotExpression } from '@/components/mascot-svg'
-import { getPatterns, getPlan, todayKey, type Patterns, type Plan } from '@/lib/memory'
+import {
+  getCompanionName,
+  getPatterns,
+  getPlan,
+  saveCompanionName,
+  todayKey,
+  type Patterns,
+  type Plan,
+} from '@/lib/memory'
 
 type FirstWord = {
   greeting: string
@@ -107,6 +115,19 @@ export function HomeScreen() {
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null)
   const [stats, setStats] = useState<Patterns | null>(null)
 
+  // Endowment: названное существо становится «моим». Имя спрашиваем
+  // после первого старта — когда ценность уже прожита, а не обещана.
+  const [companionName, setCompanionName] = useState<string | null>(null)
+  const [nameLoaded, setNameLoaded] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
+
+  async function giveName(name: string) {
+    const trimmed = name.trim()
+    if (!trimmed) return
+    await saveCompanionName(trimmed)
+    setCompanionName(trimmed)
+  }
+
   // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
   // есть шаг — собран, поздний вечер — сонный, иначе спокоен
   const hour = new Date().getHours()
@@ -120,9 +141,15 @@ export function HomeScreen() {
           : 'calm'
 
   async function refresh() {
-    const [plan, patterns] = await Promise.all([getPlan(), getPatterns()])
+    const [plan, patterns, name] = await Promise.all([
+      getPlan(),
+      getPatterns(),
+      getCompanionName(),
+    ])
     setFirstWord(buildFirstWord(plan, patterns, new Date()))
     setStats(patterns)
+    setCompanionName(name)
+    setNameLoaded(true)
   }
 
   useEffect(() => {
@@ -138,11 +165,45 @@ export function HomeScreen() {
       <section className="border-b border-border bg-card">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
-            <MascotSvg expression={mascotExpression} label="Напарник" size={52} className="shrink-0" />
+            <MascotSvg
+              expression={mascotExpression}
+              label={companionName ?? 'Напарник'}
+              size={52}
+              className="shrink-0"
+            />
             <p className="pt-1 font-hand text-xl leading-snug">
               {firstWord ? firstWord.greeting : '…'}
             </p>
           </div>
+
+          {/* Момент дарения имени: один раз, после первого старта.
+              Названное существо — уже не приложение, а «мой». */}
+          {nameLoaded && !companionName && stats !== null && stats.totalStarts >= 1 && (
+            <form
+              className="flex flex-col gap-2 rounded-2xl border border-primary/30 bg-secondary/50 p-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                giveName(nameDraft)
+              }}
+            >
+              <p className="font-hand text-lg leading-snug">
+                Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду откликаться.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  placeholder="Как меня зовут?"
+                  maxLength={24}
+                  aria-label="Имя для напарника"
+                  className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Button type="submit" size="sm" className="h-10" disabled={!nameDraft.trim()}>
+                  Так и зовут
+                </Button>
+              </div>
+            </form>
+          )}
 
           {firstWord?.actionStep && (
             <Button
