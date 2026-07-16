@@ -9,11 +9,14 @@ import { MascotSvg } from '@/components/mascot-svg'
 import { ChevronRight, Sprout } from 'lucide-react'
 import {
   addFind,
+  clearActiveSession,
   clearPlan,
+  getActiveSession,
   getFinds,
   getPlan,
   getStarts,
   recordStart,
+  saveActiveSession,
   savePlan,
   todayKey,
   updateStartMinutes,
@@ -120,13 +123,47 @@ export function FocusSession() {
     fetchVoice(moment, taskLabel, mins).then(setVoice)
   }, [])
 
+  // Честный таймер: остаток вычисляется от абсолютного времени старта,
+  // а не тиками — фоновая вкладка и троттлинг браузера не искажают часы.
   useEffect(() => {
     if (phase !== 'running') return
-    const id = setInterval(() => {
-      setSecondsLeft((s) => Math.max(0, s - 1))
-    }, 1000)
-    return () => clearInterval(id)
+    const update = () => {
+      const elapsed = (Date.now() - startedAtRef.current) / 1000
+      setSecondsLeft(Math.max(0, Math.ceil(totalRef.current - elapsed)))
+    }
+    update()
+    const id = setInterval(update, 1000)
+    // Возврат во вкладку — мгновенная синхронизация, без ожидания тика
+    const onVisible = () => {
+      if (!document.hidden) update()
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [phase])
+
+  // Сессия переживает закрытие вкладки: если при открытии страницы есть
+  // незавершённая сессия — продолжаем с правильного места (или сразу финиш)
+  const restoredRef = useRef(false)
+  useEffect(() => {
+    if (restoredRef.current) return
+    restoredRef.current = true
+    getActiveSession().then((s) => {
+      if (!s) return
+      totalRef.current = s.minutes * 60
+      startedAtRef.current = s.startedAt
+      startIdRef.current = s.startId
+      firedMomentsRef.current = new Set()
+      setTask(s.task)
+      setMinutes(s.minutes)
+      const elapsed = (Date.now() - s.startedAt) / 1000
+      setSecondsLeft(Math.max(0, Math.ceil(s.minutes * 60 - elapsed)))
+      setVoice(fallbackVoice.start)
+      setPhase('running')
+    })
+  }, [])
 
   // Завершение по нулю — отдельным эффектом, а не изнутри setState-апдейтера
   useEffect(() => {
@@ -158,6 +195,14 @@ export function FocusSession() {
     const entry = await recordStart({ label: task, fromPlan })
     startIdRef.current = entry.id
 
+    // Сессия переживает закрытие вкладки
+    await saveActiveSession({
+      startedAt: startedAtRef.current,
+      minutes,
+      task,
+      startId: entry.id,
+    })
+
     // Если это был первый шаг из плана — план исполнен
     if (fromPlan) {
       const plan = await getPlan()
@@ -168,7 +213,12 @@ export function FocusSession() {
   }
 
   async function finish(early: boolean) {
-    const workedMin = (Date.now() - startedAtRef.current) / 60000
+    await clearActiveSession()
+    // Не больше длительности сессии: вкладка могла быть закрыта надолго
+    const workedMin = Math.min(
+      (Date.now() - startedAtRef.current) / 60000,
+      totalRef.current / 60,
+    )
     if (startIdRef.current) {
       await updateStartMinutes(startIdRef.current, workedMin)
     }

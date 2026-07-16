@@ -54,6 +54,8 @@ const KEYS = {
   notes: 'naparnik:notes',
   finds: 'naparnik:finds',
   worldSeen: 'naparnik:worldSeen',
+  activeSession: 'naparnik:activeSession',
+  chat: 'naparnik:chat',
 } as const
 
 function isBrowser() {
@@ -176,6 +178,44 @@ export async function addFind(find: IslandFindEntry): Promise<void> {
   if (finds.some((f) => f.startId === find.startId)) return
   finds.push(find)
   write(KEYS.finds, finds)
+}
+
+// ---------- Активная сессия (переживает закрытие вкладки) ----------
+
+export type ActiveSession = {
+  /** Unix ms момента старта — единственный источник правды для таймера */
+  startedAt: number
+  minutes: number
+  task: string
+  startId: string
+}
+
+export async function getActiveSession(): Promise<ActiveSession | null> {
+  return read<ActiveSession | null>(KEYS.activeSession, null)
+}
+
+export async function saveActiveSession(session: ActiveSession): Promise<void> {
+  write(KEYS.activeSession, session)
+}
+
+export async function clearActiveSession(): Promise<void> {
+  write(KEYS.activeSession, null)
+}
+
+// ---------- Память разговора (котик помнит, о чём говорили) ----------
+
+const MAX_CHAT_MESSAGES = 30
+
+/**
+ * Сохранённые сообщения чата в формате UIMessage (структурная копия).
+ * Тип намеренно свободный: сообщения приходят из useChat и сериализуемы.
+ */
+export async function getChatMessages<T>(): Promise<T[]> {
+  return read<T[]>(KEYS.chat, [])
+}
+
+export async function saveChatMessages<T>(messages: T[]): Promise<void> {
+  write(KEYS.chat, messages.slice(-MAX_CHAT_MESSAGES))
 }
 
 // ---------- Непросмотренное на острове (триггер возврата к награде) ----------

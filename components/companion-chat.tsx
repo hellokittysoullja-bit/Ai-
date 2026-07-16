@@ -12,6 +12,8 @@ import Link from 'next/link'
 import {
   addNote,
   buildMemoryContext,
+  getChatMessages,
+  saveChatMessages,
   savePlan,
   type MemoryContext,
 } from '@/lib/memory'
@@ -132,6 +134,26 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
   })
 
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // «Он тебя помнит»: разговор переживает перезагрузку страницы.
+  // Восстанавливаем последние сообщения при открытии чата.
+  const chatRestoredRef = useRef(false)
+  useEffect(() => {
+    if (chatRestoredRef.current) return
+    chatRestoredRef.current = true
+    getChatMessages<(typeof messages)[number]>().then((saved) => {
+      if (saved.length > 0) setMessages(saved)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Сохраняем после каждого завершённого обмена (не во время стриминга)
+  useEffect(() => {
+    if (!chatRestoredRef.current) return
+    if (status === 'streaming' || status === 'submitted') return
+    if (messages.length === 0) return
+    saveChatMessages(messages)
+  }, [messages, status])
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
