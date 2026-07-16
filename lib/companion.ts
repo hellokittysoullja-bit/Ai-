@@ -66,8 +66,10 @@ function formatMemory(memory: MemoryContextPayload | null | undefined): string {
 
   const p = memory.patterns
   if (p.totalStarts > 0) {
+    // Намеренно НЕ передаём «дней подряд»: у нас нет стриков. Считаем только
+    // накопительное число стартов, которое никогда не падает.
     lines.push(
-      `Всего стартов: ${p.totalStarts}. Дней подряд со стартами: ${p.runningDays}.` +
+      `Всего стартов за всё время: ${p.totalStarts} (это число только растёт, оно не сгорает).` +
         (p.favoriteHour !== null
           ? ` Чаще всего человек реально начинает около ${p.favoriteHour}:00.`
           : ''),
