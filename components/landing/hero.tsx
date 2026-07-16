@@ -67,6 +67,7 @@ function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
 }
 
 export function Hero() {
+  const reduceMotion = useReducedMotion()
   const [steps, setSteps] = useState<SceneStep[]>([])
   const [showChoices, setShowChoices] = useState(false)
   const [answered, setAnswered] = useState(false)
@@ -92,19 +93,71 @@ export function Hero() {
   }
 
   return (
-    <section className="grain relative flex min-h-[92svh] flex-col items-center justify-center px-4 py-16">
+    <section className="grain relative flex min-h-[92svh] flex-col items-center justify-center overflow-hidden px-4 py-16">
+      {/* Атмосфера: существо живёт в месте, а не парит в пустоте.
+          Ночь, звёзды, тёплый свет — считывается за 200мс, раньше слов. */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <svg className="h-full w-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 800 900">
+          <defs>
+            <linearGradient id="heroSky" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--color-background)" />
+              <stop offset="62%" stopColor="var(--color-background)" />
+              <stop offset="100%" stopColor="var(--color-secondary)" />
+            </linearGradient>
+            <radialGradient id="heroWarm" cx="0.5" cy="0.62" r="0.5">
+              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.13" />
+              <stop offset="55%" stopColor="var(--color-primary)" stopOpacity="0.05" />
+              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
+            </radialGradient>
+          </defs>
+          <rect width="800" height="900" fill="url(#heroSky)" />
+          {/* звёзды: мерцают каждая в своём ритме */}
+          {[
+            [70, 90, 1.4], [160, 200, 0.9], [250, 60, 1.2], [340, 150, 0.8],
+            [420, 80, 1.5], [510, 190, 0.9], [600, 70, 1.2], [680, 160, 1.0],
+            [740, 90, 1.3], [120, 320, 0.8], [640, 300, 0.9], [380, 260, 0.7],
+            [40, 220, 1.0], [720, 230, 0.8], [280, 330, 0.9], [560, 120, 0.7],
+          ].map(([x, y, r], i) => (
+            <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.45">
+              <animate
+                attributeName="opacity"
+                values="0.2;0.7;0.2"
+                dur={`${2.8 + (i % 6) * 0.8}s`}
+                begin={`${(i % 8) * 0.45}s`}
+                repeatCount="indefinite"
+              />
+            </circle>
+          ))}
+          {/* тёплое свечение вокруг существа — «здесь горит костёр» */}
+          <rect width="800" height="900" fill="url(#heroWarm)">
+            <animate attributeName="opacity" values="0.85;1;0.85" dur="4.5s" repeatCount="indefinite" />
+          </rect>
+          {/* земля под существом: тонкая линия холма у нижней кромки */}
+          <path
+            d="M0 810 Q200 780 400 792 Q600 802 800 778 L800 900 L0 900 Z"
+            fill="var(--color-secondary)"
+            opacity="0.6"
+          />
+        </svg>
+      </div>
+
       {/* Сцена: маскот + диалог. Один фокус, много воздуха */}
-      <div className="flex w-full max-w-md flex-col items-center gap-8">
+      <div className="relative flex w-full max-w-md flex-col items-center gap-8">
         <motion.div
           initial={{ opacity: 0, scale: 0.85, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           transition={{ type: 'spring', stiffness: 200, damping: 18 }}
         >
-          <MascotSvg
-            expression={expression}
-            size={176}
-            label="Напарник — пушистое существо с зелёными глазами"
-          />
+          <motion.div
+            animate={reduceMotion ? undefined : { y: [0, -5, 0] }}
+            transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <MascotSvg
+              expression={expression}
+              size={200}
+              label="Напарник — пушистое существо с зелёными глазами"
+            />
+          </motion.div>
         </motion.div>
 
         <div className="flex w-full flex-col gap-3" aria-live="polite">

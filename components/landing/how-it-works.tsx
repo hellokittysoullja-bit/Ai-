@@ -47,9 +47,6 @@ export function HowItWorks() {
           viewport={{ once: true, margin: '-80px' }}
           transition={{ type: 'spring', stiffness: 120, damping: 20 }}
         >
-          <p className="font-mono text-xs uppercase tracking-widest text-primary">
-            [ один день вдвоём ]
-          </p>
           <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
             Как проходит день с напарником
           </h2>

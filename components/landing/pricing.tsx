@@ -30,12 +30,7 @@ export function Pricing() {
         transition={{ type: 'spring', stiffness: 160, damping: 20 }}
       >
         <div className="flex items-start justify-between gap-4">
-          <div className="flex flex-col gap-1">
-            <p className="font-mono text-xs uppercase tracking-widest text-primary">
-              [ наш договор ]
-            </p>
-            <h2 className="font-hand text-4xl leading-tight">Я обещаю:</h2>
-          </div>
+          <h2 className="font-hand text-4xl leading-tight">Я обещаю:</h2>
           <MascotSvg expression="happy" size={56} label="Напарник" className="shrink-0" />
         </div>
 
