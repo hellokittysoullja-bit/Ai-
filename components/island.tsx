@@ -655,9 +655,7 @@ export function Island() {
       {patterns && patterns.totalStarts > 0 && (
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
           Всего стартов: {patterns.totalStarts}
-          {rareCount > 0 ? ` · редких находок: ${rareCount}` : ''} · дней подряд:{' '}
-          {patterns.runningDays}
-          {patterns.runningDays === 0 ? ' (пауза, не обнуление)' : ''}
+          {rareCount > 0 ? ` · редких находок: ${rareCount}` : ''}. Это число только растёт.
         </p>
       )}
     </div>

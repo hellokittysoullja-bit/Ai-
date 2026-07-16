@@ -31,12 +31,20 @@ export type MemoryContextPayload = {
   }
   notes: string[]
   recentFinds?: Array<{ name: string; rarity: string; date: string }>
+  /** Имя, которое человек дал существу */
+  companionName?: string | null
 }
 
 function formatMemory(memory: MemoryContextPayload | null | undefined): string {
   if (!memory) return 'Ты пока ничего не знаешь об этом человеке — это ваш первый разговор.'
 
   const lines: string[] = []
+
+  if (memory.companionName) {
+    lines.push(
+      `Человек дал тебе имя — «${memory.companionName}». Ты этим именем дорожишь: откликаешься на него и изредка называешь себя им. Это знак вашей близости.`,
+    )
+  }
 
   if (memory.plan) {
     const time = memory.plan.startTime ? ` в ${memory.plan.startTime}` : ''
@@ -58,8 +66,10 @@ function formatMemory(memory: MemoryContextPayload | null | undefined): string {
 
   const p = memory.patterns
   if (p.totalStarts > 0) {
+    // Намеренно НЕ передаём «дней подряд»: у нас нет стриков. Считаем только
+    // накопительное число стартов, которое никогда не падает.
     lines.push(
-      `Всего стартов: ${p.totalStarts}. Дней подряд со стартами: ${p.runningDays}.` +
+      `Всего стартов за всё время: ${p.totalStarts} (это число только растёт, оно не сгорает).` +
         (p.favoriteHour !== null
           ? ` Чаще всего человек реально начинает около ${p.favoriteHour}:00.`
           : ''),
