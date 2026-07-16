@@ -19,6 +19,7 @@ const caveat = Caveat({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://ai-zq.vercel.app'),
   title: 'Напарник — существо, которое не даст тебе слиться',
   description:
     'Не ещё один планировщик. Напарник пишет тебе первым, помогает начать и растит свой мир из твоих фокус-сессий. Без стриков. Без стыда.',
@@ -27,6 +28,20 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: 'black-translucent',
     title: 'Напарник',
+  },
+  openGraph: {
+    title: 'Напарник — существо, которое не даст тебе слиться',
+    description:
+      'Помогает начать, сидит рядом во время работы и растит остров из твоих стартов. Бесплатно, без карты и регистрации.',
+    type: 'website',
+    locale: 'ru_RU',
+    siteName: 'Напарник',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Напарник — существо, которое не даст тебе слиться',
+    description:
+      'Помогает начать, сидит рядом во время работы и растит остров из твоих стартов.',
   },
 }
 

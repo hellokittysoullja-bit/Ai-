@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { motion } from 'motion/react'
+import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
 import { ChevronRight, Sprout } from 'lucide-react'
@@ -25,6 +25,8 @@ import {
   RARITY_LABEL,
   type Rarity,
 } from '@/lib/island-elements'
+import { playRewardChime } from '@/lib/reward-sound'
+import { hapticDone, hapticReward, hapticStart } from '@/lib/haptics'
 
 const durations = [15, 25, 45]
 
@@ -56,6 +58,7 @@ async function fetchVoice(moment: Moment, task: string, minutes: number): Promis
 type Phase = 'setup' | 'running' | 'done'
 
 export function FocusSession() {
+  const reducedMotion = useReducedMotion()
   const searchParams = useSearchParams()
   const prefilledStep = searchParams.get('step') ?? ''
   const fromPlan = searchParams.get('plan') === '1'
@@ -83,6 +86,28 @@ export function FocusSession() {
   const [tomorrowStep, setTomorrowStep] = useState('')
   const [planSaved, setPlanSaved] = useState(false)
   const [planFormOpen, setPlanFormOpen] = useState(false)
+
+  // Последовательное раскрытие: сначала находка одна на экране
+  // (пик без конкурентов), потом появляются план и кнопки
+  const [restRevealed, setRestRevealed] = useState(false)
+
+  useEffect(() => {
+    if (phase !== 'done') return
+    if (!grownElement) {
+      setRestRevealed(true)
+      return
+    }
+    // Звук и вибрация в момент появления карточки находки
+    const chime = window.setTimeout(() => {
+      playRewardChime(grownElement.rarity)
+      hapticReward()
+    }, 500)
+    const reveal = window.setTimeout(() => setRestRevealed(true), 1700)
+    return () => {
+      window.clearTimeout(chime)
+      window.clearTimeout(reveal)
+    }
+  }, [phase, grownElement])
 
   const totalRef = useRef(0)
   const startIdRef = useRef<string | null>(null)
@@ -121,6 +146,7 @@ export function FocusSession() {
 
   async function start() {
     if (!task.trim()) return
+    hapticStart()
     totalRef.current = minutes * 60
     setSecondsLeft(minutes * 60)
     firedMomentsRef.current = new Set()
@@ -164,10 +190,12 @@ export function FocusSession() {
       }
       setGrownElement({ name: find.name, rarity: find.rarity })
     }
+    hapticDone()
     setEndedEarly(early)
     setDoneVoice(null)
     setPlanSaved(false)
     setPlanFormOpen(false)
+    setRestRevealed(false)
     setTomorrowTask('')
     setTomorrowStep('')
     setPhase('done')
@@ -294,9 +322,13 @@ export function FocusSession() {
       {grownElement && (
         <motion.div
           className="w-full"
-          initial={{ opacity: 0, y: 18, scale: 0.92 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.5, type: 'spring', stiffness: 260, damping: 18 }}
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.92 }}
+          animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+          transition={
+            reducedMotion
+              ? { delay: 0.5, duration: 0.3 }
+              : { delay: 0.5, type: 'spring', stiffness: 260, damping: 18 }
+          }
         >
           <Link
             href="/app/world"
@@ -322,6 +354,15 @@ export function FocusSession() {
         </motion.div>
       )}
 
+      {/* План и кнопки появляются после того, как находка отыграла свой момент */}
+      <motion.div
+        className="flex w-full flex-col items-center gap-6"
+        initial={false}
+        animate={{ opacity: restRevealed ? 1 : 0, y: restRevealed ? 0 : 12 }}
+        transition={{ duration: 0.45, ease: 'easeOut' }}
+        style={{ pointerEvents: restRevealed ? 'auto' : 'none' }}
+        aria-hidden={!restRevealed}
+      >
       {!planSaved ? (
         !planFormOpen ? (
           <button
@@ -393,6 +434,7 @@ export function FocusSession() {
           Посмотреть, как вырос мир
         </Button>
       </div>
+      </motion.div>
     </div>
   )
 }

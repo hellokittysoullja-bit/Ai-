@@ -53,6 +53,7 @@ const KEYS = {
   starts: 'naparnik:starts',
   notes: 'naparnik:notes',
   finds: 'naparnik:finds',
+  worldSeen: 'naparnik:worldSeen',
 } as const
 
 function isBrowser() {
@@ -177,6 +178,23 @@ export async function addFind(find: IslandFindEntry): Promise<void> {
   write(KEYS.finds, finds)
 }
 
+// ---------- Непросмотренное на острове (триггер возврата к награде) ----------
+
+/**
+ * Сколько стартов человек ещё не видел на острове.
+ * Бейдж на табе «Мир» гаснет при заходе на страницу острова.
+ */
+export async function getUnseenWorldCount(): Promise<number> {
+  const starts = await getStarts()
+  const seen = read<number>(KEYS.worldSeen, 0)
+  return Math.max(0, starts.length - seen)
+}
+
+export async function markWorldSeen(): Promise<void> {
+  const starts = await getStarts()
+  write(KEYS.worldSeen, starts.length)
+}
+
 // ---------- Заметки напарника ----------
 
 const MAX_NOTES = 6
@@ -255,7 +273,7 @@ export type MemoryContext = {
   recentStarts: Array<Pick<StartEntry, 'date' | 'label' | 'minutes' | 'fromPlan'>>
   patterns: Patterns
   notes: string[]
-  /** Последние находки острова — напарник может вспоминать их в разговоре */
+  /** Последние находки острова — напарник может вспоминать их �� разговоре */
   recentFinds: Array<Pick<IslandFindEntry, 'name' | 'rarity' | 'date'>>
 }
 

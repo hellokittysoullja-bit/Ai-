@@ -6,6 +6,7 @@ import {
   getFinds,
   getPatterns,
   getStarts,
+  markWorldSeen,
   todayKey,
   type IslandFindEntry,
   type Patterns,
@@ -14,6 +15,7 @@ import {
 import {
   drawFind,
   ISLAND_ELEMENT_NAMES,
+  ISLAND_POOL,
   LANDMARK_COUNT,
   poolElementByKey,
   RARITY_LABEL,
@@ -353,7 +355,7 @@ export function Island() {
       const [s, p] = await Promise.all([getStarts(), getPatterns()])
       let f = await getFinds()
 
-      // Бэкфилл: старты сверх карты, сделанные до появления пула находок,
+      // Бэкфилл: старты сверх карты, сделанные д�� появления пула находок,
       // получают свои находки задним числом — история не теряется.
       const owed = Math.max(0, s.length - LANDMARK_COUNT) - f.length
       if (owed > 0) {
@@ -372,6 +374,9 @@ export function Island() {
       setStarts(s)
       setFinds(f)
       setPatterns(p)
+
+      // Человек увидел свой остров — бейдж на табе «Мир» гаснет
+      await markWorldSeen()
     }
     load()
   }, [])
@@ -490,6 +495,46 @@ export function Island() {
           <p className="text-sm font-semibold">Пока здесь пусто — и это нормально.</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Первый же старт — любой, даже минутный — вырастит здесь первый росток.
+          </p>
+        </div>
+      )}
+
+      {/* Витрина редких: найденные — в цвете, остальные — силуэты «???».
+          Цель на горизонте: человек с первого дня видит, что есть что искать. */}
+      {starts !== null && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            редкие события острова
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {ISLAND_POOL.filter((e) => e.rarity === 'rare').map((rare) => {
+              const found = finds.some((f) => f.key === rare.key)
+              const sprite = findSprites[rare.key]
+              return (
+                <div
+                  key={rare.key}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center ${
+                    found ? 'border-primary/50' : 'border-border'
+                  }`}
+                >
+                  <svg viewBox="-32 -44 64 56" className="h-9 w-12" aria-hidden="true">
+                    <g opacity={found ? 1 : 0.45} style={found ? undefined : { filter: 'saturate(0)' }}>
+                      {sprite}
+                    </g>
+                  </svg>
+                  <span
+                    className={`text-[11px] font-semibold leading-tight ${
+                      found ? '' : 'text-muted-foreground'
+                    }`}
+                  >
+                    {found ? rare.name : '???'}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            полная сессия повышает шанс редкой находки
           </p>
         </div>
       )}
