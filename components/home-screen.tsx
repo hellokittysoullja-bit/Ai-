@@ -15,6 +15,14 @@ import {
   type Patterns,
   type Plan,
 } from '@/lib/memory'
+import {
+  enableCheckins,
+  getCheckinState,
+  mirrorCompanionName,
+  registerServiceWorker,
+  type CheckinState,
+} from '@/lib/checkin'
+import { Bell } from 'lucide-react'
 
 type FirstWord = {
   greeting: string
@@ -126,6 +134,20 @@ export function HomeScreen() {
     if (!trimmed) return
     await saveCompanionName(trimmed)
     setCompanionName(trimmed)
+    // Дублируем имя в IndexedDB, чтобы весточки от напарника были персональными
+    void mirrorCompanionName(trimmed)
+  }
+
+  // Проактивные весточки: «он пишет первым», когда приложение закрыто.
+  // Работает только там, где браузер это умеет (установленная PWA на Chrome).
+  const [checkinState, setCheckinState] = useState<CheckinState>('unsupported')
+  const [checkinBusy, setCheckinBusy] = useState(false)
+
+  async function turnOnCheckins() {
+    setCheckinBusy(true)
+    const next = await enableCheckins()
+    setCheckinState(next)
+    setCheckinBusy(false)
   }
 
   // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
@@ -154,6 +176,9 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh()
+    // Тихо ставим service worker и узнаём, доступны ли весточки
+    void registerServiceWorker()
+    void getCheckinState().then(setCheckinState)
   }, [])
 
   function startNow(step: string) {
@@ -203,6 +228,37 @@ export function HomeScreen() {
                 </Button>
               </div>
             </form>
+          )}
+
+          {/* Весточки от напарника: предлагаем один раз, после того как
+              человек уже назвал существо. Только там, где браузер их умеет.
+              Ни спама, ни давления — «один тихий раз в день». */}
+          {checkinState === 'available' && !!companionName && (
+            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-secondary/40 p-3">
+              <div className="flex items-start gap-2">
+                <Bell className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                <p className="font-hand text-lg leading-snug">
+                  Хочешь, я буду махать тебе с острова раз в день? Один тихий раз, без спама — и
+                  никаких «ты пропал».
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-10 self-start"
+                onClick={turnOnCheckins}
+                disabled={checkinBusy}
+              >
+                {checkinBusy ? 'Секунду…' : 'Да, махай мне'}
+              </Button>
+            </div>
+          )}
+
+          {checkinState === 'enabled' && !!companionName && (
+            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
+              <Bell className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              {companionName} будет тихо махать тебе с острова раз в день.
+            </p>
           )}
 
           {firstWord?.actionStep && (
