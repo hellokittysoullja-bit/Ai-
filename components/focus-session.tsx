@@ -398,7 +398,7 @@ export function FocusSession() {
       if (startIdRef.current) {
         await addFind({ ...find, date: todayKey(), startId: startIdRef.current })
       }
-      // Дубликат — не пустышка: каждый экземпляр встаёт на остров,
+      // Дубликат — не пустышка: каждый экземпляр встаёт на остро��,
       // и человек видит, что остров густеет, а не «опять то же самое»
       const repeat = finds.filter((f) => f.key === find.key).length + 1
       setGrownElement({ name: find.name, rarity: find.rarity, repeat })
@@ -796,7 +796,8 @@ export function FocusSession() {
                     key={chip}
                     type="button"
                     onClick={() => setTomorrowAnchor(chip)}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    aria-pressed={tomorrowAnchor === chip}
+                    className={`min-h-11 rounded-full border px-3.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                       tomorrowAnchor === chip
                         ? 'border-primary bg-primary text-primary-foreground'
                         : 'border-border bg-background text-muted-foreground hover:text-foreground'

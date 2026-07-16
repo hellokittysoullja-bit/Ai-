@@ -199,9 +199,16 @@ export function HomeScreen() {
               size={52}
               className="shrink-0"
             />
-            <p className="pt-1 font-hand text-xl leading-snug">
-              {firstWord ? firstWord.greeting : '…'}
-            </p>
+            {/* Skeleton вместо «…»: место зарезервировано, layout не прыгает */}
+            {firstWord ? (
+              <p className="pt-1 font-hand text-xl leading-snug">{firstWord.greeting}</p>
+            ) : (
+              <div className="flex w-full flex-col gap-2 pt-2" aria-hidden="true">
+                <div className="h-4 w-full animate-pulse rounded-full bg-secondary" />
+                <div className="h-4 w-4/5 animate-pulse rounded-full bg-secondary" />
+                <div className="h-4 w-3/5 animate-pulse rounded-full bg-secondary" />
+              </div>
+            )}
           </div>
 
           {/* Момент дарения имени: один раз, после первого старта.
@@ -233,9 +240,10 @@ export function HomeScreen() {
             </form>
           )}
 
-          {/* Иконка на домашнем экране — протез object permanence:
-              предлагаем после первого старта, когда ценность уже прожита */}
-          {stats !== null && stats.totalStarts >= 1 && (
+          {/* Иконка на домашнем экране — протез object permanence.
+              Один вопрос за раз (§ когнитивная нагрузка): пока существо
+              не названо, других карточек-предложений на экране нет. */}
+          {stats !== null && stats.totalStarts >= 1 && !!companionName && (
             <InstallPrompt companionName={companionName} />
           )}
 
@@ -294,7 +302,7 @@ export function HomeScreen() {
                     onClick={() =>
                       router.push(`/app/session?step=${encodeURIComponent(chip)}&d=15`)
                     }
-                    className="rounded-full border border-primary/40 bg-card px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+                    className="min-h-11 rounded-full border border-primary/40 bg-card px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                   >
                     {chip}
                   </button>
@@ -314,7 +322,11 @@ export function HomeScreen() {
               ) : (
                 'Сегодня уже был старт — остров вырос.'
               )}{' '}
-              Всего стартов: {stats.totalStarts}.
+              {/* «Активные дни за месяц» вместо стрика: копилка, которая
+                  не сгорает от пропуска — прошлый труд не обесценивается */}
+              {stats.activeDaysThisMonth >= 2
+                ? `${stats.activeDaysThisMonth} активных дней в этом месяце, ${stats.totalStarts} стартов всего.`
+                : `Всего стартов: ${stats.totalStarts}.`}
             </p>
           )}
         </div>

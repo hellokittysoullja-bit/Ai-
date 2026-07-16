@@ -42,7 +42,7 @@ export function AppNav() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? 'page' : undefined}
-              className={`flex flex-col items-center gap-1 rounded-xl px-5 py-1.5 text-xs font-medium transition-colors ${
+              className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl px-5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 active ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
               }`}
             >

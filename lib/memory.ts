@@ -41,6 +41,12 @@ export type Patterns = {
   totalStarts: number
   /** Дней подряд с хотя бы одним стартом (пропуск = пауза, не обнуление) */
   runningDays: number
+  /**
+   * Дней с хотя бы одним стартом в текущем календарном месяце.
+   * Нетоксичная замена стрику: «9 активных дней в июле» не сгорает
+   * от пропуска — прошлый труд не обесценивается никогда.
+   */
+  activeDaysThisMonth: number
   /** Час суток, в который человек чаще всего реально начинает (0-23), или null */
   favoriteHour: number | null
   lastStartDate: string | null
@@ -270,11 +276,22 @@ export async function addNote(text: string): Promise<void> {
 export async function getPatterns(): Promise<Patterns> {
   const starts = await getStarts()
   if (starts.length === 0) {
-    return { totalStarts: 0, runningDays: 0, favoriteHour: null, lastStartDate: null, daysAway: null }
+    return {
+      totalStarts: 0,
+      runningDays: 0,
+      activeDaysThisMonth: 0,
+      favoriteHour: null,
+      lastStartDate: null,
+      daysAway: null,
+    }
   }
 
   const dates = Array.from(new Set(starts.map((s) => s.date))).sort()
   const lastStartDate = dates[dates.length - 1]
+
+  // Активные дни месяца: YYYY-MM текущего месяца — префикс ключа даты
+  const monthPrefix = todayKey().slice(0, 7)
+  const activeDaysThisMonth = dates.filter((d) => d.startsWith(monthPrefix)).length
 
   // «Дней подряд»: серия, заканчивающаяся сегодня или вчера.
   // Пропуск дня приостанавливает счёт, но история не сгорает.
@@ -316,7 +333,14 @@ export async function getPatterns(): Promise<Patterns> {
     ),
   )
 
-  return { totalStarts: starts.length, runningDays, favoriteHour, lastStartDate, daysAway }
+  return {
+    totalStarts: starts.length,
+    runningDays,
+    activeDaysThisMonth,
+    favoriteHour,
+    lastStartDate,
+    daysAway,
+  }
 }
 
 // ---------- Компактный контекст для LLM ----------
