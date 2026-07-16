@@ -38,10 +38,16 @@ const c = {
 }
 
 function el(unlocked: boolean, children: React.ReactNode) {
+  // Закрытое — не невидимое, а призрачное: остров показывает своё будущее.
+  // Мозг видит, куда ведут старты (Зейгарник), без фальшивого прогресса —
+  // силуэт обесцвечен и полупрозрачен, «наградой» он ещё не притворяется.
   return (
     <g
-      opacity={unlocked ? 1 : 0}
-      style={{ transition: 'opacity 700ms ease' }}
+      opacity={unlocked ? 1 : 0.13}
+      style={{
+        transition: 'opacity 700ms ease',
+        filter: unlocked ? undefined : 'saturate(0)',
+      }}
       aria-hidden={!unlocked}
     >
       {children}
@@ -569,11 +575,18 @@ export function Island() {
 
       {starts !== null && count === 0 && (
         <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
-          <p className="text-sm font-semibold">Пока здесь пусто — и это нормально.</p>
+          <p className="text-sm font-semibold">Видишь очертания? Это всё уже твоё.</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
-            Первый же старт — любой, даже минутный — вырастит здесь первый росток.
+            Дерево, костёр, домик, причал — они ждут. Первый же старт, даже минутный, зажжёт
+            первый росток.
           </p>
         </div>
+      )}
+
+      {starts !== null && count > 0 && count < LANDMARK_COUNT && (
+        <p className="text-center text-xs leading-relaxed text-muted-foreground">
+          Призрачные очертания — то, что вырастет за следующие старты. Всё уже ждёт тебя.
+        </p>
       )}
 
       {/* Витрина редких: найденные — в цвете, остальные — силуэты «???».
