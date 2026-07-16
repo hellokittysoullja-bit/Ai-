@@ -40,11 +40,14 @@ function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): First
   const isEvening = hour >= 18 || hour < 4
   const today = todayKey(now)
 
-  // Человек долго не заходил — сначала жизнь острова, потом всё остальное
+  // Прощение как дефолт (механика Duolingo без её кнута): пауза — это
+  // просто пауза. Длинная — дневник острова, короткая — тихая радость.
   const awayLine =
     patterns.daysAway !== null && patterns.daysAway >= 3
       ? awayDiary[(patterns.totalStarts + patterns.daysAway) % awayDiary.length] + ' '
-      : ''
+      : patterns.daysAway !== null && patterns.daysAway === 2
+        ? 'Ты пришёл. Два дня — это просто два дня, остров всё помнит. '
+        : ''
 
   // Совпадение с личным часом стартов: мягкий, честный толчок из данных
   const hourLine =
@@ -104,13 +107,17 @@ export function HomeScreen() {
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null)
   const [stats, setStats] = useState<Patterns | null>(null)
 
-  // Выражение маскота по контексту: есть шаг — собран, поздний вечер — сонный, иначе спокоен
+  // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
+  // есть шаг — собран, поздний вечер — сонный, иначе спокоен
   const hour = new Date().getHours()
-  const mascotExpression: MascotExpression = firstWord?.actionStep
-    ? 'focused'
-    : hour >= 22 || hour < 5
-      ? 'sleepy'
-      : 'calm'
+  const mascotExpression: MascotExpression =
+    stats?.daysAway !== null && stats !== null && stats.daysAway >= 2
+      ? 'happy'
+      : firstWord?.actionStep
+        ? 'focused'
+        : hour >= 22 || hour < 5
+          ? 'sleepy'
+          : 'calm'
 
   async function refresh() {
     const [plan, patterns] = await Promise.all([getPlan(), getPatterns()])
@@ -176,9 +183,22 @@ export function HomeScreen() {
           )}
 
           {stats && stats.totalStarts > 0 && (
-            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              стартов: {stats.totalStarts} · дней подряд: {stats.runningDays}
-            </p>
+            <div className="flex flex-col gap-1.5">
+              {/* Предвкушение вместо нормы: обещание награды без таймера сгорания.
+                  Не сделал сегодня — ничего не потерял, завтра тоже будет. */}
+              {stats.lastStartDate !== todayKey(new Date()) ? (
+                <p className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                  первый старт дня ещё впереди — за ним находка для острова
+                </p>
+              ) : (
+                <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  сегодня уже был старт — остров вырос
+                </p>
+              )}
+              <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                стартов: {stats.totalStarts} · дней подряд: {stats.runningDays}
+              </p>
+            </div>
           )}
         </div>
       </section>
