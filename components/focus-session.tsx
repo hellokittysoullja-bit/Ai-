@@ -28,7 +28,7 @@ import {
   RARITY_LABEL,
   type Rarity,
 } from '@/lib/island-elements'
-import { playRewardChime } from '@/lib/reward-sound'
+import { playRewardChime, playStartSigh } from '@/lib/reward-sound'
 import { hapticDone, hapticReward, hapticStart } from '@/lib/haptics'
 
 const durations = [15, 25, 45]
@@ -58,7 +58,7 @@ async function fetchVoice(moment: Moment, task: string, minutes: number): Promis
   }
 }
 
-type Phase = 'setup' | 'running' | 'done'
+type Phase = 'setup' | 'starting' | 'running' | 'done'
 
 export function FocusSession() {
   const reducedMotion = useReducedMotion()
@@ -173,6 +173,27 @@ export function FocusSession() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [secondsLeft, phase])
 
+  // Хореография старта: 2.2 секунды — существо садится рядом, потом сессия
+  useEffect(() => {
+    if (phase !== 'starting') return
+    const t = window.setTimeout(() => setPhase('running'), 2200)
+    return () => window.clearTimeout(t)
+  }, [phase])
+
+  // Живое присутствие: на каждой четверти пути котик коротко радуется
+  const lastQuarterRef = useRef(0)
+  const [cheering, setCheering] = useState(false)
+  useEffect(() => {
+    if (phase !== 'running' || totalRef.current === 0) return
+    const q = Math.floor((1 - secondsLeft / totalRef.current) * 4)
+    if (q > lastQuarterRef.current && q < 4) {
+      lastQuarterRef.current = q
+      setCheering(true)
+      const t = window.setTimeout(() => setCheering(false), 2600)
+      return () => window.clearTimeout(t)
+    }
+  }, [secondsLeft, phase])
+
   // Реплики по ходу сессии
   useEffect(() => {
     if (phase !== 'running' || totalRef.current === 0) return
@@ -184,11 +205,15 @@ export function FocusSession() {
   async function start() {
     if (!task.trim()) return
     hapticStart()
+    playStartSigh()
     totalRef.current = minutes * 60
     setSecondsLeft(minutes * 60)
     firedMomentsRef.current = new Set()
+    lastQuarterRef.current = 0
     setVoice(fallbackVoice.start)
-    setPhase('running')
+    // Хореография: интерфейс растворяется, существо садится рядом,
+    // таймер проявляется. При reduced-motion — сразу к делу.
+    setPhase(reducedMotion ? 'running' : 'starting')
     startedAtRef.current = Date.now()
 
     // Старт записывается в момент старта: инициация — и есть валюта
@@ -264,82 +289,134 @@ export function FocusSession() {
 
   if (phase === 'setup') {
     return (
-      <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 py-8">
-        <div className="flex items-center gap-3">
-          <MascotSvg expression="calm" label="Напарник" size={56} className="shrink-0" />
-          <p className="rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-6">
+        {/* Сцена: существо в центре внимания, а не в углу формы */}
+        <div className="flex flex-1 flex-col items-center justify-center gap-4">
+          <MascotSvg expression="calm" label="Напарник" size={150} />
+          <p className="max-w-72 text-balance rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-xl leading-snug">
             {prefilledStep
               ? 'Шаг уже выбран. Просто жми — я рядом.'
               : 'Что делаем? Назови первый шаг — не всю задачу.'}
           </p>
         </div>
-        <label className="flex flex-col gap-2">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-            Первый шаг
-          </span>
-          <input
-            value={task}
-            onChange={(e) => setTask(e.target.value)}
-            placeholder="Открыть файл презентации"
-            className="h-12 rounded-xl border border-input bg-card px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          />
-        </label>
-        <div className="flex flex-col gap-2">
-          <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-            Длительность
-          </span>
-          <div className="flex gap-2">
-            {durations.map((d) => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => setMinutes(d)}
-                aria-pressed={minutes === d}
-                className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
-                  minutes === d
-                    ? 'border-primary bg-primary text-primary-foreground'
-                    : 'border-border bg-card text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {d} мин
-              </button>
-            ))}
+        {/* Управление внизу — в зоне большого пальца */}
+        <div className="flex flex-col gap-4">
+          <label className="flex flex-col gap-2">
+            <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Первый шаг
+            </span>
+            <input
+              value={task}
+              onChange={(e) => setTask(e.target.value)}
+              placeholder="Открыть файл презентации"
+              className="h-12 rounded-xl border border-input bg-card px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          </label>
+          <div className="flex flex-col gap-2">
+            <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
+              Длительность
+            </span>
+            <div className="flex gap-2">
+              {durations.map((d) => (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setMinutes(d)}
+                  aria-pressed={minutes === d}
+                  className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
+                    minutes === d
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {d} мин
+                </button>
+              ))}
+            </div>
           </div>
+          <motion.div whileTap={reducedMotion ? undefined : { scale: 0.96 }}>
+            <Button
+              size="lg"
+              onClick={start}
+              disabled={!task.trim()}
+              className="w-full font-semibold"
+            >
+              Начали. Я рядом
+            </Button>
+          </motion.div>
+          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            старт засчитывается сразу — даже если выйдешь раньше
+          </p>
         </div>
-        <Button size="lg" onClick={start} disabled={!task.trim()} className="font-semibold">
-          Начали. Я рядом
-        </Button>
-        <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-          старт засчитывается сразу — даже если выйдешь раньше
-        </p>
+      </div>
+    )
+  }
+
+  if (phase === 'starting') {
+    // Хореография: мир затихает, существо садится рядом, сессия проявляется
+    return (
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5 px-4 py-8">
+        <motion.div
+          initial={{ scale: 1.06 }}
+          animate={{ scale: 1 }}
+          transition={{ duration: 1.8, ease: 'easeOut' }}
+        >
+          <MascotSvg expression="happy" label="Напарник садится рядом" size={170} />
+        </motion.div>
+        <motion.p
+          className="font-hand text-2xl text-muted-foreground"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6, duration: 0.7 }}
+        >
+          Сажусь рядом. Начали.
+        </motion.p>
+        <motion.p
+          className="font-mono text-xs uppercase tracking-widest text-primary"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.3, duration: 0.6 }}
+        >
+          старт засчитан
+        </motion.p>
       </div>
     )
   }
 
   if (phase === 'running') {
     return (
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-8 px-4 py-8">
-        <p className="text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          {task}
+      <motion.div
+        className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 px-4 py-8"
+        initial={reducedMotion ? false : { opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.6 }}
+      >
+        {/* Существо — центр сцены. Радуется на каждой четверти пути */}
+        <MascotSvg
+          expression={cheering ? 'happy' : 'focused'}
+          label="Напарник работает рядом"
+          size={130}
+        />
+        <p className="max-w-72 text-balance rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-xl leading-snug">
+          {cheering ? 'Четверть пути позади. Идём.' : voice}
         </p>
-        <div
-          role="timer"
-          aria-live="polite"
-          className="text-7xl font-bold tabular-nums tracking-tight"
-        >
-          {mm}:{ss}
-        </div>
-        <div className="h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-secondary">
-          <div
-            className="h-full rounded-full bg-primary transition-all duration-1000"
-            style={{ width: `${progress * 100}%` }}
-          />
-        </div>
-        <div className="flex items-center gap-3">
-          <MascotSvg expression="focused" label="Напарник работает рядом" size={64} className="shrink-0" />
-          <p className="max-w-56 rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
-            {voice}
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
+            {task}
           </p>
+          <div
+            role="timer"
+            aria-live="polite"
+            className="text-7xl font-bold tabular-nums tracking-tight"
+          >
+            {mm}:{ss}
+          </div>
+          <div className="h-1.5 w-64 overflow-hidden rounded-full bg-secondary">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-1000"
+              style={{ width: `${progress * 100}%` }}
+            />
+          </div>
         </div>
         <div className="flex flex-col items-center gap-1">
           <Button
@@ -354,7 +431,7 @@ export function FocusSession() {
             старт уже засчитан · полная сессия повышает шанс редкой находки
           </p>
         </div>
-      </div>
+      </motion.div>
     )
   }
 
