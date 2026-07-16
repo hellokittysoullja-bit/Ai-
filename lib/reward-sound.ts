@@ -79,3 +79,22 @@ export function playRewardChime(rarity: Rarity | 'landmark') {
   note(ac, SCALE[4], t + 0.22, 0.36, 0.05)
   note(ac, SCALE[5], t + 0.36, 0.9, 0.055)
 }
+
+/**
+ * Звук-выдох момента старта: два тихих нисходящих тона,
+ * как «садимся, начинаем». Противоположность фанфарам —
+ * старт должен успокаивать, а не будоражить.
+ */
+export function playStartSigh() {
+  if (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return
+  }
+  const ac = audioCtx()
+  if (!ac) return
+  const t = ac.currentTime + 0.02
+  note(ac, SCALE[3], t, 0.5, 0.035)
+  note(ac, SCALE[1], t + 0.18, 0.9, 0.03)
+}
