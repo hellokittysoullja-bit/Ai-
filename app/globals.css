@@ -1,6 +1,6 @@
-@import 'tailwindcss';
-@import 'tw-animate-css';
-@import 'shadcn/tailwind.css';
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -103,7 +103,7 @@
 
 /* Плёночное зерно поверх тёмных секций — снимает стерильность плоских заливок */
 .grain::before {
-  content: '';
+  content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -181,5 +181,49 @@
   .island-grow,
   .island-grow.island-new-element {
     animation: none;
+  }
+}
+
+/* Первый кадр «статика прежде скрипта»: весь контент уже в серверном HTML,
+   появление хореографирует чистый CSS — работает даже с выключенным JS */
+@keyframes hero-word-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  animation: hero-word-in 0.32s ease-out forwards;
+}
+
+@keyframes hero-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-rise {
+  opacity: 0;
+  animation: hero-rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--rise-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-word,
+  .hero-rise {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
   }
 }
