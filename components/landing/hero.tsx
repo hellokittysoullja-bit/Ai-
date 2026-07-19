@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
@@ -8,17 +8,18 @@ import { GroundPool, HeroScene } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
 
 /**
- * Живой первый экран: не рассказ о продукте, а сам продукт.
- * Сцена (небо, свет очага, существо на земле) — серверный SVG, живёт без JS:
- * первый отрисованный кадр уже показывает мир, а не спиннер.
- * Напарник печатает первую реплику ≤2 сек после загрузки (Rule of 40s);
- * тап по бабблу мгновенно достраивает строку (agency, как в игровых диалогах).
- * Ответ посетителя — ровно 2 кнопки (Hick's Law), без свободного ввода.
- * Выбор сохраняется в naparnik:intro — /app продолжает разговор, а не начинает заново.
+ * Первый экран по принципу «статика прежде скрипта» (уровень прод-команд):
+ * весь первый кадр — сцена, первая реплика, кнопки-ответы, заголовок —
+ * существует уже в серверном HTML. Хореография появления (каскад слов,
+ * подъём блоков) — чистый CSS (hero-word / hero-rise в globals.css),
+ * поэтому кадр одинаков с JS и без него, для человека и для поисковика.
+ *
+ * JavaScript добавляет только поведение и ни одного пикселя содержимого:
+ * взгляд существа за курсором, розыгрыш диалога после ответа, память
+ * выбора (naparnik:intro), появление CTA по дочитыванию реплики.
+ *
+ * Деградация без JS: кнопки-ответы — настоящие ссылки в /app.
  */
-
-type SceneStep =
-  { kind: "companion"; text: string } | { kind: "visitor"; text: string };
 
 const OPENING_LINE =
   "Привет. Я Напарник. Я не планировщик — я тот, кто сидит рядом, когда трудно начать.";
@@ -40,7 +41,46 @@ type ReplyKey = keyof typeof REPLIES;
 
 const INTRO_CHOICE_KEY = "naparnik:intro";
 
-/** Печатающаяся реплика напарника; тап — мгновенно достроить строку */
+type SceneStep = { kind: "companion" | "visitor"; text: string };
+
+/**
+ * Каскадное появление слов на чистом CSS: серверный HTML уже содержит весь
+ * текст (скринридеры и роботы читают его сразу), а глаз видит «печать».
+ */
+function WordReveal({
+  text,
+  startDelay = 0.55,
+  step = 0.085,
+  className,
+}: {
+  text: string;
+  startDelay?: number;
+  step?: number;
+  className?: string;
+}) {
+  const words = text.split(" ");
+  return (
+    <p className={className}>
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {words.map((word, i) => (
+          <span key={i}>
+            <span
+              className="hero-word"
+              style={{
+                animationDelay: `${(startDelay + i * step).toFixed(2)}s`,
+              }}
+            >
+              {word}
+            </span>{" "}
+          </span>
+        ))}
+      </span>
+    </p>
+  );
+}
+
+/** Печатающаяся реплика (только для диалога после ответа — там JS уже точно есть) */
 function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
   const reduceMotion = useReducedMotion();
   const [shown, setShown] = useState(reduceMotion ? text.length : 0);
@@ -91,29 +131,13 @@ function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
 }
 
 export function Hero() {
+  // Диалог ПОСЛЕ ответа посетителя — единственная JS-зависимая часть сцены
   const [steps, setSteps] = useState<SceneStep[]>([]);
-  const [showChoices, setShowChoices] = useState(false);
   const [answered, setAnswered] = useState(false);
   const [showCta, setShowCta] = useState(false);
-  const [showFallbackCta, setShowFallbackCta] = useState(false);
   const [expression, setExpression] = useState<MascotExpression>("calm");
 
-  // Rule of 40s: первая реплика стартует почти сразу после загрузки
-  useEffect(() => {
-    const id = setTimeout(() => {
-      setSteps([{ kind: "companion", text: OPENING_LINE }]);
-    }, 400);
-    return () => clearTimeout(id);
-  }, []);
-
-  // Запасной путь вперёд появляется только если сцена не увлекла
-  useEffect(() => {
-    const id = setTimeout(() => setShowFallbackCta(true), 7000);
-    return () => clearTimeout(id);
-  }, []);
-
   function choose(key: ReplyKey) {
-    setShowChoices(false);
     setAnswered(true);
     setExpression("happy");
     // Шов лендинг → /app: приложение продолжит этот разговор
@@ -122,10 +146,7 @@ export function Hero() {
     } catch {
       // приватный режим — не критично
     }
-    setSteps((prev) => [
-      ...prev,
-      { kind: "visitor", text: REPLIES[key].visitor },
-    ]);
+    setSteps([{ kind: "visitor", text: REPLIES[key].visitor }]);
     // реплика напарника — после короткой паузы, как в живом разговоре
     setTimeout(() => {
       setSteps((prev) => [
@@ -155,6 +176,18 @@ export function Hero() {
         </div>
 
         <div className="flex w-full flex-col gap-3" aria-live="polite">
+          {/* Первая реплика: в HTML с первого байта, слова — каскадом через CSS */}
+          <div
+            className="hero-rise max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5"
+            style={{ "--rise-delay": "0.25s" } as CSSProperties}
+          >
+            <WordReveal
+              text={OPENING_LINE}
+              className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
+            />
+          </div>
+
+          {/* Розыгрыш диалога после ответа */}
           <AnimatePresence initial={false}>
             {steps.map((step, i) =>
               step.kind === "companion" ? (
@@ -165,14 +198,7 @@ export function Hero() {
                   transition={{ type: "spring", stiffness: 300, damping: 24 }}
                   className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5"
                 >
-                  <TypedLine
-                    text={step.text}
-                    onDone={
-                      i === 0
-                        ? () => setShowChoices(true)
-                        : () => setShowCta(true)
-                    }
-                  />
+                  <TypedLine text={step.text} onDone={() => setShowCta(true)} />
                 </motion.div>
               ) : (
                 <motion.div
@@ -190,30 +216,28 @@ export function Hero() {
             )}
           </AnimatePresence>
 
-          {/* Hick's Law: ровно 2 варианта ответа — оформлены как «твоя следующая
-              реплика» (форма visitor-баббла), а не как теги */}
-          <AnimatePresence>
-            {showChoices && !answered && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
-                transition={{ delay: 0.2 }}
-                className="flex flex-wrap justify-end gap-2 pt-1"
-              >
-                {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => choose(key)}
-                    className="rounded-2xl rounded-br-sm border border-primary/40 bg-primary/10 px-5 py-3 text-[15px] font-semibold text-foreground transition-colors hover:bg-primary/20 active:translate-y-px"
-                  >
-                    {REPLIES[key].visitor}
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {/* Hick's Law: ровно 2 ответа, оформлены как «твоя следующая реплика».
+              Это настоящие ссылки: без JS они честно ведут в /app */}
+          {!answered && (
+            <div
+              className="hero-rise flex flex-wrap justify-end gap-2 pt-1"
+              style={{ "--rise-delay": "2.05s" } as CSSProperties}
+            >
+              {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
+                <Link
+                  key={key}
+                  href="/app"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    choose(key);
+                  }}
+                  className="rounded-2xl rounded-br-sm border border-primary/40 bg-primary/10 px-5 py-3 text-[15px] font-semibold text-foreground transition-colors hover:bg-primary/20 active:translate-y-px"
+                >
+                  {REPLIES[key].visitor}
+                </Link>
+              ))}
+            </div>
+          )}
 
           {/* Пик сцены: CTA появляется когда ответ дочитан, а не по таймеру */}
           {showCta && (
@@ -241,13 +265,11 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Заголовок ПОД сценой: сцена важнее слов. Появляется после первой реплики,
-          чтобы не конкурировать с печатью за внимание */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 2.6, duration: 0.8 }}
-        className="mt-16 flex max-w-sm flex-col items-center gap-3 text-center"
+      {/* Заголовок ПОД сценой: сцена важнее слов. В серверном HTML — сразу,
+          глазу проявляется после первой реплики (CSS-задержка) */}
+      <div
+        className="hero-rise mt-16 flex max-w-sm flex-col items-center gap-3 text-center"
+        style={{ "--rise-delay": "2.6s" } as CSSProperties}
       >
         <h1 className="text-balance text-3xl font-bold leading-tight md:text-4xl">
           Существо, которое не даст тебе слиться
@@ -256,30 +278,27 @@ export function Hero() {
           Помогает начать, сидит рядом во время работы и растит остров из твоих
           стартов. Без стриков. Без стыда.
         </p>
-        {/* Запасной путь: тихий, чтобы не спорить с чипами сцены */}
-        <AnimatePresence>
-          {!answered && showFallbackCta && (
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0 }}
+        {/* Запасной путь вперёд: тихий, на CSS-таймере, прячется после ответа */}
+        {!answered && (
+          <div
+            className="hero-rise"
+            style={{ "--rise-delay": "7s" } as CSSProperties}
+          >
+            <Button
+              render={<Link href="/app" />}
+              nativeButton={false}
+              size="lg"
+              variant="outline"
+              className="mt-2 font-semibold"
             >
-              <Button
-                render={<Link href="/app" />}
-                nativeButton={false}
-                size="lg"
-                variant="outline"
-                className="mt-2 font-semibold"
-              >
-                Попробовать
-              </Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              Попробовать
+            </Button>
+          </div>
+        )}
         <span className="pt-1 font-mono text-xs text-muted-foreground">
           бесплатно, без карты и регистрации
         </span>
-      </motion.div>
+      </div>
     </section>
   );
 }
