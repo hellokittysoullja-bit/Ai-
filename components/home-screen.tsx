@@ -1,11 +1,13 @@
-'use client'
+"use client";
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Play } from 'lucide-react'
-import { CompanionChat } from '@/components/companion-chat'
-import { MascotSvg, type MascotExpression } from '@/components/mascot-svg'
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { Button } from "@/components/ui/button";
+import { Play } from "lucide-react";
+import { CompanionChat } from "@/components/companion-chat";
+import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
   getCompanionName,
   getPatterns,
@@ -14,30 +16,30 @@ import {
   todayKey,
   type Patterns,
   type Plan,
-} from '@/lib/memory'
+} from "@/lib/memory";
 import {
   enableCheckins,
   getCheckinState,
   mirrorCompanionName,
   registerServiceWorker,
   type CheckinState,
-} from '@/lib/checkin'
-import { Bell } from 'lucide-react'
+} from "@/lib/checkin";
+import { Bell } from "lucide-react";
 
 type FirstWord = {
-  greeting: string
+  greeting: string;
   /** Есть план на сегодня — показываем кнопку «Начинаю» */
-  actionStep: string | null
+  actionStep: string | null;
   /** Новичок без стартов — показываем чипы мгновенного первого старта */
-  showStarterChips?: boolean
-}
+  showStarterChips?: boolean;
+};
 
 /** Готовые крошечные шаги: ноль решений до первого старта */
 const starterChips = [
-  'Открыть нужный файл',
-  'Убрать одну вещь со стола',
-  'Написать одно предложение',
-]
+  "Открыть нужный файл",
+  "Убрать одну вещь со стола",
+  "Написать одно предложение",
+];
 
 /**
  * Дневник отсутствия: напарник жил на острове, пока человека не было.
@@ -45,39 +47,47 @@ const starterChips = [
  * Выбор события детерминированный, чтобы не менялся при каждом рендере.
  */
 const awayDiary = [
-  'Пока тебя не было, я рыбачил у причала. Море было тихое. Остров стоит, ничего не сгорело.',
-  'Я тут пересчитал всё, что выросло на острове, — всё на месте. Пауза — это пауза, не откат.',
-  'Без тебя я смотрел на волны и гадал, что вырастет от твоего следующего старта.',
-  'Я развёл костёр и просто ждал. Это не упрёк — я рад, что ты зашёл.',
-]
+  "Пока тебя не было, я рыбачил у причала. Море было тихое. Остров стоит, ничего не сгорело.",
+  "Я тут пересчитал всё, что выросло на острове, — всё на месте. Пауза — это пауза, не откат.",
+  "Без тебя я смотрел на волны и гадал, что вырастет от твоего следующего старта.",
+  "Я развёл костёр и просто ждал. Это не упрёк — я рад, что ты зашёл.",
+];
 
-function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): FirstWord {
-  const hour = now.getHours()
-  const isEvening = hour >= 18 || hour < 4
-  const today = todayKey(now)
+function buildFirstWord(
+  plan: Plan | null,
+  patterns: Patterns,
+  now: Date,
+): FirstWord {
+  const hour = now.getHours();
+  const isEvening = hour >= 18 || hour < 4;
+  const today = todayKey(now);
 
   // Прощение как дефолт (механика Duolingo без её кнута): пауза — это
   // просто пауза. Длинная — дневник острова, короткая — тихая радость.
   const awayLine =
     patterns.daysAway !== null && patterns.daysAway >= 3
-      ? awayDiary[(patterns.totalStarts + patterns.daysAway) % awayDiary.length] + ' '
+      ? awayDiary[
+          (patterns.totalStarts + patterns.daysAway) % awayDiary.length
+        ] + " "
       : patterns.daysAway !== null && patterns.daysAway === 2
-        ? 'Ты пришёл. Два дня — это просто два дня, остров всё помнит. '
-        : ''
+        ? "Ты пришёл. Два дня — это просто два дня, остров всё помнит. "
+        : "";
 
   // Совпадение с личным часом стартов: мягкий, честный толчок из данных
   const hourLine =
-    patterns.favoriteHour !== null && patterns.totalStarts >= 3 && hour === patterns.favoriteHour
+    patterns.favoriteHour !== null &&
+    patterns.totalStarts >= 3 &&
+    hour === patterns.favoriteHour
       ? ` Сейчас ${hour}:00 — обычно именно в это время ты реально начинаешь.`
-      : ''
+      : "";
 
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
-    const time = plan.startTime ? ` в ${plan.startTime}` : ''
+    const time = plan.startTime ? ` в ${plan.startTime}` : "";
     return {
       greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} Я рядом, жми кнопку.`,
       actionStep: plan.firstStep,
-    }
+    };
   }
 
   // План на завтра уже положен, сейчас день — подтверждение
@@ -85,161 +95,219 @@ function buildFirstWord(plan: Plan | null, patterns: Patterns, now: Date): First
     return {
       greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
       actionStep: null,
-    }
+    };
   }
 
   if (plan && isEvening) {
     return {
       greeting: `План на завтра уже готов: «${plan.task}», первый шаг — ${plan.firstStep.toLowerCase()}. Утром напишу первым. Можешь спать спокойно.`,
       actionStep: null,
-    }
+    };
   }
 
   if (isEvening) {
     return {
       greeting:
-        'Вечер — лучшее время договориться с завтрашним собой. Давай за три минуты решим: одно дело, один первый шаг, одно время. Напиши, что завтра важно.',
+        "Вечер — лучшее время договориться с завтрашним собой. Давай за три минуты решим: одно дело, один первый шаг, одно время. Напиши, что завтра важно.",
       actionStep: null,
-    }
+    };
   }
 
   if (patterns.totalStarts === 0) {
     return {
       greeting:
-        'Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши, что висит.',
+        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
       actionStep: null,
       showStarterChips: true,
-    }
+    };
   }
 
   return {
     greeting: `${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
-  }
+  };
 }
 
 export function HomeScreen() {
-  const router = useRouter()
-  const [firstWord, setFirstWord] = useState<FirstWord | null>(null)
-  const [stats, setStats] = useState<Patterns | null>(null)
+  const router = useRouter();
+  const [firstWord, setFirstWord] = useState<FirstWord | null>(null);
+  const [stats, setStats] = useState<Patterns | null>(null);
 
   // Endowment: названное существо становится «моим». Имя спрашиваем
   // после первого старта — когда ценность уже прожита, а не обещана.
-  const [companionName, setCompanionName] = useState<string | null>(null)
-  const [nameLoaded, setNameLoaded] = useState(false)
-  const [nameDraft, setNameDraft] = useState('')
+  const [companionName, setCompanionName] = useState<string | null>(null);
+  const [nameLoaded, setNameLoaded] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   async function giveName(name: string) {
-    const trimmed = name.trim()
-    if (!trimmed) return
-    await saveCompanionName(trimmed)
-    setCompanionName(trimmed)
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    await saveCompanionName(trimmed);
+    setCompanionName(trimmed);
     // Дублируем имя в IndexedDB, чтобы весточки от напарника были персональными
-    void mirrorCompanionName(trimmed)
+    void mirrorCompanionName(trimmed);
   }
 
   // Проактивные весточки: «он пишет первым», когда приложение закрыто.
   // Работает только там, где браузер это умеет (установленная PWA на Chrome).
-  const [checkinState, setCheckinState] = useState<CheckinState>('unsupported')
-  const [checkinBusy, setCheckinBusy] = useState(false)
+  const [checkinState, setCheckinState] = useState<CheckinState>("unsupported");
+  const [checkinBusy, setCheckinBusy] = useState(false);
 
   async function turnOnCheckins() {
-    setCheckinBusy(true)
-    const next = await enableCheckins()
-    setCheckinState(next)
-    setCheckinBusy(false)
+    setCheckinBusy(true);
+    const next = await enableCheckins();
+    setCheckinState(next);
+    setCheckinBusy(false);
   }
+
+  // reduceMotion объявляем первым — используется ниже
+  const reduceMotion = useReducedMotion();
+
+  // Маскот оживает ТОЛЬКО при возвращении после паузы (daysAway ≥ 1).
+  // На каждый mount — НЕ анимируем: habituation убивает дофамин к 5-му визиту.
+  // Событийный триггер (вернулся!) = surprise = дофамин. Variable Reward.
+  const shouldAnimateMascot =
+    !reduceMotion &&
+    stats !== null &&
+    // Событийный триггер: вернулся после паузы ИЛИ первый визит.
+    // Первый визит: peak moment bond-formation — маскот должен отреагировать.
+    // Возвращение после паузы: Variable Reward — дофамин от surprise.
+    // ONLY return after real pause (daysAway≥1) = Variable Reward.
+    // totalStarts===0 REMOVED: HomeScreen remounts on every tab switch →
+    // bounce would fire 3x/session → habituation → dopamine dies by visit 5.
+    // Rare event = dopamine peak. Frequent = background noise.
+    stats.daysAway !== null && stats.daysAway >= 1;
 
   // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
   // есть шаг — собран, поздний вечер — сонный, иначе спокоен
-  const hour = new Date().getHours()
+  const hour = new Date().getHours();
   const mascotExpression: MascotExpression =
     stats?.daysAway !== null && stats !== null && stats.daysAway >= 2
-      ? 'happy'
+      ? "happy"
       : firstWord?.actionStep
-        ? 'focused'
+        ? "focused"
         : hour >= 22 || hour < 5
-          ? 'sleepy'
-          : 'calm'
+          ? "sleepy"
+          : "calm";
 
   async function refresh() {
     const [plan, patterns, name] = await Promise.all([
       getPlan(),
       getPatterns(),
       getCompanionName(),
-    ])
-    setFirstWord(buildFirstWord(plan, patterns, new Date()))
-    setStats(patterns)
-    setCompanionName(name)
-    setNameLoaded(true)
+    ]);
+    setFirstWord(buildFirstWord(plan, patterns, new Date()));
+    setStats(patterns);
+    setCompanionName(name);
+    setNameLoaded(true);
   }
 
   useEffect(() => {
-    refresh()
+    refresh();
     // Тихо ставим service worker и узнаём, доступны ли весточки
-    void registerServiceWorker()
-    void getCheckinState().then(setCheckinState)
-  }, [])
+    void registerServiceWorker();
+    void getCheckinState().then(setCheckinState);
+  }, []);
 
   function startNow(step: string) {
-    router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`)
+    router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section className="border-b border-border bg-card">
+      <section className="border-b border-border/40 bg-gradient-to-b from-card to-background">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
-            <MascotSvg
-              expression={mascotExpression}
-              label={companionName ?? 'Напарник'}
-              size={52}
+            {/*
+              Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
+              На каждый mount — статичен. Habituation убивает дофамин к 5-му визиту.
+              Событийный триггер = Variable Reward = настоящий дофамин.
+              keyframes [1, 1.14, 0.95, 1.05, 1] = радостный прыжок, не угроза.
+            */}
+            <motion.div
               className="shrink-0"
-            />
-            <p className="pt-1 font-hand text-xl leading-snug">
-              {firstWord ? firstWord.greeting : '…'}
-            </p>
+              animate={
+                shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
+              }
+              transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
+            >
+              <MascotSvg
+                expression={mascotExpression}
+                label={companionName ?? "Напарник"}
+                size={52}
+              />
+            </motion.div>
+            {/*
+              Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
+              Не на mount (иначе «…» fade-in = jank = negative prediction error).
+              AnimatePresence ждёт firstWord, потом slide-up 0.25s.
+            */}
+            <AnimatePresence>
+              {firstWord ? (
+                <motion.p
+                  key="greeting"
+                  className="pt-1 font-hand text-xl leading-snug"
+                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                >
+                  {firstWord.greeting}
+                </motion.p>
+              ) : null}
+            </AnimatePresence>
           </div>
 
           {/* Момент дарения имени: один раз, после первого старта.
               Названное существо — уже не приложение, а «мой». */}
-          {nameLoaded && !companionName && stats !== null && stats.totalStarts >= 1 && (
-            <form
-              className="flex flex-col gap-2 rounded-2xl border border-primary/30 bg-secondary/50 p-3"
-              onSubmit={(e) => {
-                e.preventDefault()
-                giveName(nameDraft)
-              }}
-            >
-              <p className="font-hand text-lg leading-snug">
-                Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду откликаться.
-              </p>
-              <div className="flex gap-2">
-                <input
-                  value={nameDraft}
-                  onChange={(e) => setNameDraft(e.target.value)}
-                  placeholder="Как меня зовут?"
-                  maxLength={24}
-                  aria-label="Имя для напарника"
-                  className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-                <Button type="submit" size="sm" className="h-10" disabled={!nameDraft.trim()}>
-                  Так и зовут
-                </Button>
-              </div>
-            </form>
-          )}
+          {nameLoaded &&
+            !companionName &&
+            stats !== null &&
+            stats.totalStarts >= 1 && (
+              <form
+                className="flex flex-col gap-2 rounded-2xl border border-primary/30 bg-secondary/50 p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  giveName(nameDraft);
+                }}
+              >
+                <p className="font-hand text-lg leading-snug">
+                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+                  откликаться.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Как меня зовут?"
+                    maxLength={24}
+                    aria-label="Имя для напарника"
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-10"
+                    disabled={!nameDraft.trim()}
+                  >
+                    Так и зовут
+                  </Button>
+                </div>
+              </form>
+            )}
 
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
-          {checkinState === 'available' && !!companionName && (
+          {checkinState === "available" && !!companionName && (
             <div className="flex flex-col gap-2 rounded-2xl border border-border bg-secondary/40 p-3">
               <div className="flex items-start gap-2">
-                <Bell className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                <Bell
+                  className="mt-0.5 size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
                 <p className="font-hand text-lg leading-snug">
-                  Хочешь, я буду махать тебе с острова раз в день? Один тихий раз, без спама — и
-                  никаких «ты пропал».
+                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
+                  раз, без спама — и никаких «ты пропал».
                 </p>
               </div>
               <Button
@@ -249,14 +317,17 @@ export function HomeScreen() {
                 onClick={turnOnCheckins}
                 disabled={checkinBusy}
               >
-                {checkinBusy ? 'Секунду…' : 'Да, махай мне'}
+                {checkinBusy ? "Секунду…" : "Да, махай мне"}
               </Button>
             </div>
           )}
 
-          {checkinState === 'enabled' && !!companionName && (
+          {checkinState === "enabled" && !!companionName && (
             <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
-              <Bell className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+              <Bell
+                className="size-3.5 shrink-0 text-primary"
+                aria-hidden="true"
+              />
               {companionName} будет тихо махать тебе с острова раз в день.
             </p>
           )}
@@ -279,18 +350,18 @@ export function HomeScreen() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {starterChips.map((chip) => (
-                  <button
+                  <Link
                     key={chip}
-                    type="button"
-                    onClick={() =>
-                      router.push(`/app/session?step=${encodeURIComponent(chip)}&d=15`)
-                    }
+                    href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
                     className="rounded-full border border-primary/40 bg-card px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
                   >
                     {chip}
-                  </button>
+                  </Link>
                 ))}
               </div>
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/50">
+                Каждый старт ращуз остров →
+              </p>
             </div>
           )}
 
@@ -303,8 +374,13 @@ export function HomeScreen() {
                   Первый старт дня ещё впереди — за ним находка для острова.
                 </span>
               ) : (
-                'Сегодня уже был старт — остров вырос.'
-              )}{' '}
+                <Link
+                  href="/app/world"
+                  className="font-medium text-primary underline-offset-2 hover:underline"
+                >
+                  Остров вырос — смотри &rarr;
+                </Link>
+              )}{" "}
               Всего стартов: {stats.totalStarts}.
             </p>
           )}
@@ -319,5 +395,5 @@ export function HomeScreen() {
         />
       </div>
     </div>
-  )
+  );
 }
