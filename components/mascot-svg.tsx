@@ -1,145 +1,117 @@
-'use client'
+"use client";
 
-import { useEffect, useId, useRef, useState } from 'react'
-import { motion, useReducedMotion, useSpring } from 'motion/react'
+import { useEffect, useId, useRef, useState } from "react";
+import { motion, useReducedMotion, useSpring } from "motion/react";
+import {
+  ACCENT,
+  EYE,
+  EYE_DARK,
+  EYE_L,
+  EYE_R,
+  EYE_RX,
+  EYE_RY,
+  FLAME,
+  FLAME_CORE,
+  FUR,
+  FUR_BODY,
+  FUR_LIGHT,
+  INK,
+  OUTLINE,
+  SHEEN,
+  WARM,
+  WHITE,
+} from "@/components/mascot-geometry";
 
 /**
  * Рукокодный векторный маскот — живое существо, а не картинка.
  * Моргает, зрачки следят за курсором, дышит, меняет выражение.
  */
 
-export type MascotExpression = 'calm' | 'happy' | 'focused' | 'sleepy' | 'excited'
+export type MascotExpression =
+  "calm" | "happy" | "focused" | "sleepy" | "excited";
 
-/* Палитра существа: угольный мех + лаймовые глаза + тёплый акцент.
-   Мех заметно светлее фона (0.17) и карточек (0.21) — силуэт обязан читаться. */
-const FUR = 'oklch(0.34 0.02 135)'
-const FUR_DARK = 'oklch(0.26 0.015 135)'
-const FUR_LIGHT = 'oklch(0.46 0.03 135)'
-const EYE = 'var(--color-primary)'
-const EYE_DARK = 'oklch(0.62 0.19 130)'
-const INK = 'oklch(0.13 0.01 130)'
-const WARM = 'oklch(0.75 0.15 65)'
-const WHITE = 'oklch(0.98 0 0)'
-
-/** Пушистый контур: замкнутый путь с меховыми буграми (детерминированный) */
-function furPath(
-  cx: number,
-  cy: number,
-  rx: number,
-  ry: number,
-  bumps: number,
-  depth: number,
-  seed: number,
-) {
-  const pts: Array<[number, number]> = []
-  let s = seed
-  const rand = () => {
-    s = (s * 16807) % 2147483647
-    return s / 2147483647
-  }
-  for (let i = 0; i < bumps; i++) {
-    const a = (i / bumps) * Math.PI * 2 - Math.PI / 2
-    const wobble = 1 + (rand() - 0.5) * 0.07
-    pts.push([cx + Math.cos(a) * rx * wobble, cy + Math.sin(a) * ry * wobble])
-  }
-  let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`
-  for (let i = 0; i < bumps; i++) {
-    const p1 = pts[i]
-    const p2 = pts[(i + 1) % bumps]
-    const mx = (p1[0] + p2[0]) / 2
-    const my = (p1[1] + p2[1]) / 2
-    const dx = mx - cx
-    const dy = my - cy
-    const len = Math.hypot(dx, dy) || 1
-    const qx = mx + (dx / len) * depth
-    const qy = my + (dy / len) * depth
-    d += ` Q ${qx.toFixed(1)} ${qy.toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`
-  }
-  return `${d} Z`
-}
-
-const BODY = furPath(100, 118, 62, 57, 15, 7, 42)
-const BELLY = furPath(100, 134, 33, 26, 10, 4, 7)
-
-const EYE_L = { x: 74, y: 102 }
-const EYE_R = { x: 126, y: 102 }
-const EYE_RX = 16
-const EYE_RY = 18
+/* Палитра и геометрия существа живут в mascot-geometry.ts (без 'use client'),
+   чтобы серверный первый кадр рисовал того же напарника. */
 
 type MascotSvgProps = {
-  expression?: MascotExpression
-  size?: number
-  label?: string
-  className?: string
-}
+  expression?: MascotExpression;
+  size?: number;
+  label?: string;
+  className?: string;
+};
 
-export function MascotSvg({ expression = 'calm', size = 160, label, className }: MascotSvgProps) {
-  const reduceMotion = useReducedMotion()
-  const ref = useRef<SVGSVGElement>(null)
-  const uid = useId()
-  const [blink, setBlink] = useState(false)
+export function MascotSvg({
+  expression = "calm",
+  size = 160,
+  label,
+  className,
+}: MascotSvgProps) {
+  const reduceMotion = useReducedMotion();
+  const ref = useRef<SVGSVGElement>(null);
+  const uid = useId();
+  const [blink, setBlink] = useState(false);
 
-  const sleepy = expression === 'sleepy'
-  const focused = expression === 'focused'
-  const happy = expression === 'happy'
-  const excited = expression === 'excited'
+  const sleepy = expression === "sleepy";
+  const focused = expression === "focused";
+  const happy = expression === "happy";
+  const excited = expression === "excited";
 
   /* Зрачки следят за курсором */
-  const px = useSpring(0, { stiffness: 140, damping: 16 })
-  const py = useSpring(0, { stiffness: 140, damping: 16 })
+  const px = useSpring(0, { stiffness: 140, damping: 16 });
+  const py = useSpring(0, { stiffness: 140, damping: 16 });
 
   useEffect(() => {
     if (reduceMotion || sleepy) {
-      px.set(0)
-      py.set(0)
-      return
+      px.set(0);
+      py.set(0);
+      return;
     }
     const onMove = (e: PointerEvent) => {
-      const el = ref.current
-      if (!el) return
-      const r = el.getBoundingClientRect()
-      const cx = r.left + r.width / 2
-      const cy = r.top + r.height / 2
-      const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / (r.width * 1.2)))
-      const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / (r.height * 1.2)))
-      px.set(dx * 5)
-      py.set(dy * 4)
-    }
-    window.addEventListener('pointermove', onMove, { passive: true })
-    return () => window.removeEventListener('pointermove', onMove)
-  }, [reduceMotion, sleepy, px, py])
+      const el = ref.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const cx = r.left + r.width / 2;
+      const cy = r.top + r.height / 2;
+      const dx = Math.max(-1, Math.min(1, (e.clientX - cx) / (r.width * 1.2)));
+      const dy = Math.max(-1, Math.min(1, (e.clientY - cy) / (r.height * 1.2)));
+      px.set(dx * 5);
+      py.set(dy * 4);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [reduceMotion, sleepy, px, py]);
 
   /* Моргание со случайным интервалом */
   useEffect(() => {
-    if (reduceMotion || sleepy) return
-    let alive = true
-    let t: ReturnType<typeof setTimeout>
-    let t2: ReturnType<typeof setTimeout>
+    if (reduceMotion || sleepy) return;
+    let alive = true;
+    let t: ReturnType<typeof setTimeout>;
+    let t2: ReturnType<typeof setTimeout>;
     const loop = () => {
       t = setTimeout(
         () => {
-          if (!alive) return
-          setBlink(true)
+          if (!alive) return;
+          setBlink(true);
           t2 = setTimeout(() => {
-            if (!alive) return
-            setBlink(false)
-            loop()
-          }, 130)
+            if (!alive) return;
+            setBlink(false);
+            loop();
+          }, 130);
         },
         2400 + Math.random() * 3600,
-      )
-    }
-    loop()
+      );
+    };
+    loop();
     return () => {
-      alive = false
-      clearTimeout(t)
-      clearTimeout(t2)
-    }
-  }, [reduceMotion, sleepy])
+      alive = false;
+      clearTimeout(t);
+      clearTimeout(t2);
+    };
+  }, [reduceMotion, sleepy]);
 
-  const eye = (side: 'l' | 'r') => {
-    const { x, y } = side === 'l' ? EYE_L : EYE_R
-    const clipId = `${uid}-${side}`
+  const eye = (side: "l" | "r") => {
+    const { x, y } = side === "l" ? EYE_L : EYE_R;
+    const clipId = `${uid}-${side}`;
     return (
       <g>
         <defs>
@@ -147,18 +119,46 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
             <ellipse cx={x} cy={y} rx={EYE_RX} ry={EYE_RY} />
           </clipPath>
         </defs>
-        {/* радужка */}
-        <ellipse cx={x} cy={y} rx={EYE_RX} ry={EYE_RY} fill={EYE_DARK} />
-        <ellipse cx={x} cy={y - 1} rx={EYE_RX - 2.5} ry={EYE_RY - 2.5} fill={EYE} />
+        {/* радужка с тёмным кольцом */}
+        <ellipse
+          cx={x}
+          cy={y}
+          rx={EYE_RX}
+          ry={EYE_RY}
+          fill={EYE_DARK}
+          stroke={OUTLINE}
+          strokeWidth={3}
+        />
+        <ellipse
+          cx={x}
+          cy={y - 1}
+          rx={EYE_RX - 2.5}
+          ry={EYE_RY - 2.5}
+          fill={EYE}
+        />
         <g clipPath={`url(#${clipId})`}>
           {/* кошачий зрачок + блики, следят за курсором */}
           <motion.g style={reduceMotion ? undefined : { x: px, y: py }}>
-            <ellipse cx={x} cy={y} rx={excited ? 7 : 5.4} ry={excited ? 11 : 9.5} fill={INK} />
+            <ellipse
+              cx={x}
+              cy={y}
+              rx={excited ? 7 : 5.4}
+              ry={excited ? 11 : 9.5}
+              fill={INK}
+            />
             <circle cx={x + 5} cy={y - 7} r={3} fill={WHITE} opacity={0.95} />
             <circle cx={x - 4} cy={y + 6} r={1.4} fill={WHITE} opacity={0.55} />
           </motion.g>
           {/* прикрытые веки в фокусе: чуть опущены, но зрачки видны даже в мелком размере */}
-          {focused && <rect x={x - EYE_RX} y={y - EYE_RY} width={EYE_RX * 2} height={EYE_RY * 0.45} fill={FUR} />}
+          {focused && (
+            <rect
+              x={x - EYE_RX}
+              y={y - EYE_RY}
+              width={EYE_RX * 2}
+              height={EYE_RY * 0.45}
+              fill={FUR}
+            />
+          )}
           {/* моргание: веко опускается сверху */}
           <motion.rect
             x={x - EYE_RX - 1}
@@ -166,17 +166,17 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
             width={EYE_RX * 2 + 2}
             height={EYE_RY * 2 + 2}
             fill={FUR}
-            style={{ transformBox: 'fill-box', transformOrigin: '50% 0%' }}
+            style={{ transformBox: "fill-box", transformOrigin: "50% 0%" }}
             animate={{ scaleY: blink ? 1 : 0 }}
             transition={{ duration: 0.07 }}
           />
         </g>
       </g>
-    )
-  }
+    );
+  };
 
-  const closedEye = (side: 'l' | 'r') => {
-    const { x, y } = side === 'l' ? EYE_L : EYE_R
+  const closedEye = (side: "l" | "r") => {
+    const { x, y } = side === "l" ? EYE_L : EYE_R;
     return (
       <path
         d={`M${x - 12} ${y} q12 10 24 0`}
@@ -185,8 +185,8 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
         strokeWidth={3}
         strokeLinecap="round"
       />
-    )
-  }
+    );
+  };
 
   return (
     <motion.svg
@@ -195,69 +195,217 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
       width={size}
       height={size}
       className={className}
-      role={label ? 'img' : undefined}
+      role={label ? "img" : undefined}
       aria-label={label}
       aria-hidden={label ? undefined : true}
-      animate={
-        reduceMotion
-          ? undefined
-          : { scale: [1, 1.02, 1] }
-      }
+      animate={reduceMotion ? undefined : { scale: [1, 1.02, 1] }}
       transition={
         reduceMotion
           ? undefined
-          : { duration: 4, repeat: Infinity, ease: 'easeInOut' }
+          : { duration: 4, repeat: Infinity, ease: "easeInOut" }
       }
-      style={{ transformOrigin: '50% 90%' }}
+      style={{ transformOrigin: "50% 90%" }}
     >
-      {/* хвост: виляет в радости */}
-      <motion.path
-        d="M156 146 q30 -4 27 -30 q-2 -16 -18 -18"
-        fill="none"
-        stroke={FUR}
-        strokeWidth={15}
-        strokeLinecap="round"
-        style={{ transformBox: 'fill-box', transformOrigin: '0% 100%' }}
+      {/* хвост: вопросительный знак за спиной; виляет в радости */}
+      <motion.g
+        style={{ transformBox: "fill-box", transformOrigin: "0% 100%" }}
         animate={
           reduceMotion || !(happy || excited)
             ? undefined
             : { rotate: [-5, 6, -5] }
         }
-        transition={{ duration: 0.9, repeat: Infinity, ease: 'easeInOut' }}
-      />
+        transition={{ duration: 0.9, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <path
+          d="M144 158 Q194 154 192 120 Q190 104 182 97"
+          fill="none"
+          stroke={OUTLINE}
+          strokeWidth={17}
+          strokeLinecap="round"
+        />
+        <path
+          d="M144 158 Q194 154 192 120 Q190 104 182 97"
+          fill="none"
+          stroke={FUR}
+          strokeWidth={13}
+          strokeLinecap="round"
+        />
+        {/* огонёк на кончике хвоста: метафора стрика — не дать огню погаснуть */}
+        <g>
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0 0; 0 -1.6; 0 0"
+            dur="1.3s"
+            repeatCount="indefinite"
+          />
+          <path
+            d="M182 103 C173 93 176 81 182 70 C188 81 191 93 182 103 Z"
+            fill={FLAME}
+          />
+          <path
+            d="M182 99 C177 92 178 84 182 76 C186 84 187 92 182 99 Z"
+            fill={FLAME_CORE}
+          />
+        </g>
+        <circle cx={188} cy={64} r={2} fill="oklch(0.78 0.16 60)">
+          <animate
+            attributeName="opacity"
+            values="0;0.9;0"
+            dur="2.2s"
+            repeatCount="indefinite"
+          />
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0 0; 2 -8"
+            dur="2.2s"
+            repeatCount="indefinite"
+          />
+        </circle>
+      </motion.g>
       {/* уши */}
       <motion.g
-        style={{ transformBox: 'fill-box', transformOrigin: '50% 100%' }}
+        style={{ transformBox: "fill-box", transformOrigin: "50% 100%" }}
         animate={reduceMotion || !excited ? undefined : { rotate: [-2, 2, -2] }}
-        transition={{ duration: 0.5, repeat: Infinity, ease: 'easeInOut' }}
+        transition={{ duration: 0.5, repeat: Infinity, ease: "easeInOut" }}
       >
-        <path d="M56 74 L66 32 L94 56 Z" fill={FUR} />
-        <path d="M64 64 L69 42 L84 55 Z" fill={WARM} opacity={0.4} />
-        <path d="M144 74 L134 32 L106 56 Z" fill={FUR} />
-        <path d="M136 64 L131 42 L116 55 Z" fill={WARM} opacity={0.4} />
+        <g
+          stroke={OUTLINE}
+          strokeWidth={3}
+          strokeLinejoin="round"
+          paintOrder="stroke"
+        >
+          <path
+            d="M54 78 L55 60 L48 54 L56 49 L64 30 Q82 42 96 58 Z"
+            fill={FUR}
+          />
+          <path
+            d="M146 78 L145 58 L141 46 L136 49 L134 30 Q118 42 104 58 Z"
+            fill={FUR}
+          />
+        </g>
+        <path
+          d="M62 66 Q63 52 67 43 Q79 50 86 57 Z"
+          fill={ACCENT}
+          opacity={0.85}
+        />
+        <path
+          d="M138 66 Q137 52 133 43 Q121 50 114 57 Z"
+          fill={ACCENT}
+          opacity={0.85}
+        />
       </motion.g>
-      {/* тело */}
-      <path d={BODY} fill={FUR} />
-      <path d={BELLY} fill={FUR_LIGHT} opacity={0.35} />
-      {/* меховые пряди на макушке */}
-      <path
-        d="M88 58 q4 -10 10 -12 M100 55 q2 -9 8 -11 M110 58 q6 -8 12 -8"
-        fill="none"
-        stroke={FUR_LIGHT}
-        strokeWidth={2.5}
-        strokeLinecap="round"
-        opacity={0.5}
-      />
-      {/* усы */}
-      <g stroke={FUR_LIGHT} strokeWidth={1.8} strokeLinecap="round" opacity={0.55} fill="none">
-        <path d="M42 118 q-14 -1 -24 -5" />
-        <path d="M43 126 q-13 3 -23 2" />
-        <path d="M158 118 q14 -1 24 -5" />
-        <path d="M157 126 q13 3 23 2" />
+      {/* тело + тёплый свет очага на нижней кромке меха */}
+      <defs>
+        <radialGradient id={`${uid}-rim`} cx="0.5" cy="1.18" r="0.72">
+          <stop offset="0%" stopColor={WARM} stopOpacity="0.22" />
+          <stop offset="55%" stopColor={WARM} stopOpacity="0.06" />
+          <stop offset="100%" stopColor={WARM} stopOpacity="0" />
+        </radialGradient>
+        <radialGradient id={`${uid}-top`} cx="0.42" cy="0.2" r="0.75">
+          <stop offset="0%" stopColor={SHEEN} stopOpacity="0.5" />
+          <stop offset="55%" stopColor={SHEEN} stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`${uid}-bot`} x1="0" y1="0" x2="0" y2="1">
+          <stop
+            offset="52%"
+            stopColor="oklch(0.15 0.012 135)"
+            stopOpacity="0"
+          />
+          <stop
+            offset="100%"
+            stopColor="oklch(0.15 0.012 135)"
+            stopOpacity="0.55"
+          />
+        </linearGradient>
+        <radialGradient id={`${uid}-chest`} cx="0.5" cy="0.5" r="0.5">
+          <stop
+            offset="0%"
+            stopColor="oklch(0.72 0.15 60)"
+            stopOpacity="0.45"
+          />
+          <stop
+            offset="60%"
+            stopColor="oklch(0.72 0.15 60)"
+            stopOpacity="0.16"
+          />
+          <stop offset="100%" stopColor="oklch(0.72 0.15 60)" stopOpacity="0" />
+        </radialGradient>
+        <clipPath id={`${uid}-bodyclip`}>
+          <path d={FUR_BODY} />
+        </clipPath>
+      </defs>
+      {/* щёчные пучки: рисуются до тела, тело перекрывает их основания */}
+      <g
+        stroke={OUTLINE}
+        strokeWidth={3}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+        fill={FUR}
+      >
+        <path d="M40 102 L24 98 L40 118 Z" />
+        <path d="M160 102 L176 98 L160 118 Z" />
       </g>
+      {/* тело: рваный меховой силуэт с контуром + трёхтоновый объём */}
+      <path
+        id={`${uid}-body`}
+        d={FUR_BODY}
+        fill={FUR}
+        stroke={OUTLINE}
+        strokeWidth={3}
+        strokeLinejoin="round"
+        paintOrder="stroke"
+      />
+      <use href={`#${uid}-body`} fill={`url(#${uid}-top)`} />
+      <use href={`#${uid}-body`} fill={`url(#${uid}-bot)`} />
+      <use href={`#${uid}-body`} fill={`url(#${uid}-rim)`} />
+      {/* тёплое пятно на груди */}
+      <g clipPath={`url(#${uid}-bodyclip)`}>
+        <ellipse
+          cx={100}
+          cy={142}
+          rx={30}
+          ry={27}
+          fill={`url(#${uid}-chest)`}
+        />
+      </g>
+      {/* усы: длинные, с лёгким провисом */}
+      <g
+        stroke={FUR_LIGHT}
+        strokeWidth={1.6}
+        strokeLinecap="round"
+        opacity={0.55}
+        fill="none"
+      >
+        <path d="M44 114 q-22 -4 -36 -12" />
+        <path d="M44 122 q-23 0 -38 -4" />
+        <path d="M45 130 q-21 5 -35 4" />
+        <path d="M156 114 q22 -4 36 -12" />
+        <path d="M156 122 q23 0 38 -4" />
+        <path d="M155 130 q21 5 35 4" />
+      </g>
+      {/* мягкие бровки в спокойных выражениях */}
+      {!focused && (
+        <g
+          stroke={FUR_LIGHT}
+          strokeWidth={2.2}
+          strokeLinecap="round"
+          opacity={0.6}
+          fill="none"
+        >
+          <path d="M60 79 q9 -6 19 -4" />
+          <path d="M140 79 q-9 -6 -19 -4" />
+        </g>
+      )}
       {/* брови в фокусе */}
       {focused && (
-        <g stroke={FUR_LIGHT} strokeWidth={3} strokeLinecap="round" opacity={0.7}>
+        <g
+          stroke={FUR_LIGHT}
+          strokeWidth={3}
+          strokeLinecap="round"
+          opacity={0.7}
+        >
           <path d="M60 80 L84 87" />
           <path d="M140 80 L116 87" />
         </g>
@@ -265,44 +413,87 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
       {/* глаза */}
       {sleepy ? (
         <>
-          {closedEye('l')}
-          {closedEye('r')}
+          {closedEye("l")}
+          {closedEye("r")}
         </>
       ) : (
         <>
-          {eye('l')}
-          {eye('r')}
+          {eye("l")}
+          {eye("r")}
         </>
       )}
       {/* нос */}
-      <path d="M96 122 L104 122 L100 128 Z" fill={WARM} opacity={0.9} />
+      <path d="M96 122 L104 122 L100 128 Z" fill={ACCENT} opacity={0.95} />
       {/* рот по выражению */}
-      {expression === 'calm' && (
-        <path d="M92 138 q8 7 16 0" fill="none" stroke={INK} strokeWidth={2.5} strokeLinecap="round" />
+      {expression === "calm" && (
+        <path
+          d="M92 138 q8 7 16 0"
+          fill="none"
+          stroke={INK}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
       )}
       {happy && (
-        <path d="M88 136 q12 13 24 0" fill="none" stroke={INK} strokeWidth={3} strokeLinecap="round" />
+        <path
+          d="M88 136 q12 13 24 0"
+          fill="none"
+          stroke={INK}
+          strokeWidth={3}
+          strokeLinecap="round"
+        />
       )}
       {focused && (
-        <path d="M94 140 L106 140" fill="none" stroke={INK} strokeWidth={2.5} strokeLinecap="round" />
+        <path
+          d="M94 140 L106 140"
+          fill="none"
+          stroke={INK}
+          strokeWidth={2.5}
+          strokeLinecap="round"
+        />
       )}
       {sleepy && <circle cx={100} cy={140} r={3.2} fill={INK} />}
       {excited && (
         <g>
           <path d="M85 134 Q100 158 115 134 Z" fill={INK} />
-          <ellipse cx={100} cy={145} rx={6.5} ry={4} fill={WARM} opacity={0.85} />
+          <ellipse
+            cx={100}
+            cy={145}
+            rx={6.5}
+            ry={4}
+            fill={WARM}
+            opacity={0.85}
+          />
         </g>
       )}
-      {/* румянец */}
-      {(happy || excited) && (
-        <g fill={WARM} opacity={0.3}>
-          <ellipse cx={58} cy={126} rx={9} ry={4.5} />
-          <ellipse cx={142} cy={126} rx={9} ry={4.5} />
-        </g>
-      )}
-      {/* лапки */}
-      <ellipse cx={78} cy={170} rx={13} ry={7} fill={FUR_DARK} />
-      <ellipse cx={122} cy={170} rx={13} ry={7} fill={FUR_DARK} />
+      {/* штрихи румянца как в референсе, ярче в радости */}
+      <g
+        stroke={ACCENT}
+        strokeWidth={2}
+        strokeLinecap="round"
+        opacity={happy || excited ? 0.85 : 0.55}
+        fill="none"
+      >
+        <path d="M50 117 l11 -3" />
+        <path d="M52 123 l11 -2" />
+        <path d="M150 117 l-11 -3" />
+        <path d="M148 123 l-11 -2" />
+      </g>
+      {/* лапы с оранжевыми подушечками */}
+      <g stroke={OUTLINE} strokeWidth={3} paintOrder="stroke">
+        <ellipse cx={78} cy={166} rx={15} ry={10} fill={FUR} />
+        <ellipse cx={122} cy={166} rx={15} ry={10} fill={FUR} />
+      </g>
+      <g fill={ACCENT} opacity={0.9}>
+        <ellipse cx={78} cy={169} rx={5} ry={3.6} />
+        <circle cx={71} cy={163} r={1.9} />
+        <circle cx={78} cy={161} r={2} />
+        <circle cx={85} cy={163} r={1.9} />
+        <ellipse cx={122} cy={169} rx={5} ry={3.6} />
+        <circle cx={115} cy={163} r={1.9} />
+        <circle cx={122} cy={161} r={2} />
+        <circle cx={129} cy={163} r={1.9} />
+      </g>
       {/* zzz во сне */}
       {sleepy && (
         <g className="font-hand" fill={EYE}>
@@ -317,8 +508,17 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
               y={z.y}
               fontSize={z.s}
               initial={reduceMotion ? undefined : { opacity: 0, y: 4 }}
-              animate={reduceMotion ? undefined : { opacity: [0, 0.9, 0], y: [4, -4, -10] }}
-              transition={{ duration: 2.4, repeat: Infinity, delay: z.d, ease: 'easeInOut' }}
+              animate={
+                reduceMotion
+                  ? undefined
+                  : { opacity: [0, 0.9, 0], y: [4, -4, -10] }
+              }
+              transition={{
+                duration: 2.4,
+                repeat: Infinity,
+                delay: z.d,
+                ease: "easeInOut",
+              }}
             >
               z
             </motion.text>
@@ -337,12 +537,21 @@ export function MascotSvg({ expression = 'calm', size = 160, label, className }:
               key={sp.x}
               d="M0 -7 L1.8 -1.8 L7 0 L1.8 1.8 L0 7 L-1.8 1.8 L-7 0 L-1.8 -1.8 Z"
               style={{ x: sp.x, y: sp.y }}
-              animate={reduceMotion ? undefined : { scale: [0.5, 1.15, 0.5], opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1.4, repeat: Infinity, delay: sp.d, ease: 'easeInOut' }}
+              animate={
+                reduceMotion
+                  ? undefined
+                  : { scale: [0.5, 1.15, 0.5], opacity: [0.4, 1, 0.4] }
+              }
+              transition={{
+                duration: 1.4,
+                repeat: Infinity,
+                delay: sp.d,
+                ease: "easeInOut",
+              }}
             />
           ))}
         </g>
       )}
     </motion.svg>
-  )
+  );
 }
