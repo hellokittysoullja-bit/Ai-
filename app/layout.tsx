@@ -1,59 +1,58 @@
-import { Analytics } from '@vercel/analytics/next'
-import type { Metadata, Viewport } from 'next'
-import { Manrope, JetBrains_Mono, Caveat } from 'next/font/google'
-import './globals.css'
+import { Analytics } from "@vercel/analytics/next";
+import type { Metadata, Viewport } from "next";
+import { Manrope, JetBrains_Mono, Caveat } from "next/font/google";
+import "./globals.css";
 
 const manrope = Manrope({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-manrope',
-})
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-manrope",
+});
 
 const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-jetbrains-mono',
-})
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-jetbrains-mono",
+});
 
 const caveat = Caveat({
-  subsets: ['latin', 'cyrillic'],
-  variable: '--font-caveat',
-})
+  subsets: ["latin", "cyrillic"],
+  variable: "--font-caveat",
+});
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://ai-zq.vercel.app'),
-  title: 'Напарник — существо, которое не даст тебе слиться',
+  metadataBase: new URL("https://ai-rc-one.vercel.app"),
+  title: "Напарник — существо, которое не даст тебе слиться",
   description:
-    'Не ещё один планировщик. Напарник пишет тебе первым, помогает начать и растит свой мир из твоих фокус-сессий. Без стриков. Без стыда.',
-  generator: 'v0.app',
+    "Не ещё один планировщик. Напарник пишет тебе первым, помогает начать и растит свой мир из твоих фокус-сессий. Без стриков. Без стыда.",
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'Напарник',
+    statusBarStyle: "black-translucent",
+    title: "Напарник",
   },
   openGraph: {
-    title: 'Напарник — существо, которое не даст тебе слиться',
+    title: "Напарник — существо, которое не даст тебе слиться",
     description:
-      'Помогает начать, сидит рядом во время работы и растит остров из твоих стартов. Бесплатно, без карты и регистрации.',
-    type: 'website',
-    locale: 'ru_RU',
-    siteName: 'Напарник',
+      "Помогает начать, сидит рядом во время работы и растит остров из твоих стартов. Бесплатно, без карты и регистрации.",
+    type: "website",
+    locale: "ru_RU",
+    siteName: "Напарник",
   },
   twitter: {
-    card: 'summary_large_image',
-    title: 'Напарник — существо, которое не даст тебе слиться',
+    card: "summary_large_image",
+    title: "Напарник — существо, которое не даст тебе слиться",
     description:
-      'Помогает начать, сидит рядом во время работы и растит остров из твоих стартов.',
+      "Помогает начать, сидит рядом во время работы и растит остров из твоих стартов.",
   },
-}
+};
 
 export const viewport: Viewport = {
-  colorScheme: 'dark',
-  themeColor: '#1a1d17',
-}
+  colorScheme: "dark",
+  themeColor: "#1a1d17",
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html
@@ -62,8 +61,8 @@ export default function RootLayout({
     >
       <body className="antialiased font-sans">
         {children}
-        {process.env.NODE_ENV === 'production' && <Analytics />}
+        {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>
-  )
+  );
 }
