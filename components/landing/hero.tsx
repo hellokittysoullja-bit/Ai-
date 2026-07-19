@@ -1,179 +1,177 @@
-'use client'
+"use client";
 
-import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
-import { motion, AnimatePresence, useReducedMotion } from 'motion/react'
-import { MascotSvg, type MascotExpression } from '@/components/mascot-svg'
-import { Button } from '@/components/ui/button'
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
+import { GroundPool, HeroScene } from "@/components/hero-scene";
+import { Button } from "@/components/ui/button";
 
 /**
  * Живой первый экран: не рассказ о продукте, а сам продукт.
- * Напарник печатает первую реплику ≤2 сек после загрузки (Rule of 40s).
+ * Сцена (небо, свет очага, существо на земле) — серверный SVG, живёт без JS:
+ * первый отрисованный кадр уже показывает мир, а не спиннер.
+ * Напарник печатает первую реплику ≤2 сек после загрузки (Rule of 40s);
+ * тап по бабблу мгновенно достраивает строку (agency, как в игровых диалогах).
  * Ответ посетителя — ровно 2 кнопки (Hick's Law), без свободного ввода.
- * Скрипт первых реплик — ноль API-затрат; после ответа — честный переход в /app.
+ * Выбор сохраняется в naparnik:intro — /app продолжает разговор, а не начинает заново.
  */
 
-type SceneStep = { kind: 'companion'; text: string } | { kind: 'visitor'; text: string }
+type SceneStep =
+  { kind: "companion"; text: string } | { kind: "visitor"; text: string };
 
-const OPENING_LINE = 'Привет. Я Напарник. Я не планировщик — я тот, кто сидит рядом, когда трудно начать.'
+const OPENING_LINE =
+  "Привет. Я Напарник. Я не планировщик — я тот, кто сидит рядом, когда трудно начать.";
 
 const REPLIES = {
   procrastinate: {
-    visitor: 'Вечно откладываю дела',
+    visitor: "Вечно откладываю дела",
     companion:
-      'Знакомо. Это не лень — мозгу просто нужен кто-то рядом в момент старта. Пойдём, покажу, как это работает.',
+      "Знакомо. Это не лень — мозгу просто нужен кто-то рядом в момент старта. Пойдём, покажу, как это работает.",
   },
   curious: {
-    visitor: 'Просто посмотреть',
+    visitor: "Просто посмотреть",
     companion:
-      'Заходи. У меня тут остров, который растёт от каждого твоего старта. Попробуй одно крошечное дело — увидишь.',
+      "Заходи. У меня тут остров, который растёт от каждого твоего старта. Попробуй одно крошечное дело — увидишь.",
   },
-} as const
+} as const;
 
-type ReplyKey = keyof typeof REPLIES
+type ReplyKey = keyof typeof REPLIES;
 
-/** Печатающаяся реплика напарника */
+const INTRO_CHOICE_KEY = "naparnik:intro";
+
+/** Печатающаяся реплика напарника; тап — мгновенно достроить строку */
 function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
-  const reduceMotion = useReducedMotion()
-  const [shown, setShown] = useState(reduceMotion ? text.length : 0)
-  const onDoneRef = useRef(onDone)
-  onDoneRef.current = onDone
+  const reduceMotion = useReducedMotion();
+  const [shown, setShown] = useState(reduceMotion ? text.length : 0);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+  const finishRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (reduceMotion) {
-      onDoneRef.current?.()
-      return
+      onDoneRef.current?.();
+      return;
     }
-    let i = 0
-    const id = setInterval(() => {
-      i += 1
-      setShown(i)
-      if (i >= text.length) {
-        clearInterval(id)
-        onDoneRef.current?.()
+    let done = false;
+    const fireDone = () => {
+      if (!done) {
+        done = true;
+        onDoneRef.current?.();
       }
-    }, 26)
-    return () => clearInterval(id)
-  }, [text, reduceMotion])
+    };
+    let i = 0;
+    const id = setInterval(() => {
+      i += 1;
+      setShown(i);
+      if (i >= text.length) {
+        clearInterval(id);
+        fireDone();
+      }
+    }, 16);
+    finishRef.current = () => {
+      clearInterval(id);
+      setShown(text.length);
+      fireDone();
+    };
+    return () => clearInterval(id);
+  }, [text, reduceMotion]);
 
   return (
-    <p className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl">
+    <p
+      className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
+      onClick={() => finishRef.current()}
+    >
       {text.slice(0, shown)}
       {shown < text.length && (
-        <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse rounded bg-primary align-middle" />
+        <span className="ml-0.5 inline-block h-[0.9em] w-0.5 animate-pulse rounded bg-primary align-middle" />
       )}
     </p>
-  )
+  );
 }
 
 export function Hero() {
-  const reduceMotion = useReducedMotion()
-  const [steps, setSteps] = useState<SceneStep[]>([])
-  const [showChoices, setShowChoices] = useState(false)
-  const [answered, setAnswered] = useState(false)
-  const [expression, setExpression] = useState<MascotExpression>('calm')
+  const [steps, setSteps] = useState<SceneStep[]>([]);
+  const [showChoices, setShowChoices] = useState(false);
+  const [answered, setAnswered] = useState(false);
+  const [showCta, setShowCta] = useState(false);
+  const [showFallbackCta, setShowFallbackCta] = useState(false);
+  const [expression, setExpression] = useState<MascotExpression>("calm");
 
   // Rule of 40s: первая реплика стартует почти сразу после загрузки
   useEffect(() => {
     const id = setTimeout(() => {
-      setSteps([{ kind: 'companion', text: OPENING_LINE }])
-    }, 400)
-    return () => clearTimeout(id)
-  }, [])
+      setSteps([{ kind: "companion", text: OPENING_LINE }]);
+    }, 400);
+    return () => clearTimeout(id);
+  }, []);
+
+  // Запасной путь вперёд появляется только если сцена не увлекла
+  useEffect(() => {
+    const id = setTimeout(() => setShowFallbackCta(true), 7000);
+    return () => clearTimeout(id);
+  }, []);
 
   function choose(key: ReplyKey) {
-    setShowChoices(false)
-    setAnswered(true)
-    setExpression('happy')
-    setSteps((prev) => [...prev, { kind: 'visitor', text: REPLIES[key].visitor }])
+    setShowChoices(false);
+    setAnswered(true);
+    setExpression("happy");
+    // Шов лендинг → /app: приложение продолжит этот разговор
+    try {
+      window.localStorage.setItem(INTRO_CHOICE_KEY, key);
+    } catch {
+      // приватный режим — не критично
+    }
+    setSteps((prev) => [
+      ...prev,
+      { kind: "visitor", text: REPLIES[key].visitor },
+    ]);
     // реплика напарника — после короткой паузы, как в живом разговоре
     setTimeout(() => {
-      setSteps((prev) => [...prev, { kind: 'companion', text: REPLIES[key].companion }])
-    }, 550)
+      setSteps((prev) => [
+        ...prev,
+        { kind: "companion", text: REPLIES[key].companion },
+      ]);
+    }, 550);
   }
 
   return (
     <section className="grain relative flex min-h-[92svh] flex-col items-center justify-center overflow-hidden px-4 py-16">
-      {/* Атмосфера: существо живёт в месте, а не парит в пустоте.
-          Ночь, звёзды, тёплый свет — считывается за 200мс, раньше слов. */}
+      {/* Атмосфера: серверный SVG, живёт без JS — считывается за 200мс, раньше слов */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-        <svg className="h-full w-full" preserveAspectRatio="xMidYMid slice" viewBox="0 0 800 900">
-          <defs>
-            <linearGradient id="heroSky" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--color-background)" />
-              <stop offset="62%" stopColor="var(--color-background)" />
-              <stop offset="100%" stopColor="var(--color-secondary)" />
-            </linearGradient>
-            <radialGradient id="heroWarm" cx="0.5" cy="0.62" r="0.5">
-              <stop offset="0%" stopColor="var(--color-primary)" stopOpacity="0.13" />
-              <stop offset="55%" stopColor="var(--color-primary)" stopOpacity="0.05" />
-              <stop offset="100%" stopColor="var(--color-primary)" stopOpacity="0" />
-            </radialGradient>
-          </defs>
-          <rect width="800" height="900" fill="url(#heroSky)" />
-          {/* звёзды: мерцают каждая в своём ритме */}
-          {[
-            [70, 90, 1.4], [160, 200, 0.9], [250, 60, 1.2], [340, 150, 0.8],
-            [420, 80, 1.5], [510, 190, 0.9], [600, 70, 1.2], [680, 160, 1.0],
-            [740, 90, 1.3], [120, 320, 0.8], [640, 300, 0.9], [380, 260, 0.7],
-            [40, 220, 1.0], [720, 230, 0.8], [280, 330, 0.9], [560, 120, 0.7],
-          ].map(([x, y, r], i) => (
-            <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.45">
-              <animate
-                attributeName="opacity"
-                values="0.2;0.7;0.2"
-                dur={`${2.8 + (i % 6) * 0.8}s`}
-                begin={`${(i % 8) * 0.45}s`}
-                repeatCount="indefinite"
-              />
-            </circle>
-          ))}
-          {/* тёплое свечение вокруг существа — «здесь горит костёр» */}
-          <rect width="800" height="900" fill="url(#heroWarm)">
-            <animate attributeName="opacity" values="0.85;1;0.85" dur="4.5s" repeatCount="indefinite" />
-          </rect>
-          {/* земля под существом: тонкая линия холма у нижней кромки */}
-          <path
-            d="M0 810 Q200 780 400 792 Q600 802 800 778 L800 900 L0 900 Z"
-            fill="var(--color-secondary)"
-            opacity="0.6"
-          />
-        </svg>
+        <HeroScene />
       </div>
 
-      {/* Сцена: маскот + диалог. Один фокус, много воздуха */}
-      <div className="relative flex w-full max-w-md flex-col items-center gap-8">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.85, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 18 }}
-        >
-          <motion.div
-            animate={reduceMotion ? undefined : { y: [0, -5, 0] }}
-            transition={{ duration: 5.5, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <MascotSvg
-              expression={expression}
-              size={200}
-              label="Напарник — пушистое существо с зелёными глазами"
-            />
-          </motion.div>
-        </motion.div>
+      {/* Сцена: существо стоит в пятне света очага. Один фокус, много воздуха */}
+      <div className="relative flex w-full max-w-md flex-col items-center gap-4">
+        <div className="flex flex-col items-center">
+          <MascotSvg
+            expression={expression}
+            size={200}
+            label="Напарник — пушистое существо с зелёными глазами"
+            className="relative z-10"
+          />
+          <GroundPool className="-mt-11 -mb-9" />
+        </div>
 
         <div className="flex w-full flex-col gap-3" aria-live="polite">
           <AnimatePresence initial={false}>
             {steps.map((step, i) =>
-              step.kind === 'companion' ? (
+              step.kind === "companion" ? (
                 <motion.div
                   key={i}
                   initial={{ opacity: 0, y: 12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
                   className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5"
                 >
                   <TypedLine
                     text={step.text}
-                    onDone={i === 0 ? () => setShowChoices(true) : undefined}
+                    onDone={
+                      i === 0
+                        ? () => setShowChoices(true)
+                        : () => setShowCta(true)
+                    }
                   />
                 </motion.div>
               ) : (
@@ -181,7 +179,7 @@ export function Hero() {
                   key={i}
                   initial={{ opacity: 0, y: 12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
                   className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-5 py-2.5"
                 >
                   <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
@@ -192,7 +190,8 @@ export function Hero() {
             )}
           </AnimatePresence>
 
-          {/* Hick's Law: ровно 2 варианта ответа, свободный ввод — только в /app */}
+          {/* Hick's Law: ровно 2 варианта ответа — оформлены как «твоя следующая
+              реплика» (форма visitor-баббла), а не как теги */}
           <AnimatePresence>
             {showChoices && !answered && (
               <motion.div
@@ -207,7 +206,7 @@ export function Hero() {
                     key={key}
                     type="button"
                     onClick={() => choose(key)}
-                    className="rounded-full border border-primary/50 px-4 py-2 text-sm font-semibold text-foreground transition-colors hover:bg-primary/10"
+                    className="rounded-2xl rounded-br-sm border border-primary/40 bg-primary/10 px-5 py-3 text-[15px] font-semibold text-foreground transition-colors hover:bg-primary/20 active:translate-y-px"
                   >
                     {REPLIES[key].visitor}
                   </button>
@@ -216,12 +215,17 @@ export function Hero() {
             )}
           </AnimatePresence>
 
-          {/* После ответа — честный переход в настоящий продукт */}
-          {answered && (
+          {/* Пик сцены: CTA появляется когда ответ дочитан, а не по таймеру */}
+          {showCta && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 2.4, type: 'spring', stiffness: 200, damping: 20 }}
+              transition={{
+                delay: 0.15,
+                type: "spring",
+                stiffness: 200,
+                damping: 20,
+              }}
               className="flex justify-center pt-3"
             >
               <Button
@@ -237,35 +241,45 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Заголовок ПОД сценой: сцена важнее слов (калибровка Family) */}
+      {/* Заголовок ПОД сценой: сцена важнее слов. Появляется после первой реплики,
+          чтобы не конкурировать с печатью за внимание */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1.2, duration: 0.8 }}
+        transition={{ delay: 2.6, duration: 0.8 }}
         className="mt-16 flex max-w-sm flex-col items-center gap-3 text-center"
       >
-        <h1 className="text-balance text-2xl font-bold leading-tight md:text-3xl">
+        <h1 className="text-balance text-3xl font-bold leading-tight md:text-4xl">
           Существо, которое не даст тебе слиться
         </h1>
-        <p className="text-pretty text-sm leading-relaxed text-muted-foreground">
-          Помогает начать, сидит рядом во время работы и растит остров из твоих стартов. Без
-          стриков. Без стыда.
+        <p className="text-pretty text-base leading-relaxed text-muted-foreground">
+          Помогает начать, сидит рядом во время работы и растит остров из твоих
+          стартов. Без стриков. Без стыда.
         </p>
-        {/* Постоянный путь вперёд: не все отвечают на чипы сцены */}
-        {!answered && (
-          <Button
-            render={<Link href="/app" />}
-            nativeButton={false}
-            size="lg"
-            className="mt-2 font-semibold"
-          >
-            Попробовать
-          </Button>
-        )}
+        {/* Запасной путь: тихий, чтобы не спорить с чипами сцены */}
+        <AnimatePresence>
+          {!answered && showFallbackCta && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              <Button
+                render={<Link href="/app" />}
+                nativeButton={false}
+                size="lg"
+                variant="outline"
+                className="mt-2 font-semibold"
+              >
+                Попробовать
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
         <span className="pt-1 font-mono text-xs text-muted-foreground">
           бесплатно, без карты и регистрации
         </span>
       </motion.div>
     </section>
-  )
+  );
 }
