@@ -227,3 +227,28 @@
     animation-delay: 0s;
   }
 }
+
+/* === App page-in transition ===
+   Плавный въезд при переходе лендинг → /app.
+   Не teleport — мир продолжается, ты просто вошёл внутрь.
+   once: анимируется только при первом рендере, не при SPA-навигации внутри /app. */
+@keyframes app-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-page-enter {
+  animation: app-page-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-page-enter {
+    animation-duration: 0.01s;
+  }
+}
