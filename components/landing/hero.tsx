@@ -7,20 +7,6 @@ import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
 
-/**
- * Первый экран по принципу «статика прежде скрипта» (уровень прод-команд):
- * весь первый кадр — сцена, первая реплика, кнопки-ответы, заголовок —
- * существует уже в серверном HTML. Хореография появления (каскад слов,
- * подъём блоков) — чистый CSS (hero-word / hero-rise в globals.css),
- * поэтому кадр одинаков с JS и без него, для человека и для поисковика.
- *
- * JavaScript добавляет только поведение и ни одного пикселя содержимого:
- * взгляд существа за курсором, розыгрыш диалога после ответа, память
- * выбора (naparnik:intro), появление CTA по дочитыванию реплики.
- *
- * Деградация без JS: кнопки-ответы — настоящие ссылки в /app.
- */
-
 const OPENING_LINE =
   "Привет. Я Напарник. Я не планировщик — я тот, кто сидит рядом, когда трудно начать.";
 
@@ -43,10 +29,6 @@ const INTRO_CHOICE_KEY = "naparnik:intro";
 
 type SceneStep = { kind: "companion" | "visitor"; text: string };
 
-/**
- * Каскадное появление слов на чистом CSS: серверный HTML уже содержит весь
- * текст (скринридеры и роботы читают его сразу), а глаз видит «печать».
- */
 function WordReveal({
   text,
   startDelay = 0.55,
@@ -80,7 +62,6 @@ function WordReveal({
   );
 }
 
-/** Печатающаяся реплика (только для диалога после ответа — там JS уже точно есть) */
 function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
   const reduceMotion = useReducedMotion();
   const [shown, setShown] = useState(reduceMotion ? text.length : 0);
@@ -131,7 +112,6 @@ function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
 }
 
 export function Hero() {
-  // Диалог ПОСЛЕ ответа посетителя — единственная JS-зависимая часть сцены
   const [steps, setSteps] = useState<SceneStep[]>([]);
   const [answered, setAnswered] = useState(false);
   const [showCta, setShowCta] = useState(false);
@@ -140,14 +120,12 @@ export function Hero() {
   function choose(key: ReplyKey) {
     setAnswered(true);
     setExpression("happy");
-    // Шов лендинг → /app: приложение продолжит этот разговор
     try {
       window.localStorage.setItem(INTRO_CHOICE_KEY, key);
     } catch {
-      // приватный режим — не критично
+      // приватный режим
     }
     setSteps([{ kind: "visitor", text: REPLIES[key].visitor }]);
-    // реплика напарника — после короткой паузы, как в живом разговоре
     setTimeout(() => {
       setSteps((prev) => [
         ...prev,
@@ -157,28 +135,50 @@ export function Hero() {
   }
 
   return (
-    <section className="grain relative flex min-h-[92svh] flex-col items-center justify-center overflow-hidden px-4 py-16">
-      {/* Атмосфера: серверный SVG, живёт без JS — считывается за 200мс, раньше слов */}
+    <section className="grain relative flex min-h-[92svh] flex-col items-center justify-center overflow-hidden px-4 py-12">
+      {/* Фоновая сцена */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <HeroScene />
       </div>
 
-      {/* Сцена: существо стоит в пятне света очага. Один фокус, много воздуха */}
-      <div className="relative flex w-full max-w-md flex-col items-center gap-4">
+      {/* Огромный заголовок — первое что видит глаз */}
+      <div
+        className="hero-rise relative z-10 mb-10 flex max-w-xl flex-col items-center gap-4 text-center"
+        style={{ "--rise-delay": "0.1s" } as CSSProperties}
+      >
+        <h1 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
+          Существо,{" "}
+          <span className="text-primary">которое</span>{" "}
+          не даст тебе слиться
+        </h1>
+        <p className="text-pretty text-lg leading-relaxed text-muted-foreground md:text-xl">
+          Помогает начать, сидит рядом во время работы и растит остров из твоих стартов.
+          <br />
+          <span className="text-foreground/70">Без стриков. Без стыда.</span>
+        </p>
+      </div>
+
+      {/* Маскот + чат — центральная сцена */}
+      <div className="relative z-10 flex w-full max-w-lg flex-col items-center gap-4">
+        {/* Свечение за маскотом */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.25)_0%,transparent_70%)] blur-2xl"
+        />
+
         <div className="flex flex-col items-center">
           <MascotSvg
             expression={expression}
-            size={200}
+            size={240}
             label="Напарник — пушистое существо с зелёными глазами"
             className="relative z-10"
           />
-          <GroundPool className="-mt-11 -mb-9" />
+          <GroundPool className="-mt-12 -mb-10" />
         </div>
 
         <div className="flex w-full flex-col gap-3" aria-live="polite">
-          {/* Первая реплика: в HTML с первого байта, слова — каскадом через CSS */}
           <div
-            className="hero-rise max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5"
+            className="hero-rise max-w-[94%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-4 shadow-lg"
             style={{ "--rise-delay": "0.25s" } as CSSProperties}
           >
             <WordReveal
@@ -187,7 +187,6 @@ export function Hero() {
             />
           </div>
 
-          {/* Розыгрыш диалога после ответа */}
           <AnimatePresence initial={false}>
             {steps.map((step, i) =>
               step.kind === "companion" ? (
@@ -196,7 +195,7 @@ export function Hero() {
                   initial={{ opacity: 0, y: 12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                  className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5"
+                  className="max-w-[94%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-4 shadow-lg"
                 >
                   <TypedLine text={step.text} onDone={() => setShowCta(true)} />
                 </motion.div>
@@ -206,7 +205,7 @@ export function Hero() {
                   initial={{ opacity: 0, y: 12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                  className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-5 py-2.5"
+                  className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-5 py-3"
                 >
                   <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
                     {step.text}
@@ -216,8 +215,6 @@ export function Hero() {
             )}
           </AnimatePresence>
 
-          {/* Hick's Law: ровно 2 ответа, оформлены как «твоя следующая реплика».
-              Это настоящие ссылки: без JS они честно ведут в /app */}
           {!answered && (
             <div
               className="hero-rise flex flex-wrap justify-end gap-2 pt-1"
@@ -231,7 +228,7 @@ export function Hero() {
                     e.preventDefault();
                     choose(key);
                   }}
-                  className="rounded-2xl rounded-br-sm border border-primary/40 bg-primary/10 px-5 py-3 text-[15px] font-semibold text-foreground transition-colors hover:bg-primary/20 active:translate-y-px"
+                  className="rounded-2xl rounded-br-sm border border-primary/50 bg-primary/15 px-5 py-3 text-[15px] font-semibold text-foreground shadow-sm transition-all hover:bg-primary/25 hover:shadow-md active:translate-y-px"
                 >
                   {REPLIES[key].visitor}
                 </Link>
@@ -239,7 +236,6 @@ export function Hero() {
             </div>
           )}
 
-          {/* Пик сцены: CTA появляется когда ответ дочитан, а не по таймеру */}
           {showCta && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
@@ -250,7 +246,7 @@ export function Hero() {
                 stiffness: 200,
                 damping: 20,
               }}
-              className="flex justify-center pt-3"
+              className="flex flex-col items-center gap-2 pt-3"
             >
               <Button
                 render={<Link href="/app" />}
@@ -260,45 +256,34 @@ export function Hero() {
               >
                 Пойдём попробуем
               </Button>
+              <span className="font-mono text-xs text-muted-foreground">
+                бесплатно, без карты и регистрации
+              </span>
             </motion.div>
           )}
         </div>
       </div>
 
-      {/* Заголовок ПОД сценой: сцена важнее слов. В серверном HTML — сразу,
-          глазу проявляется после первой реплики (CSS-задержка) */}
-      <div
-        className="hero-rise mt-16 flex max-w-sm flex-col items-center gap-3 text-center"
-        style={{ "--rise-delay": "2.6s" } as CSSProperties}
-      >
-        <h1 className="text-balance text-3xl font-bold leading-tight md:text-4xl">
-          Существо, которое не даст тебе слиться
-        </h1>
-        <p className="text-pretty text-base leading-relaxed text-muted-foreground">
-          Помогает начать, сидит рядом во время работы и растит остров из твоих
-          стартов. Без стриков. Без стыда.
-        </p>
-        {/* Запасной путь вперёд: тихий, на CSS-таймере, прячется после ответа */}
-        {!answered && (
-          <div
-            className="hero-rise"
-            style={{ "--rise-delay": "7s" } as CSSProperties}
+      {/* Запасная кнопка — появляется по CSS-таймеру */}
+      {!answered && (
+        <div
+          className="hero-rise relative z-10 mt-10 flex flex-col items-center gap-3"
+          style={{ "--rise-delay": "7s" } as CSSProperties}
+        >
+          <Button
+            render={<Link href="/app" />}
+            nativeButton={false}
+            size="lg"
+            variant="outline"
+            className="font-semibold"
           >
-            <Button
-              render={<Link href="/app" />}
-              nativeButton={false}
-              size="lg"
-              variant="outline"
-              className="mt-2 font-semibold"
-            >
-              Попробовать
-            </Button>
-          </div>
-        )}
-        <span className="pt-1 font-mono text-xs text-muted-foreground">
-          бесплатно, без карты и регистрации
-        </span>
-      </div>
+            Попробовать
+          </Button>
+          <span className="font-mono text-xs text-muted-foreground">
+            бесплатно, без карты и регистрации
+          </span>
+        </div>
+      )}
     </section>
   );
 }

@@ -1,12 +1,9 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import Link from 'next/link'
 import { motion, useReducedMotion, useScroll, useMotionValueEvent } from 'motion/react'
-
-/**
- * Живое доказательство вместо картинки: остров прорастает по мере скролла.
- * Тот же визуальный язык, что и настоящий остров в /app/world.
- */
+import { Button } from '@/components/ui/button'
 
 const c = {
   ground: 'var(--color-secondary)',
@@ -16,7 +13,6 @@ const c = {
   warm: 'oklch(0.75 0.15 65)',
 }
 
-/** Элементы острова в порядке прорастания */
 const sprouts: Array<{ key: string; node: React.ReactNode }> = [
   {
     key: 'sprout',
@@ -91,10 +87,11 @@ const sprouts: Array<{ key: string; node: React.ReactNode }> = [
 ]
 
 const principles = [
-  { title: 'Ноль стриков', text: 'Стрики наказывают за срыв. Мы — нет.' },
-  { title: 'Мир не откатывается', text: 'Что построено — построено навсегда.' },
-  { title: 'Провал = ничего', text: 'Не минус, не красная цифра. Просто завтра.' },
+  { emoji: '🚫', title: 'Ноль стриков', text: 'Стрики наказывают за срыв. Мы — нет.' },
+  { emoji: '🏝️', title: 'Мир не откатывается', text: 'Что построено — построено навсегда.' },
+  { emoji: '☁️', title: 'Провал = ничего', text: 'Не минус, не красная цифра. Просто завтра.' },
   {
+    emoji: '✨',
     title: 'Никогда не знаешь, что вырастет',
     text: 'Дальше — находки: кот у костра, кит в бухте, северное сияние. Редкие — правда редкие.',
   },
@@ -112,129 +109,157 @@ export function WorldSection() {
 
   useMotionValueEvent(scrollYProgress, 'change', (v) => {
     const n = Math.round(v * sprouts.length)
-    // остров только растёт — как в продукте, ничего не исчезает
     setVisible((prev) => Math.max(prev, n))
   })
 
   const shown = reduceMotion ? sprouts.length : visible
 
   return (
-    <section ref={ref} className="mx-auto max-w-2xl px-6 py-32 md:py-48">
-      <div className="flex flex-col gap-12">
-        <motion.div
-          className="flex flex-col gap-3"
-          initial={reduceMotion ? false : { opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: '-80px' }}
-          transition={{ type: 'spring', stiffness: 120, damping: 20 }}
-        >
-          <h2 className="text-balance text-3xl font-bold tracking-tight md:text-4xl">
-            Ты растишь его мир. Он не даёт твоему рухнуть.
-          </h2>
-          <p className="leading-relaxed text-muted-foreground">
-            Каждый старт выращивает кусочек острова. Листай — и он растёт, прямо как в
-            приложении. А теперь главное: он никогда не откатывается.
-          </p>
-        </motion.div>
+    <section ref={ref} className="relative overflow-hidden">
+      {/* Lime glow в центре секции */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-1/3 h-[500px] bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,oklch(0.86_0.22_130/0.08)_0%,transparent_100%)] blur-2xl"
+      />
 
-        {/* Остров, прорастающий при скролле — та же живая сцена, что в /app/world */}
-        <div className="overflow-hidden rounded-3xl border border-border bg-card">
-          <svg
-            viewBox="0 0 380 216"
-            role="img"
-            aria-label="Остров напарника, который растёт от твоих стартов"
-            className="block w-full"
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-32 md:py-48">
+        <div className="flex flex-col gap-14">
+          <motion.div
+            className="flex flex-col gap-5"
+            initial={reduceMotion ? false : { opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '-80px' }}
+            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
           >
-            <defs>
-              <linearGradient id="lsky" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-background)" />
-                <stop offset="72%" stopColor="var(--color-background)" />
-                <stop offset="100%" stopColor="var(--color-secondary)" />
-              </linearGradient>
-              <linearGradient id="lsea" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--color-secondary)" />
-                <stop offset="100%" stopColor="var(--color-background)" />
-              </linearGradient>
-            </defs>
-            <rect x="0" y="0" width="380" height="162" fill="url(#lsky)" />
-            {[
-              [24, 18, 1.1], [58, 40, 0.8], [96, 14, 1.3], [132, 52, 0.7],
-              [168, 24, 1.0], [242, 12, 1.2], [292, 30, 1.0], [348, 20, 1.1],
-            ].map(([x, y, r], i) => (
-              <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.5">
-                {!reduceMotion && (
-                  <animate
-                    attributeName="opacity"
-                    values="0.25;0.75;0.25"
-                    dur={`${2.6 + (i % 5) * 0.9}s`}
-                    begin={`${(i % 7) * 0.5}s`}
-                    repeatCount="indefinite"
-                  />
-                )}
-              </circle>
-            ))}
-            <rect x="0" y="158" width="380" height="58" fill="url(#lsea)" />
-            <ellipse cx="190" cy="182" rx="130" ry="12" fill="var(--color-accent)" opacity="0.28" />
-            {[
-              [52, 190, 26], [136, 198, 34], [230, 192, 22], [312, 200, 30],
-            ].map(([x, y, w], i) => (
-              <line
-                key={i}
-                x1={x} y1={y} x2={x + w} y2={y}
-                stroke="var(--color-muted-foreground)"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                opacity="0.25"
-              >
-                {!reduceMotion && (
-                  <animate
-                    attributeName="opacity"
-                    values="0.1;0.35;0.1"
-                    dur={`${3.4 + i * 0.7}s`}
-                    begin={`${i * 0.8}s`}
-                    repeatCount="indefinite"
-                  />
-                )}
-              </line>
-            ))}
-            <ellipse cx="190" cy="156" rx="146" ry="26" fill={c.ground} />
-            <path
-              d="M50 156
-                 Q66 132 108 136 Q128 124 160 130 Q190 118 222 130
-                 Q254 122 276 134 Q312 130 330 156
-                 Q300 172 190 174 Q80 172 50 156 Z"
-              fill={c.groundDark}
-              opacity="0.7"
-            />
-            <ellipse cx="190" cy="160" rx="140" ry="17" fill={c.groundDark} opacity="0.35" />
-            {sprouts.map((s, i) => (
-              <g key={s.key} className={i < shown ? 'island-grow' : undefined} opacity={i < shown ? 1 : 0}>
-                {s.node}
-              </g>
-            ))}
-          </svg>
-        </div>
+            <h2 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
+              Ты растишь{' '}
+              <span className="text-primary">его мир</span>.
+              <br />
+              Он не даёт твоему рухнуть.
+            </h2>
+            <p className="text-lg leading-relaxed text-muted-foreground md:text-xl">
+              Каждый старт выращивает кусочек острова. Листай — и он растёт, прямо как в
+              приложении. А теперь главное: он никогда не откатывается.
+            </p>
+          </motion.div>
 
-        <ul className="flex flex-col gap-5">
-          {principles.map((p, i) => (
-            <motion.li
-              key={p.title}
-              className="flex flex-col gap-0.5"
-              initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-60px' }}
-              transition={{
-                type: 'spring',
-                stiffness: 200,
-                damping: 22,
-                delay: reduceMotion ? 0 : i * 0.1,
-              }}
+          {/* Остров: крупнее, с рамкой и свечением */}
+          <motion.div
+            className="overflow-hidden rounded-3xl border-2 border-primary/20 bg-card shadow-[0_0_60px_oklch(0.86_0.22_130/0.10)]"
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: '-60px' }}
+            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+          >
+            <svg
+              viewBox="0 0 380 216"
+              role="img"
+              aria-label="Остров напарника, который растёт от твоих стартов"
+              className="block w-full"
             >
-              <span className="font-bold">{p.title}</span>
-              <span className="leading-relaxed text-muted-foreground">{p.text}</span>
-            </motion.li>
-          ))}
-        </ul>
+              <defs>
+                <linearGradient id="lsky" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-background)" />
+                  <stop offset="72%" stopColor="var(--color-background)" />
+                  <stop offset="100%" stopColor="var(--color-secondary)" />
+                </linearGradient>
+                <linearGradient id="lsea" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="var(--color-secondary)" />
+                  <stop offset="100%" stopColor="var(--color-background)" />
+                </linearGradient>
+                <radialGradient id="island-glow" cx="0.5" cy="0.72" r="0.4">
+                  <stop offset="0%" stopColor="oklch(0.86 0.22 130)" stopOpacity="0.12" />
+                  <stop offset="100%" stopColor="oklch(0.86 0.22 130)" stopOpacity="0" />
+                </radialGradient>
+              </defs>
+              <rect x="0" y="0" width="380" height="162" fill="url(#lsky)" />
+              {[
+                [24, 18, 1.1], [58, 40, 0.8], [96, 14, 1.3], [132, 52, 0.7],
+                [168, 24, 1.0], [242, 12, 1.2], [292, 30, 1.0], [348, 20, 1.1],
+              ].map(([x, y, r], i) => (
+                <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.5">
+                  {!reduceMotion && (
+                    <animate
+                      attributeName="opacity"
+                      values="0.25;0.75;0.25"
+                      dur={`${2.6 + (i % 5) * 0.9}s`}
+                      begin={`${(i % 7) * 0.5}s`}
+                      repeatCount="indefinite"
+                    />
+                  )}
+                </circle>
+              ))}
+              <rect x="0" y="158" width="380" height="58" fill="url(#lsea)" />
+              <ellipse cx="190" cy="182" rx="130" ry="12" fill="var(--color-accent)" opacity="0.28" />
+              {[
+                [52, 190, 26], [136, 198, 34], [230, 192, 22], [312, 200, 30],
+              ].map(([x, y, w], i) => (
+                <line
+                  key={i}
+                  x1={x} y1={y} x2={x + w} y2={y}
+                  stroke="var(--color-muted-foreground)"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  opacity="0.25"
+                />
+              ))}
+              {/* Lime glow под островом */}
+              <ellipse cx="190" cy="157" rx="152" ry="32" fill="url(#island-glow)" />
+              <ellipse cx="190" cy="156" rx="146" ry="26" fill={c.ground} />
+              <path
+                d="M50 156
+                   Q66 132 108 136 Q128 124 160 130 Q190 118 222 130
+                   Q254 122 276 134 Q312 130 330 156
+                   Q300 172 190 174 Q80 172 50 156 Z"
+                fill={c.groundDark}
+                opacity="0.7"
+              />
+              <ellipse cx="190" cy="160" rx="140" ry="17" fill={c.groundDark} opacity="0.35" />
+              {sprouts.map((s, i) => (
+                <g key={s.key} className={i < shown ? 'island-grow' : undefined} opacity={i < shown ? 1 : 0}>
+                  {s.node}
+                </g>
+              ))}
+            </svg>
+            {/* Подпись под островом */}
+            <div className="flex items-center justify-between px-6 py-4">
+              <p className="text-sm text-muted-foreground">
+                Листай — и остров растёт
+              </p>
+              <Button
+                render={<Link href="/app" />}
+                nativeButton={false}
+                size="sm"
+                variant="outline"
+              >
+                Открыть свой
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Принципы — с emoji и крупнее */}
+          <ul className="grid gap-6 sm:grid-cols-2">
+            {principles.map((p, i) => (
+              <motion.li
+                key={p.title}
+                className="flex flex-col gap-2 rounded-2xl border border-border bg-card/50 p-6"
+                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: '-60px' }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 200,
+                  damping: 22,
+                  delay: reduceMotion ? 0 : i * 0.1,
+                }}
+              >
+                <span className="text-2xl">{p.emoji}</span>
+                <span className="text-lg font-bold">{p.title}</span>
+                <span className="leading-relaxed text-muted-foreground">{p.text}</span>
+              </motion.li>
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
   )
