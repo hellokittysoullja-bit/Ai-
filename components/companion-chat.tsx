@@ -327,7 +327,20 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
           {status === 'submitted' && (
             <div className="flex items-center gap-2">
               <CompanionAvatar />
-              <span className="font-mono text-xs text-muted-foreground">печатает…</span>
+              <span
+                className="flex items-center gap-1 px-1 py-2.5"
+                aria-label="Напарник печатает"
+              >
+                <span
+                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                  style={{ animationDelay: '-0.3s' }}
+                />
+                <span
+                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                  style={{ animationDelay: '-0.15s' }}
+                />
+                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+              </span>
             </div>
           )}
           <div ref={bottomRef} />

@@ -1,5 +1,6 @@
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { HeaderCta } from "@/components/header-cta";
 
 export function SiteHeader() {
   return (
@@ -21,16 +22,9 @@ export function SiteHeader() {
           >
             Как это работает
           </Button>
-          <Button
-            render={<Link href="/app" />}
-            nativeButton={false}
-            size="sm"
-            className="font-semibold"
-          >
-            Начать
-          </Button>
+          <HeaderCta />
         </nav>
       </div>
     </header>
-  )
+  );
 }

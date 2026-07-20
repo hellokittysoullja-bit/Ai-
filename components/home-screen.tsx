@@ -360,7 +360,7 @@ export function HomeScreen() {
                 ))}
               </div>
               <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/50">
-                Каждый старт ращуз остров →
+                Каждый старт растит остров →
               </p>
             </div>
           )}
@@ -380,8 +380,7 @@ export function HomeScreen() {
                 >
                   Остров вырос — смотри &rarr;
                 </Link>
-              )}{" "}
-              Всего стартов: {stats.totalStarts}.
+              )}
             </p>
           )}
         </div>
