@@ -252,3 +252,50 @@
     animation-duration: 0.01s;
   }
 }
+
+/* ==========================================================================
+   ЭТАП 1 (финал) — полировка без побочных эффектов
+   Принцип: ничего глобального, что может задеть чужие компоненты.
+   ========================================================================== */
+
+/* Фирменное выделение текста */
+::selection {
+  background: oklch(0.86 0.22 130);
+  color: oklch(0.18 0.02 130);
+}
+
+/* Доступность: видимый фокус только при клавиатурной навигации.
+   :where() даёт нулевую специфичность → ничего не переопределяет насильно */
+:where(a, button, [role="button"], [data-slot="button"]):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Микро-отклик нажатия — OPT-IN класс .press.
+   НАВЕШИВАЕТСЯ ТОЛЬКО на CTA без собственного active-transform
+   («Попробовать», «Пойдём попробуем», «Начать» в шапке).
+   Не конфликтует с таб-баром, отправкой в чате, motion/react и т.д. */
+.press {
+  transition: transform 120ms ease;
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+/* Плавный скролл к якорям («Как это работает») — только если motion разрешён.
+   На чат не влияет: там свой overflow-контейнер с явным scrollIntoView. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press {
+    transition: none;
+  }
+  .press:active {
+    transform: none;
+  }
+}
