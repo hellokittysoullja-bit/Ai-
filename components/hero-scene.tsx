@@ -85,12 +85,12 @@ export function HeroScene() {
           <stop
             offset="0%"
             stopColor="oklch(0.85 0.03 95)"
-            stopOpacity="0.16"
+            stopOpacity="0.22"
           />
           <stop
             offset="55%"
             stopColor="oklch(0.85 0.03 95)"
-            stopOpacity="0.05"
+            stopOpacity="0.07"
           />
           <stop offset="100%" stopColor="oklch(0.85 0.03 95)" stopOpacity="0" />
         </radialGradient>
@@ -114,19 +114,29 @@ export function HeroScene() {
       </defs>
       <rect width="800" height="900" fill="url(#hs-sky)" />
 
-      {/* луна с кратерами и мягким гало; x=556 видна и в мобильном кадре slice */}
-      <circle cx="556" cy="112" r="84" fill="url(#hs-moon-glow)" />
+      {/* луна с кратерами и дышащим гало.
+          Позиция (575, 260) видима везде при slice-кадрировании:
+          - мобиль (горизонтальный кроп): x в зоне ~174–626 — луна у плеча существа;
+          - десктоп (вертикальный кроп): y > ~220 — раньше при cy=112 луна обрезалась. */}
+      <circle cx="575" cy="260" r="110" fill="url(#hs-moon-glow)">
+        <animate
+          attributeName="opacity"
+          values="0.85;1;0.85"
+          dur="7s"
+          repeatCount="indefinite"
+        />
+      </circle>
       <circle
-        cx="556"
-        cy="112"
-        r="21"
+        cx="575"
+        cy="260"
+        r="26"
         fill="oklch(0.84 0.035 95)"
         opacity="0.95"
       />
       <g fill={INK} opacity="0.12">
-        <circle cx="549" cy="105" r="5" />
-        <circle cx="564" cy="118" r="3.4" />
-        <circle cx="554" cy="123" r="2.2" />
+        <circle cx="566" cy="251" r="6.2" />
+        <circle cx="585" cy="268" r="4.2" />
+        <circle cx="572" cy="274" r="2.7" />
       </g>
 
       {/* звёзды: каждая мерцает в своём ритме */}
