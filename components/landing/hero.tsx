@@ -10,6 +10,10 @@ import { Button } from "@/components/ui/button";
 /**
  * Первый экран: сцена прежде слов. Луна, звёзды и существо видны
  * сразу — заголовок живёт ПОД сценой и не перекрывает небо.
+ *
+ * Иерархия CTA (один «король» на зону):
+ * - в сцене-чате ведут две reply-плашки (лайм-tint, не solid);
+ * - под заголовком — единственная solid-лайм кнопка «Попробовать».
  */
 
 const OPENING_LINE =
@@ -180,9 +184,9 @@ export function Hero() {
               step.kind === "companion" ? (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                  initial= opacity: 0, y: 12, scale: 0.97​NOTION_TWS[ ]NOTION_TWS​
+                  animate= opacity: 1, y: 0, scale: 1​NOTION_TWS[ ]NOTION_TWS​
+                  transition= type: "spring", stiffness: 300, damping: 24​NOTION_TWS[ ]NOTION_TWS​
                   className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5 shadow-lg"
                 >
                   <TypedLine text={step.text} onDone={() => setShowCta(true)} />
@@ -190,9 +194,9 @@ export function Hero() {
               ) : (
                 <motion.div
                   key={i}
-                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                  initial= opacity: 0, y: 12, scale: 0.97​NOTION_TWS[ ]NOTION_TWS​
+                  animate= opacity: 1, y: 0, scale: 1​NOTION_TWS[ ]NOTION_TWS​
+                  transition= type: "spring", stiffness: 300, damping: 24​NOTION_TWS[ ]NOTION_TWS​
                   className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-5 py-2.5"
                 >
                   <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
@@ -216,7 +220,7 @@ export function Hero() {
                     e.preventDefault();
                     choose(key);
                   }}
-                  className="rounded-2xl rounded-br-sm border border-primary/50 bg-primary/15 px-5 py-3 text-[15px] font-semibold text-foreground shadow-sm transition-all hover:bg-primary/25 hover:shadow-md active:translate-y-px"
+                  className="press rounded-2xl rounded-br-sm border border-primary/50 bg-primary/15 px-5 py-3 text-[15px] font-semibold text-foreground shadow-sm transition-all hover:bg-primary/25 hover:shadow-md active:translate-y-px"
                 >
                   {REPLIES[key].visitor}
                 </Link>
@@ -226,21 +230,21 @@ export function Hero() {
 
           {showCta && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
+              initial= opacity: 0, y: 10​NOTION_TWS[ ]NOTION_TWS​
+              animate= opacity: 1, y: 0​NOTION_TWS[ ]NOTION_TWS​
+              transition=
                 delay: 0.15,
                 type: "spring",
                 stiffness: 200,
                 damping: 20,
-              }}
+​NOTION_TWS[              ]NOTION_TWS​
               className="flex justify-center pt-3"
             >
               <Button
                 render={<Link href="/app" />}
                 nativeButton={false}
                 size="lg"
-                className="font-semibold"
+                className="press font-semibold"
               >
                 Пойдём попробуем
               </Button>
@@ -255,8 +259,8 @@ export function Hero() {
         style={{ "--rise-delay": "2.6s" } as CSSProperties}
       >
         <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-          Существо, <span className="text-primary">которое</span> не даст
-          тебе слиться
+          Существо, которое не даст тебе{" "}
+          <span className="text-primary">слиться</span>
         </h1>
         <p className="text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
           Помогает начать, сидит рядом во время работы и растит остров из твоих
@@ -265,14 +269,13 @@ export function Hero() {
         {!answered && (
           <div
             className="hero-rise"
-            style={{ "--rise-delay": "7s" } as CSSProperties}
+            style={{ "--rise-delay": "2.9s" } as CSSProperties}
           >
             <Button
               render={<Link href="/app" />}
               nativeButton={false}
               size="lg"
-              variant="outline"
-              className="mt-2 font-semibold"
+              className="press mt-2 font-semibold"
             >
               Попробовать
             </Button>
