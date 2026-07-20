@@ -41,7 +41,7 @@ export function HowItWorks() {
         className="pointer-events-none absolute left-0 top-1/2 h-[700px] w-[500px] -translate-x-1/3 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.10)_0%,transparent_65%)] blur-3xl"
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl px-6 py-24 md:py-36">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-32 md:py-48">
         <motion.div
           className="mb-16 flex flex-col gap-4"
           initial={reduceMotion ? false : { opacity: 0, y: 20 }}
