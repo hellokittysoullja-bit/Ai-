@@ -184,9 +184,9 @@ export function Hero() {
               step.kind === "companion" ? (
                 <motion.div
                   key={i}
-                  initial= opacity: 0, y: 12, scale: 0.97​NOTION_TWS[ ]NOTION_TWS​
-                  animate= opacity: 1, y: 0, scale: 1​NOTION_TWS[ ]NOTION_TWS​
-                  transition= type: "spring", stiffness: 300, damping: 24​NOTION_TWS[ ]NOTION_TWS​
+                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
                   className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5 shadow-lg"
                 >
                   <TypedLine text={step.text} onDone={() => setShowCta(true)} />
@@ -194,9 +194,9 @@ export function Hero() {
               ) : (
                 <motion.div
                   key={i}
-                  initial= opacity: 0, y: 12, scale: 0.97​NOTION_TWS[ ]NOTION_TWS​
-                  animate= opacity: 1, y: 0, scale: 1​NOTION_TWS[ ]NOTION_TWS​
-                  transition= type: "spring", stiffness: 300, damping: 24​NOTION_TWS[ ]NOTION_TWS​
+                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
                   className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-5 py-2.5"
                 >
                   <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
@@ -220,7 +220,7 @@ export function Hero() {
                     e.preventDefault();
                     choose(key);
                   }}
-                  className="press rounded-2xl rounded-br-sm border border-primary/50 bg-primary/15 px-5 py-3 text-[15px] font-semibold text-foreground shadow-sm transition-all hover:bg-primary/25 hover:shadow-md active:translate-y-px"
+                  className="rounded-2xl rounded-br-sm border border-primary/50 bg-primary/15 px-5 py-3 text-[15px] font-semibold text-foreground shadow-sm transition-all hover:bg-primary/25 hover:shadow-md active:translate-y-px"
                 >
                   {REPLIES[key].visitor}
                 </Link>
@@ -230,14 +230,14 @@ export function Hero() {
 
           {showCta && (
             <motion.div
-              initial= opacity: 0, y: 10​NOTION_TWS[ ]NOTION_TWS​
-              animate= opacity: 1, y: 0​NOTION_TWS[ ]NOTION_TWS​
-              transition=
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{
                 delay: 0.15,
                 type: "spring",
                 stiffness: 200,
                 damping: 20,
-​NOTION_TWS[              ]NOTION_TWS​
+              }}
               className="flex justify-center pt-3"
             >
               <Button
