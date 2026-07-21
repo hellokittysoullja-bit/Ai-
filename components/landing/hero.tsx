@@ -8,12 +8,17 @@ import { GroundPool, HeroScene } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
 
 /**
- * Первый экран: сцена прежде слов. Луна, звёзды и существо видны
- * сразу — заголовок живёт ПОД сценой и не перекрывает небо.
+ * Первый экран: одна плотная композиция вместо двух зон, разбросанных по
+ * полутора экранам. Промис (заголовок) поднят В КАДР — на десктопе он больше
+ * не уходит под сгиб. Сцена остаётся иммерсивным фоном (её крафт — ров), но
+ * слова оффера видны сразу: сцена не важнее промиса, они делят первый экран.
  *
- * Иерархия CTA (один «король» на зону):
- * - в сцене-чате ведут две reply-плашки (лайм-tint, не solid);
- * - под заголовком — единственная solid-лайм кнопка «Попробовать».
+ * Иерархия (сверху вниз, ни одного дубля):
+ * - надзаголовок фиксирует боль («самое трудное — начать»);
+ * - H1 — обещание, с рукописным подчёркиванием ключевого слова (bespoke-деталь);
+ * - подзаголовок — конкретика механики + дифференциатор «без стриков, без стыда»;
+ * - живой чат-вход: существо здоровается, ты отвечаешь премиальной репликой —
+ *   отличительный интерактивный крючок, а не статичная кнопка.
  */
 
 const OPENING_LINE =
@@ -144,37 +149,72 @@ export function Hero() {
   }
 
   return (
-    <section className="grain relative flex min-h-[92svh] flex-col items-center justify-center overflow-hidden px-4 py-16">
-      {/* Атмосфера: ночная сцена с луной и звёздами — ничем не перекрыта */}
+    <section className="grain relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-14 pt-6">
+      {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <HeroScene />
       </div>
 
-      {/* Сцена: существо в пятне света очага */}
-      <div className="relative flex w-full max-w-md flex-col items-center gap-4">
-        {/* Мягкое свечение за маскотом — не трогает небо */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute left-1/2 top-0 h-64 w-64 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.25)_0%,transparent_70%)] blur-2xl"
-        />
-
-        <div className="flex flex-col items-center">
+      <div className="relative flex w-full max-w-md flex-col items-center gap-4 text-center">
+        {/* Существо в пятне света очага */}
+        <div className="relative flex flex-col items-center">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl"
+          />
           <MascotSvg
             expression={expression}
-            size={240}
+            size={196}
             label="Напарник — пушистое существо с зелёными глазами"
             className="relative z-10"
           />
-          <GroundPool className="-mt-12 -mb-10" />
+          <GroundPool className="-mt-10 -mb-12" />
         </div>
 
-        <div className="flex w-full flex-col gap-3" aria-live="polite">
-          <div
-            className="hero-rise max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5 shadow-lg"
-            style={{ "--rise-delay": "0.25s" } as CSSProperties}
-          >
+        {/* Надзаголовок: фиксирует боль до обещания */}
+        <span
+          className="hero-rise font-mono text-[11px] uppercase tracking-[0.22em] text-primary/85"
+          style={{ "--rise-delay": "0.2s" } as CSSProperties}
+        >
+          самое трудное — начать
+        </span>
+
+        {/* Промис В КАДРЕ: рукописное подчёркивание ключевого слова — bespoke */}
+        <h1
+          className="hero-rise text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl"
+          style={{ "--rise-delay": "0.32s" } as CSSProperties}
+        >
+          Существо, которое не даст тебе{" "}
+          <span className="scribble-underline text-primary">
+            слиться
+            <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" />
+            </svg>
+          </span>
+        </h1>
+
+        {/* Подзаголовок: конкретика + дифференциатор */}
+        <p
+          className="hero-rise text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
+          style={{ "--rise-delay": "0.46s" } as CSSProperties}
+        >
+          Помогает начать, сидит рядом во время работы и растит остров из твоих
+          стартов.{" "}
+          <span className="font-medium text-foreground/80">
+            Без стриков. Без стыда.
+          </span>
+        </p>
+
+        {/* Живой чат-вход: он здоровается, ты отвечаешь — премиальная реплика */}
+        <div
+          className="hero-rise mt-1 flex w-full flex-col gap-2.5"
+          style={{ "--rise-delay": "0.62s" } as CSSProperties}
+          aria-live="polite"
+        >
+          <div className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md">
             <WordReveal
               text={OPENING_LINE}
+              startDelay={0.85}
               className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
             />
           </div>
@@ -187,7 +227,7 @@ export function Hero() {
                   initial={{ opacity: 0, y: 12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                  className="max-w-[92%] self-start rounded-2xl rounded-tl-sm bg-secondary px-5 py-3.5 shadow-lg"
+                  className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md"
                 >
                   <TypedLine text={step.text} onDone={() => setShowCta(true)} />
                 </motion.div>
@@ -197,7 +237,7 @@ export function Hero() {
                   initial={{ opacity: 0, y: 12, scale: 0.97 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                  className="max-w-[85%] self-end rounded-2xl rounded-br-sm bg-primary px-5 py-2.5"
+                  className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_24px_-8px_oklch(0.86_0.22_130/0.5)]"
                 >
                   <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
                     {step.text}
@@ -208,10 +248,7 @@ export function Hero() {
           </AnimatePresence>
 
           {!answered && (
-            <div
-              className="hero-rise flex flex-wrap justify-end gap-2 pt-1"
-              style={{ "--rise-delay": "2.05s" } as CSSProperties}
-            >
+            <div className="flex flex-wrap justify-end gap-2 pt-0.5">
               {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
                 <Link
                   key={key}
@@ -220,7 +257,7 @@ export function Hero() {
                     e.preventDefault();
                     choose(key);
                   }}
-                  className="rounded-2xl rounded-br-sm border border-primary/50 bg-primary/15 px-5 py-3 text-[15px] font-semibold text-foreground shadow-sm transition-all hover:bg-primary/25 hover:shadow-md active:translate-y-px"
+                  className="group rounded-2xl rounded-br-md border border-white/12 bg-white/[0.04] px-5 py-3 text-[15px] font-medium text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
                 >
                   {REPLIES[key].visitor}
                 </Link>
@@ -238,7 +275,7 @@ export function Hero() {
                 stiffness: 200,
                 damping: 20,
               }}
-              className="flex justify-center pt-3"
+              className="flex justify-center pt-2"
             >
               <Button
                 render={<Link href="/app" />}
@@ -251,37 +288,21 @@ export function Hero() {
             </motion.div>
           )}
         </div>
-      </div>
 
-      {/* Заголовок ПОД сценой: сцена важнее слов, луна и звёзды видны */}
-      <div
-        className="hero-rise mt-16 flex max-w-md flex-col items-center gap-3 text-center"
-        style={{ "--rise-delay": "2.6s" } as CSSProperties}
-      >
-        <h1 className="text-balance text-4xl font-bold leading-tight tracking-tight md:text-5xl">
-          Существо, которое не даст тебе{" "}
-          <span className="text-primary">слиться</span>
-        </h1>
-        <p className="text-pretty text-base leading-relaxed text-muted-foreground md:text-lg">
-          Помогает начать, сидит рядом во время работы и растит остров из твоих
-          стартов. Без стриков. Без стыда.
-        </p>
+        {/* Тихий прямой вход + доверие: не давит на «поговорить» тех, кто готов сразу */}
         {!answered && (
-          <div
-            className="hero-rise"
-            style={{ "--rise-delay": "2.9s" } as CSSProperties}
+          <Link
+            href="/app"
+            className="hero-rise font-mono text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-primary"
+            style={{ "--rise-delay": "0.78s" } as CSSProperties}
           >
-            <Button
-              render={<Link href="/app" />}
-              nativeButton={false}
-              size="lg"
-              className="press mt-2 font-semibold"
-            >
-              Попробовать
-            </Button>
-          </div>
+            или сразу в приложение →
+          </Link>
         )}
-        <span className="pt-1 font-mono text-xs text-muted-foreground">
+        <span
+          className="hero-rise font-mono text-[11px] tracking-wide text-muted-foreground/70"
+          style={{ "--rise-delay": "0.86s" } as CSSProperties}
+        >
           бесплатно, без карты и регистрации
         </span>
       </div>
