@@ -204,7 +204,7 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
                     key={chip}
                     type="button"
                     onClick={() => sendMessage({ text: chip })}
-                    className="rounded-full border border-border bg-card px-3.5 py-2 text-sm text-foreground transition-colors hover:border-primary hover:text-primary"
+                    className="rounded-full border border-white/12 bg-white/[0.04] px-3.5 py-2 text-sm text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
                   >
                     {chip}
                   </button>

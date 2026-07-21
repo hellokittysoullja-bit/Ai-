@@ -215,7 +215,7 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section className="border-b border-border/40 bg-gradient-to-b from-card to-background">
+      <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
             {/*
@@ -223,20 +223,30 @@ export function HomeScreen() {
               На каждый mount — статичен. Habituation убивает дофамин к 5-му визиту.
               Событийный триггер = Variable Reward = настоящий дофамин.
               keyframes [1, 1.14, 0.95, 1.05, 1] = радостный прыжок, не угроза.
+
+              Тёплое пятно света позади — тот же очаг, что на лендинге, только
+              статичный: существо живёт в своём мире и на этом экране, не в
+              списке иконок. Continuity без анимационной цены.
             */}
-            <motion.div
-              className="shrink-0"
-              animate={
-                shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
-              }
-              transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
-            >
-              <MascotSvg
-                expression={mascotExpression}
-                label={companionName ?? "Напарник"}
-                size={52}
+            <div className="relative shrink-0">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.16)_0%,transparent_70%)]"
               />
-            </motion.div>
+              <motion.div
+                className="relative"
+                animate={
+                  shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
+                }
+                transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
+              >
+                <MascotSvg
+                  expression={mascotExpression}
+                  label={companionName ?? "Напарник"}
+                  size={52}
+                />
+              </motion.div>
+            </div>
             {/*
               Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
               Не на mount (иначе «…» fade-in = jank = negative prediction error).
@@ -353,7 +363,7 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="rounded-full border border-primary/40 bg-card px-4 py-2 text-sm font-semibold transition-colors hover:border-primary hover:text-primary"
+                    className="rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
                   >
                     {chip}
                   </Link>
