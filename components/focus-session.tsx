@@ -6,7 +6,8 @@ import { useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
-import { ChevronRight, Sprout } from 'lucide-react'
+import { RevealIsland, type RevealNewItem } from '@/components/reveal-island'
+import { ChevronRight } from 'lucide-react'
 import {
   addFind,
   clearActiveSession,
@@ -20,6 +21,7 @@ import {
   savePlan,
   todayKey,
   updateStartMinutes,
+  type IslandFindEntry,
 } from '@/lib/memory'
 import {
   drawFind,
@@ -28,9 +30,9 @@ import {
   RARITY_LABEL,
   type Rarity,
 } from '@/lib/island-elements'
-import { playRewardChime, playStartSigh } from '@/lib/reward-sound'
+import { playStartSigh } from '@/lib/reward-sound'
 import { startCampfire, stopCampfire } from '@/lib/ambient'
-import { hapticDone, hapticReward, hapticStart } from '@/lib/haptics'
+import { hapticDone, hapticStart } from '@/lib/haptics'
 
 const durations = [15, 25, 45]
 
@@ -110,9 +112,15 @@ export function FocusSession() {
 
   // Награда: что выросло на острове после этого старта.
   // Ориентир (старты 1-10) или находка из пула с редкостью (старты 11+).
+  // landmarksUnlocked/finds/newItem — снимок острова ДО этой находки, нужен
+  // RevealIsland, чтобы прорастить новый элемент на настоящем острове, а не
+  // на отдельной карточке (см. components/reveal-island.tsx).
   const [grownElement, setGrownElement] = useState<{
     name: string
     rarity: Rarity | 'landmark'
+    landmarksUnlocked: number
+    finds: IslandFindEntry[]
+    newItem: RevealNewItem
   } | null>(null)
 
   // Ритуал завершения: план на завтра на пике дофамина.
@@ -173,22 +181,12 @@ export function FocusSession() {
     })
   }
 
+  // Раскрытие «остального» (план/кнопки) теперь ведёт RevealIsland через
+  // onRevealed — хореография предвкушение→прорастание сама решает, когда
+  // пик отыграл своё. Этот эффект — только защита на случай null-находки.
   useEffect(() => {
     if (phase !== 'done') return
-    if (!grownElement) {
-      setRestRevealed(true)
-      return
-    }
-    // Звук и вибрация в момент появления карточки находки
-    const chime = window.setTimeout(() => {
-      playRewardChime(grownElement.rarity)
-      hapticReward()
-    }, 500)
-    const reveal = window.setTimeout(() => setRestRevealed(true), 1700)
-    return () => {
-      window.clearTimeout(chime)
-      window.clearTimeout(reveal)
-    }
+    if (!grownElement) setRestRevealed(true)
   }, [phase, grownElement])
 
   const totalRef = useRef(0)
@@ -345,19 +343,37 @@ export function FocusSession() {
     const starts = await getStarts()
     const n = starts.length
     if (n <= LANDMARK_COUNT) {
-      // Первые 10 стартов — предсказуемые ориентиры: новичку нужна ясная история
+      // Первые 10 стартов — предсказуемые ориентиры: новичку нужна ясная история.
+      // Находок пула тут структурно быть не может: пул стартует только при n > LANDMARK_COUNT.
       const name = elementNameForStartNumber(n)
-      setGrownElement(name ? { name, rarity: 'landmark' } : null)
+      setGrownElement(
+        name
+          ? {
+              name,
+              rarity: 'landmark',
+              landmarksUnlocked: n - 1,
+              finds: [],
+              newItem: { kind: 'landmark', index: n - 1 },
+            }
+          : null,
+      )
     } else {
       // Дальше — вероятностный пул. Полная сессия повышает шанс редкого.
       const finds = await getFinds()
       let pity = 0
       for (let i = finds.length - 1; i >= 0 && finds[i].rarity === 'common'; i--) pity++
       const find = drawFind(!early, pity)
+      const findEntry = { ...find, date: todayKey(), startId: startIdRef.current ?? '' }
       if (startIdRef.current) {
-        await addFind({ ...find, date: todayKey(), startId: startIdRef.current })
+        await addFind(findEntry)
       }
-      setGrownElement({ name: find.name, rarity: find.rarity })
+      setGrownElement({
+        name: find.name,
+        rarity: find.rarity,
+        landmarksUnlocked: LANDMARK_COUNT,
+        finds,
+        newItem: { kind: 'find', find: findEntry, findIndex: finds.length },
+      })
     }
     hapticDone()
     setEndedEarly(early)
@@ -628,43 +644,28 @@ export function FocusSession() {
         </p>
       </div>
 
-      {/* Пик дофамина — находка. Появляется с паузой и пружиной: предвкушение → награда */}
+      {/* Пик дофамина — находка прорастает НА настоящем острове, не на карточке поверх него.
+          RevealIsland сам ведёт хореографию предвкушение → прорастание → (для rare) золотое
+          цветение и зовёт onRevealed, когда пора показывать план/кнопки ниже. */}
       {grownElement && (
         <motion.div
           className="w-full"
-          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 18, scale: 0.92 }}
-          animate={reducedMotion ? { opacity: 1 } : { opacity: 1, y: 0, scale: 1 }}
+          initial={reducedMotion ? { opacity: 0 } : { opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={
-            reducedMotion
-              ? { delay: 0.5, duration: 0.3 }
-              : { delay: 0.5, type: 'spring', stiffness: 260, damping: 18 }
+            reducedMotion ? { duration: 0.3 } : { duration: 0.5, ease: 'easeOut' }
           }
         >
-          {/* Rare = золото: тёплый жёлтый — визуальный триггер RPE.
-              Обычные находки остаются в лаймовом — редкое ДОЛЖНО отличаться */}
           <Link
             href="/app/world"
-            className={`relative flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl border bg-card px-5 py-5 text-center transition-colors ${
-              grownElement.rarity === 'rare'
-                ? 'border-reward shadow-[0_0_44px_-4px_var(--color-reward)] hover:border-reward'
-                : grownElement.rarity === 'uncommon'
-                  ? 'border-primary/70 hover:border-primary'
-                  : 'border-primary/40 hover:border-primary'
-            }`}
+            className="group flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl border border-border bg-card px-4 pb-4 pt-3 text-center transition-colors hover:border-primary/50"
           >
-            {grownElement.rarity === 'rare' && (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  background:
-                    'radial-gradient(ellipse at 50% 0%, color-mix(in oklch, var(--color-reward) 18%, transparent), transparent 70%)',
-                }}
-              />
-            )}
-            <Sprout
-              className={`size-8 ${grownElement.rarity === 'rare' ? 'text-reward' : 'text-primary'}`}
-              aria-hidden="true"
+            <RevealIsland
+              landmarksUnlocked={grownElement.landmarksUnlocked}
+              finds={grownElement.finds}
+              newItem={grownElement.newItem}
+              rarity={grownElement.rarity}
+              onRevealed={() => setRestRevealed(true)}
             />
             <span
               className={`font-mono text-[10px] uppercase tracking-widest ${
@@ -673,11 +674,11 @@ export function FocusSession() {
             >
               {grownElement.rarity === 'landmark'
                 ? 'на острове появилось'
-                : `${RARITY_LABEL[grownElement.rarity]} находка`}
+                : RARITY_LABEL[grownElement.rarity]}
             </span>
             <span className="text-balance text-xl font-bold">{grownElement.name}</span>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              смотреть на острове
+            <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+              смотреть остров целиком
             </span>
           </Link>
         </motion.div>
