@@ -185,10 +185,13 @@ export function Hero() {
           style={{ "--rise-delay": "0.32s" } as CSSProperties}
         >
           Существо, которое не даст тебе{" "}
-          <span className="scribble-underline text-primary">
+          <span
+            className="scribble-underline scribble-draw text-primary"
+            style={{ "--scribble-delay": "0.95s" } as CSSProperties}
+          >
             слиться
             <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" />
+              <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" pathLength={1} />
             </svg>
           </span>
         </h1>
@@ -257,6 +260,10 @@ export function Hero() {
                     e.preventDefault();
                     choose(key);
                   }}
+                  // Микро-магнетизм: существо радуется, когда ты тянешься ответить —
+                  // сцена откликается на намерение раньше действия (живая, не картинка)
+                  onMouseEnter={() => setExpression("happy")}
+                  onMouseLeave={() => setExpression("calm")}
                   className="group rounded-2xl rounded-br-md border border-white/12 bg-white/[0.04] px-5 py-3 text-[15px] font-medium text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
                 >
                   {REPLIES[key].visitor}
