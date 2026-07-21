@@ -382,7 +382,7 @@ export function CompanionChat({
             }}
             placeholder={placeholder ?? 'Напиши напарнику…'}
             aria-label="Сообщение напарнику"
-            className="h-11 flex-1 rounded-xl border border-input bg-card px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="glass h-11 flex-1 rounded-xl px-4 text-sm"
           />
           <Button
             type="submit"

@@ -438,7 +438,7 @@ export function FocusSession() {
                 setBrokenSteps(null)
               }}
               placeholder="Открыть файл презентации"
-              className="h-12 rounded-xl border border-input bg-card px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="glass h-12 rounded-xl px-4 text-sm"
             />
           </label>
 
@@ -711,14 +711,14 @@ export function FocusSession() {
               onChange={(e) => setTomorrowTask(e.target.value)}
               placeholder="Что завтра важно"
               aria-label="Дело на завтра"
-              className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="glass h-11 rounded-xl px-4 text-sm"
             />
             <input
               value={tomorrowStep}
               onChange={(e) => setTomorrowStep(e.target.value)}
               placeholder="Первый крошечный шаг"
               aria-label="Первый шаг завтрашнего дела"
-              className="h-11 rounded-xl border border-input bg-background px-4 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="glass h-11 rounded-xl px-4 text-sm"
             />
             <Button
               onClick={saveTomorrowPlan}
