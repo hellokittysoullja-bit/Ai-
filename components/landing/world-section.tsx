@@ -122,7 +122,7 @@ export function WorldSection() {
         className="pointer-events-none absolute inset-x-0 top-1/3 h-[500px] bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,oklch(0.86_0.22_130/0.08)_0%,transparent_100%)] blur-2xl"
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl px-6 py-32 md:py-48">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-24 md:py-36">
         <div className="flex flex-col gap-14">
           <motion.div
             className="flex flex-col gap-5"
