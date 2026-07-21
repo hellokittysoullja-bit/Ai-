@@ -215,7 +215,7 @@ export function CompanionChat({
                     key={chip}
                     type="button"
                     onClick={() => sendMessage({ text: chip })}
-                    className="rounded-full border border-white/12 bg-white/[0.04] px-3.5 py-2 text-sm text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
+                    className="glass glass-interactive rounded-full px-3.5 py-2 text-sm text-foreground hover:text-primary"
                   >
                     {chip}
                   </button>
@@ -253,7 +253,7 @@ export function CompanionChat({
                         className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           message.role === 'user'
                             ? 'ml-auto rounded-tr-sm bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground'
-                            : 'rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
+                            : 'glass rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
                         }`}
                       >
                         {part.text}
@@ -271,7 +271,7 @@ export function CompanionChat({
                   return (
                     <div
                       key={i}
-                      className="ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl border border-primary/40 bg-card px-4 py-3"
+                      className="glass ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3"
                     >
                       <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
                         <CalendarCheck className="size-3.5" aria-hidden="true" />
@@ -295,7 +295,7 @@ export function CompanionChat({
                   return (
                     <div
                       key={i}
-                      className="ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl border border-primary/40 bg-card px-4 py-3"
+                      className="glass ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3"
                     >
                       <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
                         готов к старту · {d} мин

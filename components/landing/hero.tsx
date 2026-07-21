@@ -214,7 +214,7 @@ export function Hero() {
           style={{ "--rise-delay": "0.62s" } as CSSProperties}
           aria-live="polite"
         >
-          <div className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md">
+          <div className="glass max-w-[92%] self-start rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
             <WordReveal
               text={OPENING_LINE}
               startDelay={0.85}
@@ -264,7 +264,7 @@ export function Hero() {
                   // сцена откликается на намерение раньше действия (живая, не картинка)
                   onMouseEnter={() => setExpression("happy")}
                   onMouseLeave={() => setExpression("calm")}
-                  className="group rounded-2xl rounded-br-md border border-white/12 bg-white/[0.04] px-5 py-3 text-[15px] font-medium text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
+                  className="group glass glass-interactive rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
                 >
                   {REPLIES[key].visitor}
                 </Link>
