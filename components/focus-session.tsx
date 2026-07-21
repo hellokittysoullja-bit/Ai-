@@ -424,7 +424,7 @@ export function FocusSession() {
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     task === chip
                       ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      : 'border-white/12 bg-white/[0.04] text-muted-foreground backdrop-blur-sm hover:border-white/20 hover:bg-white/[0.07] hover:text-foreground'
                   }`}
                 >
                   {chip}
@@ -454,7 +454,7 @@ export function FocusSession() {
             </button>
           )}
           {brokenSteps && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3">
+            <div className="flex flex-col gap-2 rounded-2xl border border-white/12 bg-white/[0.04] p-3 backdrop-blur-sm">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 выбери первый — остальное потом
               </p>
@@ -489,7 +489,7 @@ export function FocusSession() {
                   className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
                     minutes === d
                       ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      : 'border-white/12 bg-white/[0.04] text-muted-foreground backdrop-blur-sm hover:border-white/20 hover:bg-white/[0.07] hover:text-foreground'
                   }`}
                 >
                   {d} мин
@@ -658,7 +658,7 @@ export function FocusSession() {
         >
           <Link
             href="/app/world"
-            className="group flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl border border-border bg-card px-4 pb-4 pt-3 text-center transition-colors hover:border-primary/50"
+            className="group flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl border border-white/12 bg-white/[0.04] px-4 pb-4 pt-3 text-center backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.45)]"
           >
             <RevealIsland
               landmarksUnlocked={grownElement.landmarksUnlocked}
@@ -698,13 +698,13 @@ export function FocusSession() {
           <button
             type="button"
             onClick={() => setPlanFormOpen(true)}
-            className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary"
+            className="flex w-full items-center justify-between rounded-2xl border border-white/12 bg-white/[0.04] px-4 py-3 text-left backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10"
           >
             <span className="text-sm font-semibold">Договориться с завтрашним собой</span>
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </button>
         ) : (
-          <div className="flex w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+          <div className="flex w-full flex-col gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-4 backdrop-blur-sm">
             <p className="text-sm font-semibold">Договоримся с завтрашним собой?</p>
             <input
               value={tomorrowTask}

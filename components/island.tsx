@@ -206,7 +206,7 @@ export function Island() {
         type="button"
         onClick={tapIsland}
         aria-label="Коснуться острова — напарник вспомнит историю"
-        className="cursor-pointer overflow-hidden rounded-3xl border border-border bg-card text-left transition-colors hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
+        className="cursor-pointer overflow-hidden rounded-3xl border border-white/12 bg-white/[0.04] text-left backdrop-blur-sm transition-all duration-200 hover:border-primary/40 focus-visible:ring-2 focus-visible:ring-ring"
       >
         <svg
           viewBox="0 0 380 216"
@@ -342,7 +342,7 @@ export function Island() {
       )}
 
       {starts !== null && count === 0 && (
-        <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-col gap-2 rounded-2xl border border-white/12 bg-white/[0.04] p-5 backdrop-blur-sm">
           <p className="text-sm font-semibold">Видишь очертания? Это всё уже твоё.</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Дерево, костёр, домик, причал — они ждут. Первый же старт, даже минутный, зажжёт
@@ -360,7 +360,7 @@ export function Island() {
       {/* Витрина редких: найденные — в цвете, остальные — силуэты «???».
           Цель на горизонте: человек с первого дня видит, что есть что искать. */}
       {starts !== null && (
-        <div className="flex flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+        <div className="flex flex-col gap-3 rounded-2xl border border-white/12 bg-white/[0.04] p-4 backdrop-blur-sm">
           <p className="text-sm font-semibold">Редкие события</p>
           <div className="grid grid-cols-4 gap-2">
             {ISLAND_POOL.filter((e) => e.rarity === 'rare').map((rare) => {
@@ -370,7 +370,7 @@ export function Island() {
                 <div
                   key={rare.key}
                   className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center ${
-                    found ? 'border-reward/60 shadow-[0_0_14px_-4px_var(--color-reward)]' : 'border-border'
+                    found ? 'border-reward/60 shadow-[0_0_14px_-4px_var(--color-reward)]' : 'border-white/12'
                   }`}
                 >
                   <svg viewBox="-32 -44 64 56" className="h-9 w-12" aria-hidden="true">
@@ -400,8 +400,8 @@ export function Island() {
           {recentDiary.map((entry) => (
             <li
               key={entry.id}
-              className={`flex items-start justify-between gap-3 rounded-xl border bg-card px-4 py-3 ${
-                entry.isNewToday ? 'border-primary/50' : 'border-border'
+              className={`flex items-start justify-between gap-3 rounded-xl border bg-white/[0.04] px-4 py-3 backdrop-blur-sm ${
+                entry.isNewToday ? 'border-primary/50' : 'border-white/12'
               }`}
             >
               <div className="flex flex-col gap-0.5">
@@ -425,7 +425,7 @@ export function Island() {
             </li>
           ))}
           {diary.length > recentDiary.length && (
-            <li className="rounded-xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+            <li className="rounded-xl border border-white/12 bg-white/[0.04] px-4 py-3 text-sm leading-relaxed text-muted-foreground backdrop-blur-sm">
               И ещё {diary.length - recentDiary.length} записей раньше — всё это по-прежнему на
               острове.
             </li>
