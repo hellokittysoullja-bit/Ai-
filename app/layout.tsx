@@ -57,6 +57,12 @@ export default function RootLayout({
   return (
     <html
       lang="ru"
+      // Плавный скролл к якорям («Как это работает») задан через CSS
+      // (app/globals.css, под prefers-reduced-motion). Next.js предупреждает,
+      // что без явного opt-in его роутер может конфликтовать с CSS-плавностью
+      // при переходах между страницами — data-атрибут снимает конфликт, сам
+      // scroll-behavior по-прежнему приходит из CSS и уважает reduced-motion.
+      data-scroll-behavior="smooth"
       className={`bg-background ${manrope.variable} ${jetbrainsMono.variable} ${caveat.variable}`}
     >
       <body className="antialiased font-sans">

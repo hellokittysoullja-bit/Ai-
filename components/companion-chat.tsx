@@ -24,6 +24,11 @@ type CompanionChatProps = {
   greeting: string
   placeholder?: string
   onPlanSaved?: () => void
+  /** Скрыть чипы-подсказки пустого чата. Нужно, когда над чатом уже показан
+      свой набор чипов (стартер-чипы новичка на HomeScreen) — два визуально
+      одинаковых ряда пилюль подряд, ведущих к разным действиям (мгновенный
+      старт vs сообщение боту), путают сильнее, чем помогают. */
+  showSuggestions?: boolean
 }
 
 function CompanionAvatar() {
@@ -34,7 +39,13 @@ function CompanionAvatar() {
   )
 }
 
-export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: CompanionChatProps) {
+export function CompanionChat({
+  mode,
+  greeting,
+  placeholder,
+  onPlanSaved,
+  showSuggestions = true,
+}: CompanionChatProps) {
   const router = useRouter()
   const [input, setInput] = useState('')
   const memoryRef = useRef<MemoryContext | null>(null)
@@ -184,7 +195,7 @@ export function CompanionChat({ mode, greeting, placeholder, onPlanSaved }: Comp
             </div>
           </motion.div>
 
-          {messages.length === 0 && (
+          {messages.length === 0 && showSuggestions && (
             <motion.div
               className="ml-10 flex flex-col gap-2"
               initial={{ opacity: 0, y: 8 }}
