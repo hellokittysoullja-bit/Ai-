@@ -1,5 +1,6 @@
 import { SiteHeader } from "@/components/site-header";
 import { Hero } from "@/components/landing/hero";
+import { LandingBackdrop } from "@/components/landing/landing-backdrop";
 import { Problem } from "@/components/landing/problem";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { WorldSection } from "@/components/landing/world-section";
@@ -18,7 +19,9 @@ export default function LandingPage() {
         <style>{`[style*="opacity:0"], [style*="opacity: 0"] { opacity: 1 !important; transform: none !important; }`}</style>
       </noscript>
       <SiteHeader />
-      <main className="flex-1">
+      {/* relative — якорь для общего ночного фона под всеми секциями */}
+      <main className="relative flex-1">
+        <LandingBackdrop />
         <Hero />
         <Problem />
         <HowItWorks />
