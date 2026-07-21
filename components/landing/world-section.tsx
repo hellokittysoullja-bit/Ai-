@@ -242,7 +242,7 @@ export function WorldSection() {
             {principles.map((p, i) => (
               <motion.li
                 key={p.title}
-                className="flex flex-col gap-2 rounded-2xl border border-border bg-card/50 p-6"
+                className="flex flex-col gap-2 rounded-2xl border border-white/12 bg-white/[0.04] p-6 backdrop-blur-sm"
                 initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-60px' }}

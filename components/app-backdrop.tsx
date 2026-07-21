@@ -12,6 +12,14 @@
  * Рендерится один раз в app/app/layout.tsx (fixed, вне потока документа —
  * не задевает существующую вёрстку трёх вложенных экранов) и живёт через
  * все переходы Дом/Фокус/Мир без перемонтирования и мигания.
+ *
+ * БЕЗ отрицательного z-index (сознательно): и <html>, и <body> здесь несут
+ * собственный явный bg-background (dark-first тема). В этой связке z-index
+ * < 0 на fixed-элементе прячет его под фон корневого элемента — эмпирически
+ * подтверждено (element inspection + попиксельная проверка PNG), а не
+ * только «правильно» по спецификации на бумаге. Порядок в DOM (этот блок
+ * рендерится ПЕРВЫМ, до остального контента) при z-index: auto даёт тот же
+ * визуальный результат — элемент под контентом — без этой ловушки.
  */
 
 const STARS: ReadonlyArray<readonly [number, number, number, number]> = [
@@ -33,7 +41,7 @@ export function AppBackdrop() {
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+      className="pointer-events-none fixed inset-0 overflow-hidden"
     >
       <div
         className="absolute inset-0"
@@ -42,10 +50,15 @@ export function AppBackdrop() {
             "linear-gradient(to bottom, oklch(0.24 0.024 135) 0%, oklch(0.175 0.014 145) 40%, oklch(0.17 0.008 130) 100%)",
         }}
       />
-      {/* Дальнее эхо очага — едва тёплое пятно вверху, не движется */}
+      {/* Дальнее эхо очага — едва тёплое пятно вверху, не движется.
+          Размер в vw: на узком /app (мобильный, основной случай) —
+          компактно и незаметно; на широких edge-экранах (404/error,
+          могут открыть на десктопе) то же пятно не теряется в пустоте. */}
       <div
-        className="absolute left-1/2 top-0 h-80 w-80 -translate-x-1/2 -translate-y-1/3 rounded-full opacity-80 blur-3xl"
+        className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/3 rounded-full opacity-80 blur-3xl"
         style={{
+          width: "clamp(18rem, 34vw, 40rem)",
+          height: "clamp(18rem, 34vw, 40rem)",
           background:
             "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.08) 0%, transparent 65%)",
         }}
@@ -57,8 +70,8 @@ export function AppBackdrop() {
           style={{
             top: `${top}%`,
             left: `${left}%`,
-            width: size,
-            height: size,
+            width: `clamp(${size * 1}px, ${size * 0.14}vw, ${size * 1.9}px)`,
+            height: `clamp(${size * 1}px, ${size * 0.14}vw, ${size * 1.9}px)`,
             backgroundColor: `oklch(0.92 0.01 210 / ${alpha})`,
           }}
         />
