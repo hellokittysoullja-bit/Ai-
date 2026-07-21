@@ -32,7 +32,7 @@ export function AppNav() {
   return (
     <nav
       aria-label="Основная навигация"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
+      className="glass-nav fixed inset-x-0 bottom-0 z-50 border-t border-white/10 pb-[env(safe-area-inset-bottom)]"
     >
       <div className="mx-auto flex max-w-md items-center justify-around py-2">
         {tabs.map((tab) => {

@@ -403,7 +403,7 @@ export function FocusSession() {
         {/* Сцена: существо в центре внимания, а не в углу формы */}
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <MascotSvg expression="calm" label="Напарник" size={150} />
-          <p className="max-w-72 text-balance rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-xl leading-snug">
+          <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
             {prefilledStep
               ? 'Шаг уже выбран. Просто жми — я рядом.'
               : 'Что делаем? Назови первый шаг — не всю задачу.'}
@@ -424,7 +424,7 @@ export function FocusSession() {
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     task === chip
                       ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      : 'glass text-muted-foreground transition-[filter] duration-150 hover:text-foreground hover:brightness-125'
                   }`}
                 >
                   {chip}
@@ -454,7 +454,7 @@ export function FocusSession() {
             </button>
           )}
           {brokenSteps && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-3">
+            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                 выбери первый — остальное потом
               </p>
@@ -467,7 +467,7 @@ export function FocusSession() {
                       setTask(step)
                       setBrokenSteps(null)
                     }}
-                    className="rounded-xl border border-primary/40 bg-secondary px-3 py-2 text-left text-sm font-medium transition-colors hover:border-primary"
+                    className="glass glass-interactive rounded-xl px-3 py-2 text-left text-sm font-medium"
                   >
                     {step}
                   </button>
@@ -489,7 +489,7 @@ export function FocusSession() {
                   className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
                     minutes === d
                       ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                      : 'glass text-muted-foreground transition-[filter] duration-150 hover:text-foreground hover:brightness-125'
                   }`}
                 >
                   {d} мин
@@ -569,7 +569,7 @@ export function FocusSession() {
             size={130}
           />
         </motion.div>
-        <p className="max-w-72 text-balance rounded-2xl bg-secondary px-4 py-2 text-center font-hand text-xl leading-snug">
+        <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
           {backFromDrift
             ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
             : cheering
@@ -658,7 +658,7 @@ export function FocusSession() {
         >
           <Link
             href="/app/world"
-            className="group flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl border border-border bg-card px-4 pb-4 pt-3 text-center transition-colors hover:border-primary/50"
+            className="group glass glass-interactive flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl px-4 pb-4 pt-3 text-center"
           >
             <RevealIsland
               landmarksUnlocked={grownElement.landmarksUnlocked}
@@ -698,13 +698,13 @@ export function FocusSession() {
           <button
             type="button"
             onClick={() => setPlanFormOpen(true)}
-            className="flex w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:border-primary"
+            className="glass glass-interactive flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
           >
             <span className="text-sm font-semibold">Договориться с завтрашним собой</span>
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
           </button>
         ) : (
-          <div className="flex w-full flex-col gap-3 rounded-2xl border border-border bg-card p-4">
+          <div className="glass flex w-full flex-col gap-3 rounded-2xl p-4">
             <p className="text-sm font-semibold">Договоримся с завтрашним собой?</p>
             <input
               value={tomorrowTask}
@@ -733,7 +733,7 @@ export function FocusSession() {
           </div>
         )
       ) : (
-        <div className="flex w-full flex-col gap-1 rounded-2xl border border-primary/40 bg-card p-4 text-center">
+        <div className="glass flex w-full flex-col gap-1 rounded-2xl p-4 text-center">
           <p className="text-sm font-semibold">План лежит. Утром напишу первым.</p>
           <p className="text-sm leading-relaxed text-muted-foreground">
             Просто открой эту страницу утром — первое слово будет за мной.

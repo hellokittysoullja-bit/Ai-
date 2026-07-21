@@ -105,20 +105,28 @@ function buildFirstWord(
     };
   }
 
-  if (isEvening) {
-    return {
-      greeting:
-        "Вечер — лучшее время договориться с завтрашним собой. Давай за три минуты решим: одно дело, один первый шаг, одно время. Напиши, что завтра важно.",
-      actionStep: null,
-    };
-  }
-
+  // Первый визит — ВСЕГДА раньше общей вечерней ветки, вне зависимости от
+  // часа. Баг, который чинит эта строка: план физически не может
+  // существовать на первом визите, поэтому раньше isEvening-проверка ниже
+  // перехватывала любого новичка, зашедшего вечером/ночью — он не видел
+  // ни приветствия, ни стартер-чипов, а сразу получал «давай распланируем
+  // завтра». Для человека, который только что пришёл с лендинга, это
+  // рвёт обещание «попробуй одно крошечное дело — увидишь» и убивает
+  // весь эффект нулевого трения до первого старта.
   if (patterns.totalStarts === 0) {
     return {
       greeting:
         "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
       actionStep: null,
       showStarterChips: true,
+    };
+  }
+
+  if (isEvening) {
+    return {
+      greeting:
+        "Вечер — лучшее время договориться с завтрашним собой. Давай за три минуты решим: одно дело, один первый шаг, одно время. Напиши, что завтра важно.",
+      actionStep: null,
     };
   }
 
@@ -274,7 +282,7 @@ export function HomeScreen() {
             stats !== null &&
             stats.totalStarts >= 1 && (
               <form
-                className="flex flex-col gap-2 rounded-2xl border border-primary/30 bg-secondary/50 p-3"
+                className="glass flex flex-col gap-2 rounded-2xl p-3"
                 onSubmit={(e) => {
                   e.preventDefault();
                   giveName(nameDraft);
@@ -309,7 +317,7 @@ export function HomeScreen() {
               человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
           {checkinState === "available" && !!companionName && (
-            <div className="flex flex-col gap-2 rounded-2xl border border-border bg-secondary/40 p-3">
+            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
                 <Bell
                   className="mt-0.5 size-4 shrink-0 text-primary"
@@ -363,7 +371,7 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-foreground backdrop-blur-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-primary/10 hover:text-primary hover:shadow-[0_10px_28px_-12px_oklch(0.86_0.22_130/0.55)] active:translate-y-0"
+                    className="glass glass-interactive rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {chip}
                   </Link>
@@ -401,6 +409,7 @@ export function HomeScreen() {
           mode="companion"
           greeting="Это наш чат. Вечером кладём план, днём дробим шаги, всегда — без стыда."
           onPlanSaved={refresh}
+          showSuggestions={!firstWord?.showStarterChips}
         />
       </div>
     </div>
