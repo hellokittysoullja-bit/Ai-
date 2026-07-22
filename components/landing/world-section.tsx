@@ -219,15 +219,26 @@ export function WorldSection() {
                 </radialGradient>
               </defs>
               <rect x="0" y="0" width="380" height="162" fill="url(#lsky)" />
-              {[
-                [24, 18, 1.1], [58, 40, 0.8], [96, 14, 1.3], [132, 52, 0.7],
-                [168, 24, 1.0], [242, 12, 1.2], [292, 30, 1.0], [348, 20, 1.1],
-              ].map(([x, y, r], i) => (
-                <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.5">
+              {/* Ближние звёзды чётче и ярче, дальние — размыты и тусклее:
+                  глубина резкости вместо одинаковых точек */}
+              {(
+                [
+                  [24, 18, 1.1, 'far'], [58, 40, 0.8, 'far'], [96, 14, 1.3, 'mid'], [132, 52, 0.7, 'far'],
+                  [168, 24, 1.0, 'mid'], [242, 12, 1.2, 'mid'], [292, 30, 1.0, 'mid'], [348, 20, 1.1, 'far'],
+                ] as [number, number, number, 'far' | 'mid'][]
+              ).map(([x, y, r, depth], i) => (
+                <circle
+                  key={i}
+                  cx={x}
+                  cy={y}
+                  r={r}
+                  fill="var(--color-muted-foreground)"
+                  className={depth === 'far' ? 'star-far' : 'star-mid'}
+                >
                   {!reduceMotion && (
                     <animate
                       attributeName="opacity"
-                      values="0.25;0.75;0.25"
+                      values={depth === 'far' ? '0.15;0.45;0.15' : '0.3;0.7;0.3'}
                       dur={`${2.6 + (i % 5) * 0.9}s`}
                       begin={`${(i % 7) * 0.5}s`}
                       repeatCount="indefinite"

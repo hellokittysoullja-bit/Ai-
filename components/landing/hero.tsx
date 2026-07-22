@@ -165,7 +165,10 @@ export function Hero() {
   }
 
   return (
-    <section className="grain relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6">
+    <section
+      id="hero"
+      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6"
+    >
       {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <HeroScene />
@@ -182,32 +185,40 @@ export function Hero() {
             className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none"
             style={{ "--rise-delay": "0.32s" } as CSSProperties}
           >
-            Начать — самое трудное. Я прихожу{" "}
-            <span
-              className="scribble-underline scribble-draw text-primary"
-              style={{ "--scribble-delay": "0.95s" } as CSSProperties}
-            >
-              первым
-              <svg
-                viewBox="0 0 100 12"
-                preserveAspectRatio="none"
-                aria-hidden="true"
+            {/* Хроматическая вспышка сходится в резкий текст ровно к моменту,
+              когда начинает рисоваться каракуля-подчёркивание (0.95s) —
+              взгляд сперва «фокусируется», потом ловит штрих */}
+            <span className="chroma-appear">
+              Начать — самое трудное. Я прихожу{" "}
+              <span
+                className="scribble-underline scribble-draw text-primary"
+                style={{ "--scribble-delay": "0.95s" } as CSSProperties}
               >
-                <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" pathLength={1} />
-                {/* Второй проход штриха: настоящая каракуля рисуется в два
-                  движения с разным нажимом — идеальная дуга выдаёт машину */}
-                <path
-                  d="M4 10 Q 30 6 55 8 T 97 9"
-                  pathLength={1}
-                  style={{
-                    strokeWidth: 2.5,
-                    opacity: 0.55,
-                    animationDelay: "1.35s",
-                  }}
-                />
-              </svg>
+                первым
+                <svg
+                  viewBox="0 0 100 12"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7"
+                    pathLength={1}
+                  />
+                  {/* Второй проход штриха: настоящая каракуля рисуется в два
+                    движения с разным нажимом — идеальная дуга выдаёт машину */}
+                  <path
+                    d="M4 10 Q 30 6 55 8 T 97 9"
+                    pathLength={1}
+                    style={{
+                      strokeWidth: 2.5,
+                      opacity: 0.55,
+                      animationDelay: "1.35s",
+                    }}
+                  />
+                </svg>
+              </span>
+              {"."}
             </span>
-            {"."}
           </h1>
 
           {/* Подзаголовок: конкретика + дифференциатор */}
