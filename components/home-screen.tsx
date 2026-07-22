@@ -404,7 +404,7 @@ export function HomeScreen() {
         </div>
       </section>
 
-      <div className="min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col">
         <CompanionChat
           mode="companion"
           greeting="Это наш чат. Вечером кладём план, днём дробим шаги, всегда — без стыда."
