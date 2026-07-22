@@ -399,7 +399,12 @@ export function HomeScreen() {
                   </Link>
                 ))}
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/50">
+              {/* text-muted-foreground/50 давал ~2.5:1 контраста на 11px —
+                  ниже порога WCAG AA (4.5:1) для мелкого текста, да ещё и
+                  на кликабельной строке. Полная непрозрачность muted-foreground
+                  здесь же на экране (строка «Первый старт за 15 минут») даёт
+                  ~6.6:1 — берём тот же тон вместо своего заниженного. */}
+              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
                 Каждый старт растит остров →
               </p>
             </div>

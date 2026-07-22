@@ -181,11 +181,16 @@ export function CompanionChat({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* justify-end: сообщения примыкают к полю ввода, не зависают у
-          верха с пустотой внизу — короткий чат (1-2 реплики) выглядит
-          обжитым, а не оборванным. Переполнение по-прежнему скроллится
-          нормально, autoscroll на bottomRef ниже не задет. */}
-      <div className="flex flex-1 flex-col justify-end overflow-y-auto">
+      {/* justify-start: на HomeScreen чат — не единственный контент экрана,
+          над ним всегда стоит секция-хедер переменной высоты (приветствие,
+          стартер-чипы, карточка имени…). justify-end раньше прижимал
+          сообщения к полю ввода и вместо этого открывал дыру ПОСЕРЕДИНЕ
+          экрана — между хедером и первой репликой, там, где взгляд ждёт
+          непрерывный контент. Пустота внизу короткого чата (сверху вниз,
+          как в любом мессенджере) читается как «начало разговора», пустота
+          между двумя блоками контента — как баг вёрстки. Переполнение
+          по-прежнему скроллится нормально, autoscroll на bottomRef ниже не задет. */}
+      <div className="flex flex-1 flex-col justify-start overflow-y-auto">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
             className="flex items-start gap-2"
