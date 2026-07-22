@@ -167,14 +167,14 @@ export function Hero() {
   return (
     <section
       id="hero"
-      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6"
+      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-10 pt-3 [@media(max-height:760px)_and_(max-width:1023px)]:pb-4 [@media(max-height:760px)_and_(max-width:1023px)]:pt-1"
     >
       {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <HeroScene />
       </div>
 
-      <div className="relative flex w-full max-w-md flex-col items-center gap-4 text-center lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:items-center lg:gap-x-16 lg:text-left">
+      <div className="relative flex w-full max-w-md flex-col items-center gap-3 text-center [@media(max-height:760px)_and_(max-width:1023px)]:gap-1.5 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:items-center lg:gap-x-16 lg:text-left">
         {/* Десктоп по референсу: оффер слева, существо и живой чат справа.
             На мобильном обе колонки схлопываются в display:contents,
             порядок кадра задают order-классы (сцена → промис → чат → CTA) */}
@@ -182,7 +182,7 @@ export function Hero() {
           {/* Промис голосом персонажа: первая фраза — боль, вторая —
             обещание от первого лица. Каракуля — под словом обещания */}
           <h1
-            className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none"
+            className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight [@media(max-height:760px)_and_(max-width:1023px)]:text-4xl md:text-5xl lg:order-none"
             style={{ "--rise-delay": "0.32s" } as CSSProperties}
           >
             {/* Хроматическая вспышка сходится в резкий текст ровно к моменту,
@@ -223,7 +223,7 @@ export function Hero() {
 
           {/* Подзаголовок: конкретика + дифференциатор */}
           <p
-            className="hero-rise order-3 text-pretty text-base leading-relaxed text-foreground/70 md:text-lg lg:order-none"
+            className="hero-rise order-3 text-pretty text-base leading-snug text-foreground/70 md:text-lg md:leading-relaxed lg:order-none"
             style={{ "--rise-delay": "0.46s" } as CSSProperties}
           >
             Напарник сидит рядом, пока ты работаешь, и растит остров из твоих
@@ -278,29 +278,32 @@ export function Hero() {
         </div>
 
         <div className="contents lg:flex lg:flex-col lg:items-center lg:gap-2">
-          {/* Существо в пятне света очага. На коротких экранах сцена
-            ужимается, чтобы CTA оставался над сгибом */}
-          <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none [@media(max-height:740px)]:scale-90">
+          {/* Существо в пятне света очага. На коротких вьюпортах существо
+            и его подсветка уменьшаются НАСТОЯЩИМ CSS-размером (не
+            transform:scale — тот не меняет коробку в потоке, поэтому старый
+            scale-90 здесь ничего не спасал: CTA всё равно уезжал за сгиб на
+            любом вьюпорте короче ~800px, что и подтвердил замер) */}
+          <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl"
+              className="pointer-events-none absolute left-1/2 top-0 h-48 w-48 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl [@media(max-height:760px)_and_(max-width:1023px)]:h-32 [@media(max-height:760px)_and_(max-width:1023px)]:w-32 lg:h-56 lg:w-56"
             />
             <MascotSvg
               expression={expression}
-              size={196}
+              size={152}
               label="Напарник — пушистое существо с зелёными глазами"
-              className="relative z-10"
+              className="relative z-10 [@media(max-height:760px)_and_(max-width:1023px)]:size-28 lg:size-[196px]"
             />
-            <GroundPool className="-mt-10 -mb-12" />
+            <GroundPool className="-mt-9 -mb-11 [@media(max-height:760px)_and_(max-width:1023px)]:-mt-6 [@media(max-height:760px)_and_(max-width:1023px)]:-mb-8 [@media(max-height:760px)_and_(max-width:1023px)]:scale-75" />
           </div>
 
           {/* Живой чат-вход: он здоровается, ты отвечаешь — премиальная реплика */}
           <div
-            className="hero-rise order-4 mt-1 flex w-full flex-col gap-2.5 lg:order-none"
+            className="hero-rise order-4 mt-1 flex w-full flex-col gap-2 lg:order-none"
             style={{ "--rise-delay": "0.62s" } as CSSProperties}
             aria-live="polite"
           >
-            <div className="glass relative max-w-[92%] self-start rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
+            <div className="glass relative max-w-[92%] self-start rounded-2xl rounded-tl-sm px-4 py-3 text-left">
               {/* Хвостик пузыря указывает вверх, на существо — без него реплика
                 «ничья» и висит между котом и кнопками */}
               <svg
@@ -331,7 +334,7 @@ export function Hero() {
                     initial={{ opacity: 0, y: 12, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={SPRING_SNAPPY}
-                    className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md"
+                    className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-4 py-3 text-left shadow-xl backdrop-blur-md"
                   >
                     <TypedLine
                       text={step.text}
@@ -355,7 +358,14 @@ export function Hero() {
             </AnimatePresence>
 
             {!answered && (
-              <div className="flex flex-wrap justify-end gap-2 pt-0.5">
+              // justify-start + rounded-full: чипы — это ЕЩЁ НЕ отправленная
+              // реплика, а предложенный ответ. rounded-2xl rounded-br-md
+              // справа — та же форма, что у уже отправленного сообщения
+              // визитёра чуть ниже (self-end bg-primary rounded-br-md) —
+              // до клика чип выглядел как «я уже это сказал». Пилюля +
+              // левый край снимают путаницу и совпадают с чипами-подсказками
+              // везде в приложении (CompanionChat, HomeScreen).
+              <div className="flex flex-wrap justify-start gap-2 pt-0.5">
                 {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
                   <Link
                     key={key}
@@ -368,7 +378,7 @@ export function Hero() {
                     // сцена откликается на намерение раньше действия (живая, не картинка)
                     onMouseEnter={() => setExpression("happy")}
                     onMouseLeave={() => setExpression("calm")}
-                    className="group glass glass-interactive press rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
+                    className="group glass glass-interactive press rounded-full px-4 py-2.5 text-[15px] font-medium text-foreground hover:text-primary"
                   >
                     {REPLIES[key].visitor}
                   </Link>
@@ -378,9 +388,11 @@ export function Hero() {
 
             {/* Рукописная заметка на полях: расширяет обещание H1, а не
               повторяет его. Тёплый цвет пера, не лайм: лайм в кадре
-              остаётся за «первым» и CTA */}
+              остаётся за «первым» и CTA. На коротких вьюпортах — первая
+              жертва: это расширение обещания, а не само обещание, и не
+              стоит того, чтобы ради неё CTA уезжал за сгиб. */}
             <div
-              className="hero-rise flex items-start gap-1.5 self-start pl-1"
+              className="hero-rise hidden items-start gap-1.5 self-start pl-1 [@media(min-height:761px)_and_(max-width:1023px)]:flex lg:flex"
               style={
                 {
                   "--rise-delay": "1.2s",
