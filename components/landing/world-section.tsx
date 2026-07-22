@@ -4,6 +4,7 @@ import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { motion, useReducedMotion, useScroll, useMotionValueEvent } from 'motion/react'
 import { Button } from '@/components/ui/button'
+import { SPRING_REVEAL, SPRING_ITEM } from '@/lib/motion'
 
 const c = {
   ground: 'var(--color-secondary)',
@@ -167,14 +168,14 @@ export function WorldSection() {
         className="pointer-events-none absolute inset-x-0 top-1/3 h-[500px] bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,oklch(0.86_0.22_130/0.08)_0%,transparent_100%)] blur-2xl"
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl px-6 py-16 md:py-24">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-20 md:py-28">
         <div className="flex flex-col gap-10">
           <motion.div
             className="flex flex-col gap-5"
             initial={reduceMotion ? false : { opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: '-80px' }}
-            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+            transition={SPRING_REVEAL}
           >
             <h2 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
               Ты растишь{' '}
@@ -194,7 +195,7 @@ export function WorldSection() {
             initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: '-60px' }}
-            transition={{ type: 'spring', stiffness: 120, damping: 20 }}
+            transition={SPRING_REVEAL}
           >
             <svg
               viewBox="0 0 380 216"
@@ -282,19 +283,21 @@ export function WorldSection() {
             </div>
           </motion.div>
 
-          {/* Принципы — с рукотворными SVG-иконками в палитре сайта */}
+          {/* Принципы — с рукотворными SVG-иконками в палитре сайта.
+              Последний пункт (редкие находки) — единственный на .glass-highlight:
+              это не гарантия, а сюрприз, ему и положено выделяться из ряда. */}
           <ul className="grid gap-6 sm:grid-cols-2">
             {principles.map((p, i) => (
               <motion.li
                 key={p.title}
-                className="flex flex-col gap-2 rounded-2xl border border-white/12 bg-white/[0.04] p-6 backdrop-blur-sm"
+                className={`flex flex-col gap-2 rounded-2xl p-6 ${
+                  i === principles.length - 1 ? "glass-highlight" : "glass"
+                }`}
                 initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: '-60px' }}
                 transition={{
-                  type: 'spring',
-                  stiffness: 200,
-                  damping: 22,
+                  ...SPRING_ITEM,
                   delay: reduceMotion ? 0 : i * 0.1,
                 }}
               >

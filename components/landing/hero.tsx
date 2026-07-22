@@ -6,6 +6,7 @@ import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
+import { SPRING_SNAPPY } from "@/lib/motion";
 
 /**
  * Первый экран: одна плотная композиция вместо двух зон, разбросанных по
@@ -297,7 +298,7 @@ export function Hero() {
                     key={i}
                     initial={{ opacity: 0, y: 12, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                    transition={SPRING_SNAPPY}
                     className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md"
                   >
                     <TypedLine
@@ -310,7 +311,7 @@ export function Hero() {
                     key={i}
                     initial={{ opacity: 0, y: 12, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                    transition={SPRING_SNAPPY}
                     className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_24px_-8px_oklch(0.86_0.22_130/0.5)]"
                   >
                     <p className="text-sm font-semibold leading-relaxed text-primary-foreground">

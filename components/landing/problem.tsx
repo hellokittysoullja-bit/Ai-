@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { MascotSvg } from "@/components/mascot-svg";
+import { SPRING_REVEAL, SPRING_ITEM } from "@/lib/motion";
 
 // 3 пункта вместо 4: три удара читаются, четыре — уже список жалоб
 const failedTools = [
@@ -54,7 +55,7 @@ export function Problem() {
           initial={reduceMotion ? false : { opacity: 0, y: 24 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-40px" }}
-          transition={{ type: "spring", stiffness: 100, damping: 20 }}
+          transition={SPRING_REVEAL}
         >
           {/* Огромный заголовок */}
           <h2 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
@@ -71,9 +72,7 @@ export function Problem() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true, margin: "-60px" }}
                 transition={{
-                  type: "spring",
-                  stiffness: 180,
-                  damping: 22,
+                  ...SPRING_ITEM,
                   delay: reduceMotion ? 0 : i * 0.15,
                 }}
               >
@@ -97,9 +96,7 @@ export function Problem() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{
-              type: "spring",
-              stiffness: 140,
-              damping: 20,
+              ...SPRING_ITEM,
               delay: reduceMotion ? 0 : 0.65,
             }}
           >
@@ -118,14 +115,12 @@ export function Problem() {
               единственная живая карточка с существом. Единственный лаймовый
               акцент секции после рукописной строки — они работают в паре */}
           <motion.div
-            className="flex items-center gap-4 self-start rounded-2xl border border-primary/45 bg-primary/10 px-5 py-4 shadow-[0_0_44px_-14px_oklch(0.86_0.22_130/0.4)]"
+            className="glass-highlight flex items-center gap-4 self-start rounded-2xl px-5 py-4"
             initial={reduceMotion ? false : { opacity: 0, y: 16, scale: 0.98 }}
             whileInView={{ opacity: 1, y: 0, scale: 1 }}
             viewport={{ once: true, margin: "-60px" }}
             transition={{
-              type: "spring",
-              stiffness: 140,
-              damping: 20,
+              ...SPRING_ITEM,
               delay: reduceMotion ? 0 : 0.85,
             }}
           >

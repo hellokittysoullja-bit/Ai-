@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { SPRING_REVEAL, SPRING_ITEM, SPRING_SNAPPY } from "@/lib/motion";
 
 const day: Array<{
   time: string;
@@ -50,13 +51,13 @@ export function HowItWorks() {
         className="pointer-events-none absolute left-0 top-1/2 h-[700px] w-[500px] -translate-x-1/3 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.10)_0%,transparent_65%)] blur-3xl"
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl px-6 py-16 md:py-24">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-20 md:py-28">
         <motion.div
           className="mb-10 flex flex-col gap-4"
           initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
-          transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          transition={SPRING_REVEAL}
         >
           <h2 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
             Один день <span className="text-primary">с напарником</span>
@@ -76,9 +77,7 @@ export function HowItWorks() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{
-                type: "spring",
-                stiffness: 160,
-                damping: 22,
+                ...SPRING_ITEM,
                 delay: reduceMotion ? 0 : i * 0.12,
               }}
             >
@@ -123,7 +122,7 @@ export function HowItWorks() {
             initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true, margin: "-80px" }}
-            transition={{ type: "spring", stiffness: 200, damping: 18 }}
+            transition={SPRING_SNAPPY}
           >
             <span
               aria-hidden="true"

@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "motion/react";
 import { MascotSvg } from "@/components/mascot-svg";
+import { SPRING_REVEAL, SPRING_ITEM } from "@/lib/motion";
 
 /**
  * Манифест перед договором: эмоциональная вершина страницы одной мыслью.
@@ -22,13 +23,23 @@ export function Presence() {
 
   return (
     <section aria-label="Присутствие" className="relative overflow-hidden">
-      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center gap-10 px-6 pt-16 text-center md:pt-24">
+      {/* Единственное место на лендинге, где холодная ночь и тёплый огонёк
+          свечи смешиваются в одном свечении — остальные секции используют
+          только один акцент за раз. Текст называет это вершиной ("не
+          мотивация — присутствие"), фон обязан её показать, а не просто
+          сообщить. Больше вертикального пространства, чем у соседей —
+          тишина вокруг немногих слов тоже часть веса. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[560px] bg-[radial-gradient(ellipse_70%_60%_at_50%_35%,oklch(0.86_0.22_130/0.10)_0%,oklch(0.72_0.17_55/0.07)_45%,transparent_80%)] blur-3xl"
+      />
+      <div className="relative z-10 mx-auto flex max-w-2xl flex-col items-center gap-10 px-6 pt-28 text-center md:pt-40">
         <motion.h2
           className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl"
           initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
-          transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          transition={SPRING_REVEAL}
         >
           Не мотивация. <span className="text-primary">Присутствие.</span>
         </motion.h2>
@@ -42,9 +53,7 @@ export function Presence() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-60px" }}
               transition={{
-                type: "spring",
-                stiffness: 160,
-                damping: 22,
+                ...SPRING_ITEM,
                 delay: reduceMotion ? 0 : 0.2 + i * 0.18,
               }}
             >
@@ -64,9 +73,7 @@ export function Presence() {
             whileInView={{ y: 0 }}
             viewport={{ once: true, margin: "-40px" }}
             transition={{
-              type: "spring",
-              stiffness: 140,
-              damping: 18,
+              ...SPRING_ITEM,
               delay: reduceMotion ? 0 : 0.45,
             }}
           >
