@@ -64,42 +64,52 @@ export function LandingBackdrop() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-0 overflow-hidden"
     >
-      {/* Колор-скрипт ночи сверху вниз — ни одного участка «мёртвого» чёрного.
-          Нижний стоп близок к --background: стык с футером без видимого шва */}
+      {/* Колор-скрипт ночи как эмоциональная дуга, а не ровная тьма.
+          Свет мотивирован: тепло = присутствие напарника. Поэтому вверху
+          (hero, свеча) тепло, в зоне «проблемы» — самый холод и глубина
+          ночи (ты один на один с правдой про силу воли, напарника в этом
+          аргументе нет), а к финалу тепло возвращается вместе с ним.
+          Путешествие оттенка 135°(зелёный) → 235°(холодная синь) → 125°
+          (тёплый зелёный) — это цвет-скрипт, как у кино-колориста, а не
+          перепад яркости. Верхний стоп неизменен: шов с небом hero. */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, oklch(0.21 0.018 135) 0%, oklch(0.175 0.012 140) 22%, oklch(0.16 0.014 165) 48%, oklch(0.17 0.012 145) 72%, oklch(0.185 0.014 135) 100%)",
+            "linear-gradient(to bottom, oklch(0.21 0.018 135) 0%, oklch(0.172 0.014 175) 20%, oklch(0.145 0.02 235) 38%, oklch(0.152 0.016 210) 52%, oklch(0.172 0.018 150) 72%, oklch(0.2 0.026 130) 100%)",
         }}
       />
-      {/* Дыхание горизонта: едва заметные пятна света вместо плоской тьмы */}
+      {/* Последнее тепло свечи, стекающее из hero — гаснет к холодной зоне */}
       <div
-        className="absolute left-1/2 top-[30%] h-[480px] w-[720px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        className="absolute left-1/2 top-[13%] h-[420px] w-[680px] -translate-x-1/2 rounded-full opacity-70 blur-3xl"
         style={{
           background:
-            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.08) 0%, transparent 65%)",
+            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.07) 0%, transparent 65%)",
         }}
       />
+      {/* Холодная впадина ночи под «проблемой»: активный синий подсвет,
+          не отсутствие тепла — дно дофаминовой ямы перед возвратом света */}
       <div
-        className="absolute left-1/2 top-[50%] h-[440px] w-[680px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        className="absolute left-1/2 top-[39%] h-[540px] w-[820px] -translate-x-1/2 rounded-full opacity-70 blur-3xl"
         style={{
           background:
-            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.05) 0%, transparent 65%)",
+            "radial-gradient(ellipse at center, oklch(0.55 0.1 240 / 0.06) 0%, transparent 62%)",
         }}
       />
+      {/* Возврат жизни: лайм разгорается на «остров растёт» */}
       <div
-        className="absolute left-1/2 top-[68%] h-[480px] w-[720px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        className="absolute left-1/2 top-[63%] h-[500px] w-[760px] -translate-x-1/2 rounded-full opacity-70 blur-3xl"
         style={{
           background:
-            "radial-gradient(ellipse at center, oklch(0.86 0.22 130 / 0.07) 0%, transparent 65%)",
+            "radial-gradient(ellipse at center, oklch(0.86 0.22 130 / 0.08) 0%, transparent 65%)",
         }}
       />
+      {/* Тёплое прибытие: напарник снова рядом у договора */}
       <div
-        className="absolute left-1/2 top-[86%] h-[420px] w-[640px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        className="absolute left-1/2 top-[85%] h-[460px] w-[700px] -translate-x-1/2 rounded-full opacity-70 blur-3xl"
         style={{
           background:
-            "radial-gradient(ellipse at center, oklch(0.86 0.22 130 / 0.05) 0%, transparent 65%)",
+            "radial-gradient(ellipse at center, oklch(0.75 0.16 60 / 0.07) 0%, transparent 65%)",
         }}
       />
       {/* Звёзды на всю высоту страницы; параллакс-слой даёт глубину неба */}

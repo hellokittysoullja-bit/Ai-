@@ -43,10 +43,15 @@ export function Problem() {
         />
       </svg>
 
-      {/* Большое тёплое свечение слева */}
+      {/* Холодный подсвет слева — не тёплый. Это самая холодная точка
+          страницы: тебе говорят правду про силу воли, напарника в этом
+          аргументе нет. Тёплая кромка гребня выше — последний отблеск
+          hero, гаснущий на входе в холод; ниже — синева дна ночи.
+          Контраст готовит возврат тепла в следующих секциях (пик сильнее
+          после впадины). */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -left-32 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.13)_0%,transparent_65%)] blur-3xl"
+        className="pointer-events-none absolute -left-32 top-1/2 h-[600px] w-[600px] -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.5_0.09_240/0.1)_0%,transparent_65%)] blur-3xl"
       />
 
       <div className="relative mx-auto max-w-2xl px-6 py-16 md:py-24">
