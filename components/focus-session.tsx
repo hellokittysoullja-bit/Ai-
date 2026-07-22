@@ -13,7 +13,9 @@ import {
   clearActiveSession,
   clearPlan,
   getActiveSession,
+  getCompanionName,
   getFinds,
+  getPatterns,
   getPlan,
   getStarts,
   recordStart,
@@ -40,6 +42,25 @@ const durations = [15, 25, 45]
 const stepChips = ['Открыть документ', 'Убрать одну вещь', 'Ответить на одно сообщение']
 
 const HIDE_DIGITS_KEY = 'naparnik:hideDigits'
+
+/**
+ * Реплика сетапа. На первой сессии объясняет правило («первый шаг — не
+ * вся задача») — это ещё не прожито. На последующих — то же объяснение
+ * читается как будто существо забыло, что уже говорило это вчера.
+ */
+function buildSetupLine(
+  prefilledStep: string,
+  priorSessions: number,
+  companionName: string | null,
+): string {
+  if (prefilledStep) return 'Шаг уже выбран. Просто жми — я рядом.'
+  if (priorSessions === 0) {
+    return 'Что делаем? Назови первый шаг — не всю задачу.'
+  }
+  return companionName
+    ? `Погнали. Что в фокусе? ${companionName} рядом.`
+    : 'Погнали. Что в фокусе? Я рядом.'
+}
 const AMBIENT_KEY = 'naparnik:ambient'
 
 type Moment = 'start' | 'middle' | 'late' | 'done' | 'early-exit'
@@ -79,6 +100,17 @@ export function FocusSession() {
 
   const [phase, setPhase] = useState<Phase>('setup')
   const [task, setTask] = useState(prefilledStep)
+
+  // Имя и число прошлых сессий — тот же экран не должен объяснять
+  // механику вечно: на 20-й сессии человек уже знает, что «первый шаг —
+  // не вся задача». Раз узнаём на маунте — реплика сетапа тратится
+  // мгновенно, к моменту, когда человек читает текст, состояние уже есть.
+  const [companionName, setCompanionName] = useState<string | null>(null)
+  const [priorSessions, setPriorSessions] = useState(0)
+  useEffect(() => {
+    void getCompanionName().then(setCompanionName)
+    void getPatterns().then((p) => setPriorSessions(p.totalStarts))
+  }, [])
 
   // «Раздроби мне задачу»: человек пишет большое пугающее дело —
   // AI возвращает 3 крошечных шага. Task initiation — главный
@@ -402,11 +434,9 @@ export function FocusSession() {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-6">
         {/* Сцена: существо в центре внимания, а не в углу формы */}
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
-          <MascotSvg expression="calm" label="Напарник" size={150} />
+          <MascotSvg expression="calm" label={companionName ?? 'Напарник'} size={150} />
           <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
-            {prefilledStep
-              ? 'Шаг уже выбран. Просто жми — я рядом.'
-              : 'Что делаем? Назови первый шаг — не всю задачу.'}
+            {buildSetupLine(prefilledStep, priorSessions, companionName)}
           </p>
         </div>
         {/* Управление внизу — в зоне большого пальца */}
