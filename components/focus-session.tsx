@@ -175,6 +175,23 @@ export function FocusSession() {
     }
   }, [planFormOpen])
 
+  // Защита состояния потока: пока идёт сессия, нижний таб-бар (Дом/Мир)
+  // — это всегда видимая рампа выхода ровно в тот момент, когда мы держим
+  // человека в фокусе. Flow требует убрать конкурирующие affordance'ы
+  // действия (так же гаснет HUD в играх на катсцене, прячется хром в
+  // видеоплеере). Не ловушка: «Закончить раньше» на экране остаётся, и
+  // это его собственный таймер. На фазе 'done' (награда + план) навигация
+  // возвращается — уйти на выросший остров как раз желанно.
+  // Нав живёт в layout, фаза — здесь, поэтому связь через data-атрибут body.
+  useEffect(() => {
+    const immersive = phase === 'starting' || phase === 'running'
+    if (immersive) document.body.dataset.focusImmersive = 'true'
+    else delete document.body.dataset.focusImmersive
+    return () => {
+      delete document.body.dataset.focusImmersive
+    }
+  }, [phase])
+
   // Последовательное раскрытие: сначала находка одна на экране
   // (пик без конкурентов), потом появляются план и кнопки
   const [restRevealed, setRestRevealed] = useState(false)

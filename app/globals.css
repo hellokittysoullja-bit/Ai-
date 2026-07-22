@@ -277,6 +277,30 @@
   }
 }
 
+/* Иммерсивный фокус: пока идёт сессия (body[data-focus-immersive]), нижний
+   таб-бар уезжает вниз и становится некликабельным — экран фокуса остаётся
+   единственной сценой без конкурирующих путей выхода. Целим только нижний
+   апп-нав (aria-label), не шапку лендинга с тем же .glass-nav.
+   Плавно, чтобы возврат навигации на фазе 'done' не мигал. */
+nav[aria-label="Основная навигация"] {
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.4s ease;
+}
+body[data-focus-immersive] nav[aria-label="Основная навигация"] {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  nav[aria-label="Основная навигация"] {
+    transition: opacity 0.15s ease;
+  }
+  body[data-focus-immersive] nav[aria-label="Основная навигация"] {
+    transform: none;
+  }
+}
+
 /* ==========================================================================
    ЭТАП 1 (финал) — полировка без побочных эффектов
    Принцип: ничего глобального, что может задеть чужие компоненты.
