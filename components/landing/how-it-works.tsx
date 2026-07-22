@@ -1,26 +1,36 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
+import { SPRING_REVEAL, SPRING_ITEM, SPRING_SNAPPY } from "@/lib/motion";
 
-const day = [
+const day: Array<{
+  time: string;
+  title: string;
+  text: string;
+  quote: string;
+  reply?: string;
+}> = [
   {
-    time: "21:40",
+    time: "накануне · 21:40",
     title: "Вечером — 3 минуты",
     text: "Напарник разбирает с тобой завтра и превращает «поработать над проектом» в одно физическое действие.",
     quote:
       "Значит, завтра просто открываешь файл диплома. Всё, больше ничего не планируем.",
+    reply: "Договорились",
   },
   {
     time: "09:12",
     title: "Утром он пишет первым",
     text: "Не пуш «пора работать», а сообщение от живого существа. Начать — легче, чем отказать.",
     quote: "Я тут. Помнишь — просто открыть файл. Я рядом.",
+    reply: "Открыл",
   },
   {
     time: "09:31",
     title: "Сессия вдвоём",
     text: "Ты работаешь — он рядом. Body doubling без второго человека. Отвлёкся? Мягко вернёт.",
     quote: "Полёт нормальный. Я никуда не ухожу.",
+    reply: "Пишу дальше",
   },
   {
     time: "10:04",
@@ -41,25 +51,24 @@ export function HowItWorks() {
         className="pointer-events-none absolute left-0 top-1/2 h-[700px] w-[500px] -translate-x-1/3 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.10)_0%,transparent_65%)] blur-3xl"
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl px-6 py-24 md:py-36">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-20 md:py-28">
         <motion.div
-          className="mb-16 flex flex-col gap-4"
+          className="mb-10 flex flex-col gap-4"
           initial={reduceMotion ? false : { opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-80px" }}
-          transition={{ type: "spring", stiffness: 120, damping: 20 }}
+          transition={SPRING_REVEAL}
         >
           <h2 className="text-balance text-4xl font-bold leading-[1.1] tracking-tight md:text-6xl">
-            Один день{" "}
-            <span className="text-primary">с напарником</span>
+            Один день <span className="text-primary">с напарником</span>
           </h2>
           <p className="text-lg text-foreground/60 md:text-xl">
-            Он пишет первым. Ты просто отвечаешь.
+            Ты просто отвечаешь. Остальное — моя работа.
           </p>
         </motion.div>
 
         {/* Вертикальная лента: более толстая нить, lime-цвет */}
-        <div className="relative flex flex-col gap-16 border-l-4 border-primary/40 pl-8 md:pl-14">
+        <div className="relative flex flex-col gap-12 border-l-4 border-primary/40 pl-8 md:pl-14">
           {day.map((step, i) => (
             <motion.article
               key={step.time}
@@ -68,9 +77,7 @@ export function HowItWorks() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-80px" }}
               transition={{
-                type: "spring",
-                stiffness: 160,
-                damping: 22,
+                ...SPRING_ITEM,
                 delay: reduceMotion ? 0 : i * 0.12,
               }}
             >
@@ -98,8 +105,48 @@ export function HowItWorks() {
                   «{step.quote}»
                 </p>
               </div>
+              {/* Ответ-чип: показывает цену входа — два слова, не эссе.
+                  Стиль повторяет реплику посетителя из чата в hero */}
+              {step.reply && (
+                <p className="self-end rounded-2xl rounded-br-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-[0_6px_18px_-8px_oklch(0.86_0.22_130/0.5)]">
+                  {step.reply}
+                </p>
+              )}
             </motion.article>
           ))}
+
+          {/* Якорь награды: день закрывается зафиксированной победой, а не
+              просто последним шагом — replay дофаминовой петли до регистрации */}
+          <motion.div
+            className="relative flex items-center gap-2.5 self-start rounded-full border border-primary/45 bg-primary/15 px-5 py-2.5"
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true, margin: "-80px" }}
+            transition={SPRING_SNAPPY}
+          >
+            <span
+              aria-hidden="true"
+              className="absolute -left-8 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-primary bg-primary ring-4 ring-primary/15 md:-left-14"
+            />
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 8.5 L6.5 12 L13 4.5"
+                stroke="var(--color-primary)"
+                strokeWidth="2.2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className="font-mono text-sm tracking-wide text-primary">
+              победа записана в остров
+            </span>
+          </motion.div>
         </div>
       </div>
     </section>

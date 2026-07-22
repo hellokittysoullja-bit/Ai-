@@ -22,6 +22,15 @@ export function SiteHeader() {
           >
             Как это работает
           </Button>
+          <Button
+            render={<Link href="#world" />}
+            nativeButton={false}
+            size="sm"
+            variant="ghost"
+            className="hidden text-muted-foreground sm:inline-flex"
+          >
+            Мир
+          </Button>
           <HeaderCta />
         </nav>
       </div>

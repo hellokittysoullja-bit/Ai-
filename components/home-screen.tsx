@@ -299,7 +299,7 @@ export function HomeScreen() {
                     placeholder="Как меня зовут?"
                     maxLength={24}
                     aria-label="Имя для напарника"
-                    className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
                   />
                   <Button
                     type="submit"

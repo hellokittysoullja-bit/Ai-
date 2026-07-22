@@ -4,6 +4,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { MascotSvg } from "@/components/mascot-svg";
+import { SPRING_ITEM } from "@/lib/motion";
 
 /**
  * Не прайсинг-карточка с чеклистом, а договор, написанный напарником от руки.
@@ -21,13 +22,13 @@ export function Pricing() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-16 md:py-24">
+    <section className="mx-auto max-w-5xl px-4 py-20 md:py-28">
       <motion.div
         className="relative mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-primary/40 bg-card p-8 shadow-[0_0_0_1px_oklch(0.72_0.17_55/0.10),0_8px_40px_oklch(0.72_0.17_55/0.09)]"
         initial={reduceMotion ? false : { opacity: 0, y: 28, rotate: -0.6 }}
         whileInView={{ opacity: 1, y: 0, rotate: -0.6 }}
         viewport={{ once: true, margin: "-80px" }}
-        transition={{ type: "spring", stiffness: 160, damping: 20 }}
+        transition={SPRING_ITEM}
       >
         <div className="flex items-start justify-between gap-4">
           <h2 className="font-hand text-4xl leading-tight">Я обещаю:</h2>
@@ -101,10 +102,14 @@ export function Pricing() {
           render={<Link href="/app" />}
           nativeButton={false}
           size="lg"
-          className="w-full font-semibold"
+          className="press w-full font-semibold"
         >
           Познакомиться с напарником
         </Button>
+        {/* Снятие риска прямо у точки решения */}
+        <p className="-mt-3 text-center font-mono text-xs text-muted-foreground/70">
+          вход — просто открыть, без карты и регистрации
+        </p>
       </motion.div>
     </section>
   );

@@ -289,8 +289,12 @@
 }
 
 /* Доступность: видимый фокус только при клавиатурной навигации.
-   :where() даёт нулевую специфичность → ничего не переопределяет насильно */
-:where(a, button, [role="button"], [data-slot="button"]):focus-visible {
+   :where() даёт нулевую специфичность → ничего не переопределяет насильно.
+   outline — намеренно, не Tailwind-ring (box-shadow): у .glass свой
+   unlayered box-shadow, который молча перекрыл бы layered ring-утилиту
+   (та же ловушка каскада, что и с border-primary/50 в дневнике острова).
+   outline — отдельный слой рендера, .glass его никак не задевает. */
+:where(a, button, [role="button"], [data-slot="button"], input):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
@@ -356,7 +360,6 @@
     oklch(1 0 0 / 0.02) 100%
   );
   backdrop-filter: blur(20px) saturate(165%);
-  -webkit-backdrop-filter: blur(20px) saturate(165%);
   border: 1px solid var(--glass-border, oklch(1 0 0 / 0.16));
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.2),
@@ -414,5 +417,24 @@
     oklch(0.17 0.008 130 / 0.68) 100%
   );
   backdrop-filter: blur(24px) saturate(160%);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+
+/* Третий материальный ярус, не второй .glass. У обычного стекла нет
+   ранга — оно одинаково для карточки, кнопки и чата, поэтому важное
+   неотличимо от второстепенного по глубине. Этот класс — сознательно
+   редкий: один такой элемент на секцию, не больше, иначе ранг исчезает
+   так же, как исчезает акцент, если лаймовый — это весь текст. */
+.glass-highlight {
+  background: linear-gradient(
+    155deg,
+    oklch(0.86 0.22 130 / 0.16) 0%,
+    oklch(0.86 0.22 130 / 0.06) 55%,
+    oklch(1 0 0 / 0.02) 100%
+  );
+  backdrop-filter: blur(20px) saturate(165%);
+  border: 1px solid oklch(0.86 0.22 130 / 0.4);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.22),
+    inset 0 0 28px oklch(0.86 0.22 130 / 0.07),
+    0 0 48px -16px oklch(0.86 0.22 130 / 0.45);
 }

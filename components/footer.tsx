@@ -51,10 +51,17 @@ export function Footer() {
           render={<Link href="/app" />}
           nativeButton={false}
           size="lg"
-          className="font-semibold"
+          className="press font-semibold"
         >
           Пойдём
         </Button>
+
+        {/* Полоса доверия: снимает последние возражения одной строкой,
+            включая прямое называние СДВГ-аудитории */}
+        <p className="max-w-sm font-mono text-[11px] leading-relaxed tracking-wide text-muted-foreground/70">
+          работает в браузере · данные остаются у тебя · без стыда и стриков ·
+          подходит при СДВГ и без
+        </p>
 
         <div className="mt-4 flex flex-col items-center gap-3 border-t border-border/40 pt-6 w-full">
           <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground/60">
