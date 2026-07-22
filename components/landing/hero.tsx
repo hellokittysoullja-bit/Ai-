@@ -167,7 +167,7 @@ export function Hero() {
   return (
     <section
       id="hero"
-      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-10 pt-3 [@media(max-height:760px)_and_(max-width:1023px)]:pb-4 [@media(max-height:760px)_and_(max-width:1023px)]:pt-1"
+      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-10 pt-6 [@media(max-height:760px)_and_(max-width:1023px)]:pb-4 [@media(max-height:760px)_and_(max-width:1023px)]:pt-2"
     >
       {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
@@ -233,11 +233,17 @@ export function Hero() {
             </span>
           </p>
 
-          {/* Главный CTA: на мобильном — последний в кадре (order-5), на
-            десктопе — в текстовой колонке сразу под оффером */}
+          {/* Главный CTA: order-4 — сразу после промиса и подзаголовка, ДО
+            живого чата. Раньше стоял order-5, последним в кадре, после
+            самого тяжёлого по контенту блока (бабл + 2 чипа + заметка) —
+            маршрут взгляда получался «главный объект → второстепенное →
+            ещё второстепенное → и только потом кнопка», вместо «главный
+            объект → главная кнопка → второстепенное». На десктопе порядок
+            и так был верный (CTA в своей колонке сразу под оффером,
+            lg:order-none просто снимает мобильный override). */}
           <div
-            className="hero-rise order-5 mt-1 flex w-full flex-col items-center gap-2.5 lg:order-none lg:items-start"
-            style={{ "--rise-delay": "0.78s" } as CSSProperties}
+            className="hero-rise order-4 mt-2 flex w-full flex-col items-center gap-2.5 lg:order-none lg:items-start"
+            style={{ "--rise-delay": "0.62s" } as CSSProperties}
           >
             <motion.div
               animate={ctaBoost ? { scale: [1, 1.045, 1] } : {}}
@@ -289,21 +295,34 @@ export function Hero() {
           <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none">
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-0 h-48 w-48 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl [@media(max-height:760px)_and_(max-width:1023px)]:h-32 [@media(max-height:760px)_and_(max-width:1023px)]:w-32 lg:h-56 lg:w-56"
+              className="pointer-events-none absolute left-1/2 top-0 h-52 w-52 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl [@media(max-height:760px)_and_(max-width:1023px)]:h-32 [@media(max-height:760px)_and_(max-width:1023px)]:w-32 lg:h-56 lg:w-56"
             />
+            {/* size 152→184: существо ужималось ради того, чтобы CTA не
+                уезжал за сгиб (был спрятан за целым блоком живого чата).
+                После переноса CTA на order-4 (сразу после оффера) запас
+                по высоте — сотни пикселей даже на низких вьюпортах, зажимать
+                маскот больше незачем. Один сильный визуальный акцент
+                весит больше, если он не ужат искусственно. */}
             <MascotSvg
               expression={expression}
-              size={152}
+              size={184}
               label="Напарник — пушистое существо с зелёными глазами"
               className="relative z-10 [@media(max-height:760px)_and_(max-width:1023px)]:size-28 lg:size-[196px]"
             />
-            <GroundPool className="-mt-9 -mb-11 [@media(max-height:760px)_and_(max-width:1023px)]:-mt-6 [@media(max-height:760px)_and_(max-width:1023px)]:-mb-8 [@media(max-height:760px)_and_(max-width:1023px)]:scale-75" />
+            <GroundPool className="-mt-10 -mb-12 [@media(max-height:760px)_and_(max-width:1023px)]:-mt-6 [@media(max-height:760px)_and_(max-width:1023px)]:-mb-8 [@media(max-height:760px)_and_(max-width:1023px)]:scale-75" />
           </div>
 
-          {/* Живой чат-вход: он здоровается, ты отвечаешь — премиальная реплика */}
+          {/* Живой чат-вход: order-5, после CTA — это доп.вовлечение для
+            тех, кто продолжает читать, а не барьер перед главной кнопкой.
+            Он здоровается, ты отвечаешь — премиальная реплика */}
           <div
-            className="hero-rise order-4 mt-1 flex w-full flex-col gap-2 lg:order-none"
-            style={{ "--rise-delay": "0.62s" } as CSSProperties}
+            // mt-7: заметный отступ ПЕРЕД чатом — граница между разреженной
+            // "промо" зоной (маскот/заголовок/CTA) и плотной "чатовой"
+            // зоной ниже. Разная плотность в одном кадре — не ошибка,
+            // это ритм: если бы все блоки дышали одинаково, глаз не понял
+            // бы, где кончается главное и начинается вторичное.
+            className="hero-rise order-5 mt-7 flex w-full flex-col gap-2 lg:order-none"
+            style={{ "--rise-delay": "0.78s" } as CSSProperties}
             aria-live="polite"
           >
             {/* Аватар-мордочка слева от реплики: на скрине-хиро существо
