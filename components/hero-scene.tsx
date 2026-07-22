@@ -596,6 +596,18 @@ export function MascotStatic({
             strokeWidth={13}
             strokeLinecap="round"
           />
+          {/* Фитилёк-мостик — см. тот же приём в mascot-svg.tsx: без него
+              огонёк на увеличенном кадре читается как отдельная левитирующая
+              капля рядом с хвостом, а не пламя на его кончике. */}
+          <ellipse
+            cx={182}
+            cy={98}
+            rx={4}
+            ry={6.5}
+            fill={FUR}
+            stroke={OUTLINE}
+            strokeWidth={1.5}
+          />
           <g>
             <animateTransform
               attributeName="transform"

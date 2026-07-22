@@ -121,7 +121,7 @@ function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
 
   return (
     <p
-      className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
+      className="font-hand text-lg leading-snug text-secondary-foreground md:text-2xl"
       onClick={() => finishRef.current()}
     >
       {text.slice(0, shown)}
@@ -271,7 +271,10 @@ export function Hero() {
                 )}
               </Button>
             </motion.div>
-            <span className="font-mono text-xs tracking-wide text-muted-foreground/75">
+            {/* /75 давал 4.23:1 на 12px — ниже порога WCAG AA (4.5:1),
+                замерено canvas-конвертацией computed color. Полная
+                непрозрачность muted-foreground держит ~6:1+. */}
+            <span className="font-mono text-xs tracking-wide text-muted-foreground">
               бесплатно · без карты и регистрации
             </span>
           </div>
@@ -303,27 +306,25 @@ export function Hero() {
             style={{ "--rise-delay": "0.62s" } as CSSProperties}
             aria-live="polite"
           >
-            <div className="glass relative max-w-[92%] self-start rounded-2xl rounded-tl-sm px-4 py-3 text-left">
-              {/* Хвостик пузыря указывает вверх, на существо — без него реплика
-                «ничья» и висит между котом и кнопками */}
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 14 10"
-                className="absolute -top-[9px] left-7 h-[10px] w-[14px] text-white/25"
-              >
-                <path
-                  d="M2 10 Q 5 4 12 1"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
+            {/* Аватар-мордочка слева от реплики: на скрине-хиро существо
+                стоит наверху кадра, а реплика — ниже подзаголовка, через
+                луну и заголовок. Прежний хвостик-«запятая» указывал в
+                сторону, а не на существо, и терялся на таком расстоянии —
+                атрибуция «это говорит именно кот» держалась только на
+                чтении текста «Я Напарник». Тот же приём, что в реальном
+                чате (CompanionAvatar в companion-chat.tsx), даёт мгновенную
+                атрибуцию без чтения и опережает продукт: это уже чат. */}
+            <div className="flex items-end gap-1.5">
+              <div className="flex size-7 shrink-0 items-center justify-center self-start">
+                <MascotSvg expression="calm" size={28} />
+              </div>
+              <div className="glass relative max-w-[calc(92%-2.125rem)] self-start rounded-2xl rounded-tl-sm px-4 py-3 text-left">
+                <WordReveal
+                  text={OPENING_LINE}
+                  startDelay={0.85}
+                  className="font-hand text-lg leading-snug text-secondary-foreground md:text-2xl"
                 />
-              </svg>
-              <WordReveal
-                text={OPENING_LINE}
-                startDelay={0.85}
-                className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
-              />
+              </div>
             </div>
 
             <AnimatePresence initial={false}>
@@ -334,12 +335,17 @@ export function Hero() {
                     initial={{ opacity: 0, y: 12, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={SPRING_SNAPPY}
-                    className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-4 py-3 text-left shadow-xl backdrop-blur-md"
+                    className="flex max-w-[92%] items-end gap-1.5 self-start"
                   >
-                    <TypedLine
-                      text={step.text}
-                      onDone={() => setCtaBoost(true)}
-                    />
+                    <div className="flex size-7 shrink-0 items-center justify-center">
+                      <MascotSvg expression="happy" size={28} />
+                    </div>
+                    <div className="rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-4 py-3 text-left shadow-xl backdrop-blur-md">
+                      <TypedLine
+                        text={step.text}
+                        onDone={() => setCtaBoost(true)}
+                      />
+                    </div>
                   </motion.div>
                 ) : (
                   <motion.div
@@ -434,7 +440,11 @@ export function Hero() {
           нижняя кромка читается как конец страницы. */}
       <a
         href="#how"
-        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/60 transition-colors hover:text-primary [@media(max-height:680px)]:hidden"
+        // px-3 py-2.5: сам текст+иконка были ~28px высотой — ниже
+        // рекомендованного минимума тап-зоны (44px, WCAG 2.5.5 / Apple HIG).
+        // Паддинг расширяет только хит-зону, без изменения видимого размера.
+        // /60 давал <4.5:1 контраста на 12px — заменено на полный muted-foreground.
+        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 px-3 py-2.5 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary [@media(max-height:680px)]:hidden"
         style={{ "--rise-delay": "1.5s" } as CSSProperties}
       >
         как это работает
