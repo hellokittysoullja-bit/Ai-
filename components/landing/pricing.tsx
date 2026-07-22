@@ -104,7 +104,7 @@ export function Pricing() {
           size="lg"
           className="press w-full font-semibold"
         >
-          Познакомиться с напарником
+          Договорились
         </Button>
         {/* Снятие риска прямо у точки решения */}
         <p className="-mt-3 text-center font-mono text-xs text-muted-foreground/70">

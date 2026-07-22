@@ -527,7 +527,7 @@ export function FocusSession() {
                       setTask(step)
                       setBrokenSteps(null)
                     }}
-                    className="glass glass-interactive rounded-xl px-3 py-2 text-left text-sm font-medium"
+                    className="glass glass-interactive press rounded-xl px-3 py-2 text-left text-sm font-medium"
                   >
                     {step}
                   </button>
@@ -718,7 +718,7 @@ export function FocusSession() {
         >
           <Link
             href="/app/world"
-            className="group glass glass-interactive flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl px-4 pb-4 pt-3 text-center"
+            className="group glass glass-interactive press flex w-full flex-col items-center gap-2 overflow-hidden rounded-2xl px-4 pb-4 pt-3 text-center"
           >
             <RevealIsland
               landmarksUnlocked={grownElement.landmarksUnlocked}
@@ -758,7 +758,7 @@ export function FocusSession() {
           <button
             type="button"
             onClick={() => setPlanFormOpen(true)}
-            className="glass glass-interactive flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
+            className="glass glass-interactive press flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
           >
             <span className="text-sm font-semibold">Договориться с завтрашним собой</span>
             <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />

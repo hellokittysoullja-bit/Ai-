@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { Loader2 } from "lucide-react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,12 @@ export function Hero() {
   // всё равно должен закрывать дофаминовую петлю действием, а не повисать
   // в пустоте — импульс на уже видимую кнопку вместо второй, конкурирующей
   const [ctaBoost, setCtaBoost] = useState(false);
+  // Клиентский переход на /app не мгновенен (первая загрузка бандла) —
+  // 200-300мс без визуального отклика читаются мозгом как «не сработало»,
+  // тянет за собой повторный клик. Гвардим от двойного клика в самом
+  // обработчике: disabled на Link-рендере base-ui ничего не даёт
+  // (:disabled — псевдокласс нативных форм, у <a> его не бывает).
+  const [navigating, setNavigating] = useState(false);
 
   function choose(key: ReplyKey) {
     setAnswered(true);
@@ -230,13 +237,27 @@ export function Hero() {
                 render={<Link href="/app" />}
                 nativeButton={false}
                 size="lg"
+                onClick={(e: React.MouseEvent) => {
+                  if (navigating) {
+                    e.preventDefault();
+                    return;
+                  }
+                  setNavigating(true);
+                }}
                 className={`press w-full max-w-xs font-semibold shadow-[0_12px_36px_-12px_oklch(0.86_0.22_130/0.55)] transition-shadow duration-500 sm:w-auto sm:px-10 ${
                   ctaBoost
                     ? "shadow-[0_16px_44px_-10px_oklch(0.86_0.22_130/0.75)]"
                     : ""
                 }`}
               >
-                Начать первое дело →
+                {navigating ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    Иду…
+                  </>
+                ) : (
+                  "Начать первое дело →"
+                )}
               </Button>
             </motion.div>
             <span className="font-mono text-xs tracking-wide text-muted-foreground/75">
@@ -336,7 +357,7 @@ export function Hero() {
                     // сцена откликается на намерение раньше действия (живая, не картинка)
                     onMouseEnter={() => setExpression("happy")}
                     onMouseLeave={() => setExpression("calm")}
-                    className="group glass glass-interactive rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
+                    className="group glass glass-interactive press rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
                   >
                     {REPLIES[key].visitor}
                   </Link>
