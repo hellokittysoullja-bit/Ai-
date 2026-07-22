@@ -57,6 +57,7 @@ function buildFirstWord(
   plan: Plan | null,
   patterns: Patterns,
   now: Date,
+  companionName: string | null,
 ): FirstWord {
   const hour = now.getHours();
   const isEvening = hour >= 18 || hour < 4;
@@ -85,7 +86,7 @@ function buildFirstWord(
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} Я рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
       actionStep: plan.firstStep,
     };
   }
@@ -100,7 +101,7 @@ function buildFirstWord(
 
   if (plan && isEvening) {
     return {
-      greeting: `План на завтра уже готов: «${plan.task}», первый шаг — ${plan.firstStep.toLowerCase()}. Утром напишу первым. Можешь спать спокойно.`,
+      greeting: `План на завтра уже готов: «${plan.task}», первый шаг — ${plan.firstStep.toLowerCase()}. Утром ${companionName ?? "я"} напишу первым. Можешь спать спокойно.`,
       actionStep: null,
     };
   }
@@ -134,6 +135,27 @@ function buildFirstWord(
     greeting: `${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
+}
+
+/**
+ * Первая реплика чата. На нулевом старте — объясняет механику: чат ещё
+ * не прожит, объяснение уместно. С первого же старта эта же строка
+ * продолжала звучать как онбординг для человека, который её давно знает —
+ * лендинг обещает «сообщение от живого существа», а не диктофонную запись.
+ * totalStarts и имя уже приходят в HomeScreen из того же refresh(),
+ * здесь только выбор реплики, не новый источник данных.
+ */
+function buildChatGreeting(
+  totalStarts: number,
+  companionName: string | null,
+): string {
+  if (totalStarts === 0) {
+    return "Это наш чат. Вечером кладём план, днём дробим шаги, всегда — без стыда.";
+  }
+  const who = companionName ?? "Я";
+  const startsWord =
+    totalStarts === 1 ? "старт" : totalStarts < 5 ? "старта" : "стартов";
+  return `${who} тут. Помню ${totalStarts} твоих ${startsWord} — пиши, что нужно.`;
 }
 
 export function HomeScreen() {
@@ -204,7 +226,7 @@ export function HomeScreen() {
       getPatterns(),
       getCompanionName(),
     ]);
-    setFirstWord(buildFirstWord(plan, patterns, new Date()));
+    setFirstWord(buildFirstWord(plan, patterns, new Date(), name));
     setStats(patterns);
     setCompanionName(name);
     setNameLoaded(true);
@@ -407,7 +429,7 @@ export function HomeScreen() {
       <div className="flex min-h-0 flex-1 flex-col">
         <CompanionChat
           mode="companion"
-          greeting="Это наш чат. Вечером кладём план, днём дробим шаги, всегда — без стыда."
+          greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
           onPlanSaved={refresh}
           showSuggestions={!firstWord?.showStarterChips}
         />
