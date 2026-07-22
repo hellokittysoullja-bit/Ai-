@@ -180,9 +180,13 @@ export function CompanionChat({
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-md flex-col gap-3 px-4 py-4">
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* justify-end: сообщения примыкают к полю ввода, не зависают у
+          верха с пустотой внизу — короткий чат (1-2 реплики) выглядит
+          обжитым, а не оборванным. Переполнение по-прежнему скроллится
+          нормально, autoscroll на bottomRef ниже не задет. */}
+      <div className="flex flex-1 flex-col justify-end overflow-y-auto">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
