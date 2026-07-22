@@ -162,6 +162,36 @@ export function FocusSession() {
   const [planSaved, setPlanSaved] = useState(false)
   const [planFormOpen, setPlanFormOpen] = useState(false)
 
+  // Раскрытие формы добавляет ~140px под сгиб (2 поля + кнопка + CTA
+  // «Ещё одна сессия» ниже) — без автоскролла кнопка сохранения формы
+  // и следующая за ней CTA утыкаются в fixed-нав без подсказки, что
+  // нужно проскроллить. Скроллим к концу документа, а не scrollIntoView
+  // на саму форму: элемент оказывается «уже в зоне видимости» по расчёту
+  // браузера ещё до появления кнопок под ним, и scrollIntoView тогда
+  // молча не скроллит вовсе — эмпирически проверено, не только в теории.
+  useEffect(() => {
+    if (planFormOpen) {
+      window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
+    }
+  }, [planFormOpen])
+
+  // Защита состояния потока: пока идёт сессия, нижний таб-бар (Дом/Мир)
+  // — это всегда видимая рампа выхода ровно в тот момент, когда мы держим
+  // человека в фокусе. Flow требует убрать конкурирующие affordance'ы
+  // действия (так же гаснет HUD в играх на катсцене, прячется хром в
+  // видеоплеере). Не ловушка: «Закончить раньше» на экране остаётся, и
+  // это его собственный таймер. На фазе 'done' (награда + план) навигация
+  // возвращается — уйти на выросший остров как раз желанно.
+  // Нав живёт в layout, фаза — здесь, поэтому связь через data-атрибут body.
+  useEffect(() => {
+    const immersive = phase === 'starting' || phase === 'running'
+    if (immersive) document.body.dataset.focusImmersive = 'true'
+    else delete document.body.dataset.focusImmersive
+    return () => {
+      delete document.body.dataset.focusImmersive
+    }
+  }, [phase])
+
   // Последовательное раскрытие: сначала находка одна на экране
   // (пик без конкурентов), потом появляются план и кнопки
   const [restRevealed, setRestRevealed] = useState(false)
@@ -751,6 +781,7 @@ export function FocusSession() {
               className="glass h-11 rounded-xl px-4 text-sm"
             />
             <Button
+              size="lg"
               onClick={saveTomorrowPlan}
               disabled={!tomorrowTask.trim() || !tomorrowStep.trim()}
               className="font-semibold"
