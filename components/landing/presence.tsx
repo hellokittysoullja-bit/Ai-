@@ -22,7 +22,11 @@ export function Presence() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section aria-label="Присутствие" className="relative overflow-hidden">
+    <section
+      id="presence"
+      aria-label="Присутствие"
+      className="relative scroll-mt-20 overflow-hidden"
+    >
       {/* Единственное место на лендинге, где холодная ночь и тёплый огонёк
           свечи смешиваются в одном свечении — остальные секции используют
           только один акцент за раз. Текст называет это вершиной ("не

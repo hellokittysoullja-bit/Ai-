@@ -22,7 +22,7 @@ export function Pricing() {
   const reduceMotion = useReducedMotion();
 
   return (
-    <section className="mx-auto max-w-5xl px-4 py-20 md:py-28">
+    <section id="pricing" className="mx-auto max-w-5xl px-4 py-20 md:py-28 scroll-mt-20">
       <motion.div
         className="relative mx-auto flex max-w-md flex-col gap-6 rounded-3xl border border-primary/40 bg-card p-8 shadow-[0_0_0_1px_oklch(0.72_0.17_55/0.10),0_8px_40px_oklch(0.72_0.17_55/0.09)]"
         initial={reduceMotion ? false : { opacity: 0, y: 28, rotate: -0.6 }}
@@ -104,7 +104,7 @@ export function Pricing() {
           size="lg"
           className="press w-full font-semibold"
         >
-          Познакомиться с напарником
+          Договорились
         </Button>
         {/* Снятие риска прямо у точки решения */}
         <p className="-mt-3 text-center font-mono text-xs text-muted-foreground/70">

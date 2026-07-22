@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import { Loader2 } from "lucide-react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
@@ -139,6 +140,12 @@ export function Hero() {
   // всё равно должен закрывать дофаминовую петлю действием, а не повисать
   // в пустоте — импульс на уже видимую кнопку вместо второй, конкурирующей
   const [ctaBoost, setCtaBoost] = useState(false);
+  // Клиентский переход на /app не мгновенен (первая загрузка бандла) —
+  // 200-300мс без визуального отклика читаются мозгом как «не сработало»,
+  // тянет за собой повторный клик. Гвардим от двойного клика в самом
+  // обработчике: disabled на Link-рендере base-ui ничего не даёт
+  // (:disabled — псевдокласс нативных форм, у <a> его не бывает).
+  const [navigating, setNavigating] = useState(false);
 
   function choose(key: ReplyKey) {
     setAnswered(true);
@@ -158,7 +165,10 @@ export function Hero() {
   }
 
   return (
-    <section className="grain relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6">
+    <section
+      id="hero"
+      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6"
+    >
       {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <HeroScene />
@@ -175,32 +185,40 @@ export function Hero() {
             className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none"
             style={{ "--rise-delay": "0.32s" } as CSSProperties}
           >
-            Начать — самое трудное. Я прихожу{" "}
-            <span
-              className="scribble-underline scribble-draw text-primary"
-              style={{ "--scribble-delay": "0.95s" } as CSSProperties}
-            >
-              первым
-              <svg
-                viewBox="0 0 100 12"
-                preserveAspectRatio="none"
-                aria-hidden="true"
+            {/* Хроматическая вспышка сходится в резкий текст ровно к моменту,
+              когда начинает рисоваться каракуля-подчёркивание (0.95s) —
+              взгляд сперва «фокусируется», потом ловит штрих */}
+            <span className="chroma-appear">
+              Начать — самое трудное. Я прихожу{" "}
+              <span
+                className="scribble-underline scribble-draw text-primary"
+                style={{ "--scribble-delay": "0.95s" } as CSSProperties}
               >
-                <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" pathLength={1} />
-                {/* Второй проход штриха: настоящая каракуля рисуется в два
-                  движения с разным нажимом — идеальная дуга выдаёт машину */}
-                <path
-                  d="M4 10 Q 30 6 55 8 T 97 9"
-                  pathLength={1}
-                  style={{
-                    strokeWidth: 2.5,
-                    opacity: 0.55,
-                    animationDelay: "1.35s",
-                  }}
-                />
-              </svg>
+                первым
+                <svg
+                  viewBox="0 0 100 12"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7"
+                    pathLength={1}
+                  />
+                  {/* Второй проход штриха: настоящая каракуля рисуется в два
+                    движения с разным нажимом — идеальная дуга выдаёт машину */}
+                  <path
+                    d="M4 10 Q 30 6 55 8 T 97 9"
+                    pathLength={1}
+                    style={{
+                      strokeWidth: 2.5,
+                      opacity: 0.55,
+                      animationDelay: "1.35s",
+                    }}
+                  />
+                </svg>
+              </span>
+              {"."}
             </span>
-            {"."}
           </h1>
 
           {/* Подзаголовок: конкретика + дифференциатор */}
@@ -230,13 +248,27 @@ export function Hero() {
                 render={<Link href="/app" />}
                 nativeButton={false}
                 size="lg"
+                onClick={(e: React.MouseEvent) => {
+                  if (navigating) {
+                    e.preventDefault();
+                    return;
+                  }
+                  setNavigating(true);
+                }}
                 className={`press w-full max-w-xs font-semibold shadow-[0_12px_36px_-12px_oklch(0.86_0.22_130/0.55)] transition-shadow duration-500 sm:w-auto sm:px-10 ${
                   ctaBoost
                     ? "shadow-[0_16px_44px_-10px_oklch(0.86_0.22_130/0.75)]"
                     : ""
                 }`}
               >
-                Начать первое дело →
+                {navigating ? (
+                  <>
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                    Иду…
+                  </>
+                ) : (
+                  "Начать первое дело →"
+                )}
               </Button>
             </motion.div>
             <span className="font-mono text-xs tracking-wide text-muted-foreground/75">
@@ -336,7 +368,7 @@ export function Hero() {
                     // сцена откликается на намерение раньше действия (живая, не картинка)
                     onMouseEnter={() => setExpression("happy")}
                     onMouseLeave={() => setExpression("calm")}
-                    className="group glass glass-interactive rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
+                    className="group glass glass-interactive press rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
                   >
                     {REPLIES[key].visitor}
                   </Link>

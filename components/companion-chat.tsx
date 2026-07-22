@@ -219,7 +219,7 @@ export function CompanionChat({
                     key={chip}
                     type="button"
                     onClick={() => sendMessage({ text: chip })}
-                    className="glass glass-interactive rounded-full px-3.5 py-2 text-sm text-foreground hover:text-primary"
+                    className="glass glass-interactive press rounded-full px-3.5 py-2 text-sm text-foreground hover:text-primary"
                   >
                     {chip}
                   </button>

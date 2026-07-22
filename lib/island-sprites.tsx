@@ -42,13 +42,21 @@ export const landmarkNodes: ReactNode[] = [
     <path d="M196 136 q-8 -4 -10 -12 q10 0 10 12" fill={c.green} />
     <path d="M196 140 q8 -4 10 -12 q-10 0 -10 12" fill={c.green} />
   </>,
-  // 1 — Дерево
-  <>
+  // 1 — Дерево (лёгкое покачивание кроны от корня — тот же принцип
+  // «дыхания», что уже у костра и фонаря, просто через поворот, не opacity)
+  <g>
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      values="0 121 146; 1.2 121 146; 0 121 146; -1.2 121 146; 0 121 146"
+      dur="5s"
+      repeatCount="indefinite"
+    />
     <rect x="118" y="118" width="6" height="28" rx="3" fill={c.groundDark} />
     <circle cx="121" cy="108" r="20" fill={c.green} opacity="0.9" />
     <circle cx="108" cy="118" r="12" fill={c.green} opacity="0.75" />
     <circle cx="134" cy="116" r="13" fill={c.green} opacity="0.8" />
-  </>,
+  </g>,
   // 2 — Костёр
   <>
     <line x1="238" y1="148" x2="252" y2="140" stroke={c.groundDark} strokeWidth="4" strokeLinecap="round" />
@@ -80,12 +88,20 @@ export const landmarkNodes: ReactNode[] = [
       <animate attributeName="opacity" values="0.15;0.35;0.15" dur="3.6s" repeatCount="indefinite" />
     </circle>
   </>,
-  // 6 — Второе дерево
-  <>
+  // 6 — Второе дерево (свой ритм и амплитуда — не зеркало первого,
+  // деревья на настоящем ветру не качаются синхронно)
+  <g>
+    <animateTransform
+      attributeName="transform"
+      type="rotate"
+      values="0 274.5 136; -1 274.5 136; 0 274.5 136; 1 274.5 136; 0 274.5 136"
+      dur="4.2s"
+      repeatCount="indefinite"
+    />
     <rect x="272" y="112" width="5" height="24" rx="2.5" fill={c.groundDark} />
     <circle cx="274" cy="102" r="15" fill={c.green} opacity="0.8" />
     <circle cx="284" cy="110" r="9" fill={c.green} opacity="0.65" />
-  </>,
+  </g>,
   // 7 — Флаг
   <>
     <line x1="68" y1="132" x2="68" y2="100" stroke={c.soft} strokeWidth="2.5" strokeLinecap="round" />

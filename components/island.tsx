@@ -206,7 +206,7 @@ export function Island() {
         type="button"
         onClick={tapIsland}
         aria-label="Коснуться острова — напарник вспомнит историю"
-        className="glass glass-interactive cursor-pointer overflow-hidden rounded-3xl text-left focus-visible:ring-2 focus-visible:ring-ring"
+        className="glass glass-interactive press cursor-pointer overflow-hidden rounded-3xl text-left focus-visible:ring-2 focus-visible:ring-ring"
       >
         <svg
           viewBox="0 0 380 216"

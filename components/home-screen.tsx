@@ -393,7 +393,7 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="glass glass-interactive rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
+                    className="glass glass-interactive press rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {chip}
                   </Link>

@@ -112,6 +112,14 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
 }
 
+/* Зерно чуть плотнее именно в hero: первый экран держит взгляд дольше всех
+   остальных секций, лёгкая избыточная текстура здесь читается как
+   кинематографичность, а не грязь. Компаунд-селектор — выше специфичность
+   .grain::before без !important, порядок объявления в файле не важен. */
+.grain.grain-hero::before {
+  opacity: 0.7;
+}
+
 /* Каракуля-подчёркивание под ключевым словом */
 .scribble-underline {
   position: relative;
@@ -249,6 +257,37 @@
   .hero-rise {
     animation-duration: 0.01s;
     animation-delay: 0s;
+  }
+}
+
+/* Хроматическая аберрация H1 при появлении: RGB-расслоение сходится в
+   резкий текст за 0.65s — глаз цепляется за нестабильность раньше, чем
+   успевает читать (bottom-up salience), затем текст «фокусируется». */
+@keyframes chroma-flash {
+  0% {
+    text-shadow:
+      -4px 0 oklch(0.7 0.25 29 / 0.55),
+      4px 0 oklch(0.6 0.2 230 / 0.55);
+    filter: blur(0.6px);
+  }
+  45% {
+    text-shadow:
+      -1.5px 0 oklch(0.7 0.25 29 / 0.2),
+      1.5px 0 oklch(0.6 0.2 230 / 0.2);
+    filter: blur(0);
+  }
+  100% {
+    text-shadow: none;
+    filter: blur(0);
+  }
+}
+.chroma-appear {
+  animation: chroma-flash 0.65s ease-out both;
+  animation-delay: 0.34s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chroma-appear {
+    animation: none;
   }
 }
 
@@ -448,6 +487,18 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    неотличимо от второстепенного по глубине. Этот класс — сознательно
    редкий: один такой элемент на секцию, не больше, иначе ранг исчезает
    так же, как исчезает акцент, если лаймовый — это весь текст. */
+/* Глубина резкости у звёзд острова: ближние чётче и ярче, дальние —
+   размыты и тусклее. Статичный fallback для prefers-reduced-motion —
+   SMIL <animate> поверх него мерцает, когда движение разрешено. */
+.star-far {
+  filter: blur(0.6px);
+  opacity: 0.35;
+}
+.star-mid {
+  filter: blur(0.2px);
+  opacity: 0.5;
+}
+
 .glass-highlight {
   background: linear-gradient(
     155deg,
