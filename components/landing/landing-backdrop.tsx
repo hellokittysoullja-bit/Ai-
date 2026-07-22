@@ -46,6 +46,16 @@ const STARS: readonly Star[] = [
   [86, 58, 1.5, 0.14],
   [91, 34, 2, 0.18],
   [95, 76, 1.5, 0.14],
+  // Дозасветка межсекционных зон: пустой экран без единой светящейся точки
+  // читается как «сломано», с звёздами — как «ночь»
+  [24, 52, 2, 0.24, 6.2],
+  [31, 38, 2.5, 0.28],
+  [39, 60, 2, 0.22, 5.4],
+  [47, 44, 1.5, 0.2],
+  [55, 26, 2, 0.26, 7.2],
+  [59, 90, 2, 0.22],
+  [67, 52, 2.5, 0.26, 6.4],
+  [72, 16, 2, 0.2],
 ];
 
 export function LandingBackdrop() {
@@ -68,6 +78,13 @@ export function LandingBackdrop() {
         className="absolute left-1/2 top-[30%] h-[480px] w-[720px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
         style={{
           background:
+            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.08) 0%, transparent 65%)",
+        }}
+      />
+      <div
+        className="absolute left-1/2 top-[50%] h-[440px] w-[680px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        style={{
+          background:
             "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.05) 0%, transparent 65%)",
         }}
       />
@@ -75,7 +92,14 @@ export function LandingBackdrop() {
         className="absolute left-1/2 top-[68%] h-[480px] w-[720px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
         style={{
           background:
-            "radial-gradient(ellipse at center, oklch(0.86 0.22 130 / 0.045) 0%, transparent 65%)",
+            "radial-gradient(ellipse at center, oklch(0.86 0.22 130 / 0.07) 0%, transparent 65%)",
+        }}
+      />
+      <div
+        className="absolute left-1/2 top-[86%] h-[420px] w-[640px] -translate-x-1/2 rounded-full opacity-60 blur-3xl"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, oklch(0.86 0.22 130 / 0.05) 0%, transparent 65%)",
         }}
       />
       {/* Звёзды на всю высоту страницы; параллакс-слой даёт глубину неба */}

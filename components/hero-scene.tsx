@@ -45,6 +45,16 @@ const STARS: ReadonlyArray<
   [748, 58, 1.3, 3.6, 1.3, 0.3, 0.74],
   [118, 330, 0.9, 5.5, 0.7, 0.2, 0.52],
   [642, 306, 1, 4.3, 1.8, 0.22, 0.56],
+  // Звёзды в мобильной полосе видимости (x≈192–608 при slice-кропе):
+  // без них телефон видит почти пустое небо — атмосфера оставалась за кадром
+  [230, 40, 1.2, 3.7, 0.5, 0.28, 0.7],
+  [300, 105, 0.9, 4.4, 1.4, 0.22, 0.58],
+  [352, 60, 1, 4.7, 2.3, 0.24, 0.6],
+  [452, 40, 1.1, 3.2, 0.9, 0.28, 0.72],
+  [508, 132, 0.8, 5.1, 2, 0.2, 0.52],
+  [246, 176, 1, 4, 0.3, 0.24, 0.6],
+  [584, 96, 1.3, 3.5, 1.7, 0.3, 0.75],
+  [418, 210, 0.8, 5.4, 1.1, 0.2, 0.5],
   [382, 262, 0.8, 3.9, 2.4, 0.2, 0.52],
   [42, 224, 1.1, 4.4, 1, 0.24, 0.62],
   [722, 294, 0.9, 5, 0.3, 0.22, 0.54],
@@ -67,8 +77,10 @@ export function HeroScene() {
     >
       <defs>
         <linearGradient id="hs-sky" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="oklch(0.125 0.028 210)" />
-          <stop offset="45%" stopColor="oklch(0.155 0.018 170)" />
+          {/* Чуть светлее и насыщеннее оригинала: на OLED-телефонах
+              холодный верх неба тонул в чёрном и градиент не считывался */}
+          <stop offset="0%" stopColor="oklch(0.145 0.032 215)" />
+          <stop offset="45%" stopColor="oklch(0.165 0.02 170)" />
           <stop offset="100%" stopColor="oklch(0.21 0.018 135)" />
         </linearGradient>
         <radialGradient id="hs-warm" cx="0.5" cy="0.5" r="0.3">
@@ -107,7 +119,7 @@ export function HeroScene() {
           <stop
             offset="55%"
             stopColor="oklch(0.6 0.02 150)"
-            stopOpacity="0.055"
+            stopOpacity="0.085"
           />
           <stop offset="100%" stopColor="oklch(0.6 0.02 150)" stopOpacity="0" />
         </linearGradient>
@@ -206,8 +218,17 @@ export function HeroScene() {
         <path d="M692 674 L708 626 L724 674 Z" />
         <path d="M722 672 L734 640 L746 672 Z" />
         <path d="M752 672 L762 646 L772 672 Z" />
+        {/* Лес в мобильной полосе: на телефоне краевые деревья срезаны
+            кропом — горизонт был пустой линией. Невысокие группы по
+            флангам видимой зоны, центр остаётся существу */}
+        <path d="M218 690 L230 658 L242 690 Z" />
+        <path d="M244 688 L258 650 L272 688 Z" />
+        <path d="M276 690 L286 664 L296 690 Z" />
+        <path d="M540 700 L552 666 L564 700 Z" />
+        <path d="M566 700 L582 658 L598 700 Z" />
       </g>
-      {/* дымка у горизонта — воздушная перспектива */}
+      {/* дымка у горизонта — воздушная перспектива (усилена:
+          на телефонах 0.055 не считывалась вовсе) */}
       <rect x="0" y="620" width="800" height="140" fill="url(#hs-mist)" />
 
       {/* ближний холм */}
@@ -231,7 +252,7 @@ export function HeroScene() {
 
       {/* светлячки у земли */}
       <g fill="oklch(0.8 0.14 80)">
-        <circle cx="188" cy="712" r="2.2" opacity="0.5">
+        <circle cx="214" cy="712" r="2.2" opacity="0.5">
           <animate
             attributeName="opacity"
             values="0.15;0.75;0.15"
@@ -294,6 +315,42 @@ export function HeroScene() {
             values="0 0; -6 -10; 0 0"
             dur="10s"
             begin="1.4s"
+            repeatCount="indefinite"
+          />
+        </circle>
+        {/* Светлячки у нижней кромки, в зоне CTA: мир касается
+            интерфейса, а не заканчивается на лапах кота */}
+        <circle cx="336" cy="842" r="1.5" opacity="0.35">
+          <animate
+            attributeName="opacity"
+            values="0.1;0.5;0.1"
+            dur="5s"
+            begin="1.6s"
+            repeatCount="indefinite"
+          />
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0 0; 7 -11; 0 0"
+            dur="13s"
+            begin="0.8s"
+            repeatCount="indefinite"
+          />
+        </circle>
+        <circle cx="508" cy="856" r="1.8" opacity="0.4">
+          <animate
+            attributeName="opacity"
+            values="0.12;0.58;0.12"
+            dur="4.4s"
+            begin="2.4s"
+            repeatCount="indefinite"
+          />
+          <animateTransform
+            attributeName="transform"
+            type="translate"
+            values="0 0; -5 -13; 0 0"
+            dur="11s"
+            begin="1.9s"
             repeatCount="indefinite"
           />
         </circle>

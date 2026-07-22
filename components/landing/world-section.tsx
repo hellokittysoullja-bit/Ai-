@@ -86,12 +86,57 @@ const sprouts: Array<{ key: string; node: React.ReactNode }> = [
   },
 ]
 
-const principles = [
-  { emoji: '🚫', title: 'Ноль стриков', text: 'Стрики наказывают за срыв. Мы — нет.' },
-  { emoji: '🏝️', title: 'Мир не откатывается', text: 'Что построено — построено навсегда.' },
-  { emoji: '☁️', title: 'Провал = ничего', text: 'Не минус, не красная цифра. Просто завтра.' },
+// Рукотворные SVG-иконки вместо системных emoji: emoji рендерятся по-разному
+// на iOS/Android/Windows и спорят с bespoke-графикой острова.
+const principles: Array<{ icon: React.ReactNode; title: string; text: string }> = [
   {
-    emoji: '✨',
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <path
+          d="M13 4.5 q-4.5 5.5 -2.8 9.3 a5 5 0 0 0 9.4 -0.8 q0.4 -3.8 -2.6 -5.8 q-0.2 2.6 -2 3.6 q-1.8 -2.8 -2 -6.3z"
+          stroke={c.warm}
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <line x1="5" y1="5" x2="21" y2="21" stroke="var(--color-destructive)" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    ),
+    title: 'Ноль стриков',
+    text: 'Стрики наказывают за срыв. Мы — нет.',
+  },
+  {
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <ellipse cx="13" cy="18.5" rx="9" ry="4" fill={c.green} opacity="0.3" />
+        <path d="M13 17 v-5.5" stroke={c.green} strokeWidth="2" strokeLinecap="round" />
+        <path d="M13 12 q-5 -2 -6 -7 q6 1 6 7z" fill={c.green} />
+        <path d="M13 13.5 q5 -2 6 -7 q-6 1 -6 7z" fill={c.green} opacity="0.75" />
+      </svg>
+    ),
+    title: 'Мир не откатывается',
+    text: 'Что построено — построено навсегда.',
+  },
+  {
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <path
+          d="M7.5 18.5 a4 4 0 0 1 -0.5 -8 a5.5 5.5 0 0 1 10.8 -1 a4.3 4.3 0 0 1 0.7 8.5 z"
+          stroke={c.soft}
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+      </svg>
+    ),
+    title: 'Провал = ничего',
+    text: 'Не минус, не красная цифра. Просто завтра.',
+  },
+  {
+    icon: (
+      <svg width="26" height="26" viewBox="0 0 26 26" fill="none" aria-hidden="true">
+        <path d="M13 3.5 q1.4 6.6 9.5 9.5 q-8.1 2.9 -9.5 9.5 q-1.4 -6.6 -9.5 -9.5 q8.1 -2.9 9.5 -9.5z" fill={c.warm} opacity="0.9" />
+        <circle cx="20.5" cy="5.5" r="1.4" fill={c.warm} opacity="0.6" />
+      </svg>
+    ),
     title: 'Никогда не знаешь, что вырастет',
     text: 'Дальше — находки: кот у костра, кит в бухте, северное сияние. Редкие — правда редкие.',
   },
@@ -104,7 +149,7 @@ export function WorldSection() {
 
   const { scrollYProgress } = useScroll({
     target: ref,
-    offset: ['start 85%', 'center 45%'],
+    offset: ['start 92%', 'center 40%'],
   })
 
   useMotionValueEvent(scrollYProgress, 'change', (v) => {
@@ -115,15 +160,15 @@ export function WorldSection() {
   const shown = reduceMotion ? sprouts.length : visible
 
   return (
-    <section ref={ref} className="relative overflow-hidden">
+    <section ref={ref} id="world" className="relative scroll-mt-20 overflow-hidden">
       {/* Lime glow в центре секции */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-0 top-1/3 h-[500px] bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,oklch(0.86_0.22_130/0.08)_0%,transparent_100%)] blur-2xl"
       />
 
-      <div className="relative z-10 mx-auto max-w-2xl px-6 py-24 md:py-36">
-        <div className="flex flex-col gap-14">
+      <div className="relative z-10 mx-auto max-w-2xl px-6 py-16 md:py-24">
+        <div className="flex flex-col gap-10">
           <motion.div
             className="flex flex-col gap-5"
             initial={reduceMotion ? false : { opacity: 0, y: 20 }}
@@ -237,7 +282,7 @@ export function WorldSection() {
             </div>
           </motion.div>
 
-          {/* Принципы — с emoji и крупнее */}
+          {/* Принципы — с рукотворными SVG-иконками в палитре сайта */}
           <ul className="grid gap-6 sm:grid-cols-2">
             {principles.map((p, i) => (
               <motion.li
@@ -253,7 +298,7 @@ export function WorldSection() {
                   delay: reduceMotion ? 0 : i * 0.1,
                 }}
               >
-                <span className="text-2xl">{p.emoji}</span>
+                {p.icon}
                 <span className="text-lg font-bold">{p.title}</span>
                 <span className="leading-relaxed text-muted-foreground">{p.text}</span>
               </motion.li>

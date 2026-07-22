@@ -4,6 +4,7 @@ import { LandingBackdrop } from "@/components/landing/landing-backdrop";
 import { Problem } from "@/components/landing/problem";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { WorldSection } from "@/components/landing/world-section";
+import { Presence } from "@/components/landing/presence";
 import { Pricing } from "@/components/landing/pricing";
 import { Footer } from "@/components/footer";
 
@@ -26,6 +27,7 @@ export default function LandingPage() {
         <Problem />
         <HowItWorks />
         <WorldSection />
+        <Presence />
         <Pricing />
       </main>
       <Footer />

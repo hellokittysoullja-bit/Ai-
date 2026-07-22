@@ -101,10 +101,14 @@ export function Pricing() {
           render={<Link href="/app" />}
           nativeButton={false}
           size="lg"
-          className="w-full font-semibold"
+          className="press w-full font-semibold"
         >
           Познакомиться с напарником
         </Button>
+        {/* Снятие риска прямо у точки решения */}
+        <p className="-mt-3 text-center font-mono text-xs text-muted-foreground/70">
+          вход — просто открыть, без карты и регистрации
+        </p>
       </motion.div>
     </section>
   );

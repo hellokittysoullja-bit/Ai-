@@ -14,15 +14,20 @@ import { Button } from "@/components/ui/button";
  * слова оффера видны сразу: сцена не важнее промиса, они делят первый экран.
  *
  * Иерархия (сверху вниз, ни одного дубля):
- * - надзаголовок фиксирует боль («самое трудное — начать»);
- * - H1 — обещание, с рукописным подчёркиванием ключевого слова (bespoke-деталь);
+ * - H1 — голос персонажа: «Начать — самое трудное. Я прихожу первым»
+ *   с рукописным подчёркиванием слова-обещания (bespoke-деталь);
+ * - рядом с чатом — рукописная пометка «даже если ты пропал на неделю» —
+ *   расширяет обещание H1, а не повторяет его;
+ * - на lg+ — две колонки: оффер слева, существо и чат справа;
  * - подзаголовок — конкретика механики + дифференциатор «без стриков, без стыда»;
  * - живой чат-вход: существо здоровается, ты отвечаешь премиальной репликой —
- *   отличительный интерактивный крючок, а не статичная кнопка.
+ *   отличительный интерактивный крючок;
+ * - главный CTA виден с первой секунды (не заперт за диалогом), внизу экрана —
+ *   подсказка скролла: hero не должен читаться как конец страницы.
  */
 
 const OPENING_LINE =
-  "Привет. Я Напарник. Я не планировщик — я тот, кто сидит рядом, когда трудно начать.";
+  "Привет. Я Напарник. Если сил совсем нет — давай просто побудем рядом минуту.";
 
 const REPLIES = {
   procrastinate: {
@@ -128,8 +133,11 @@ function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
 export function Hero() {
   const [steps, setSteps] = useState<SceneStep[]>([]);
   const [answered, setAnswered] = useState(false);
-  const [showCta, setShowCta] = useState(false);
   const [expression, setExpression] = useState<MascotExpression>("calm");
+  // CTA виден с первой секунды (не заперт за диалогом), но ответ существа
+  // всё равно должен закрывать дофаминовую петлю действием, а не повисать
+  // в пустоте — импульс на уже видимую кнопку вместо второй, конкурирующей
+  const [ctaBoost, setCtaBoost] = useState(false);
 
   function choose(key: ReplyKey) {
     setAnswered(true);
@@ -149,170 +157,259 @@ export function Hero() {
   }
 
   return (
-    <section className="grain relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-14 pt-6">
+    <section className="grain relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6">
       {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <HeroScene />
       </div>
 
-      <div className="relative flex w-full max-w-md flex-col items-center gap-4 text-center">
-        {/* Существо в пятне света очага */}
-        <div className="relative flex flex-col items-center">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl"
-          />
-          <MascotSvg
-            expression={expression}
-            size={196}
-            label="Напарник — пушистое существо с зелёными глазами"
-            className="relative z-10"
-          />
-          <GroundPool className="-mt-10 -mb-12" />
-        </div>
-
-        {/* Надзаголовок: фиксирует боль до обещания */}
-        <span
-          className="hero-rise font-mono text-[11px] uppercase tracking-[0.22em] text-primary/85"
-          style={{ "--rise-delay": "0.2s" } as CSSProperties}
-        >
-          самое трудное — начать
-        </span>
-
-        {/* Промис В КАДРЕ: рукописное подчёркивание ключевого слова — bespoke */}
-        <h1
-          className="hero-rise text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl"
-          style={{ "--rise-delay": "0.32s" } as CSSProperties}
-        >
-          Существо, которое не даст тебе{" "}
-          <span
-            className="scribble-underline scribble-draw text-primary"
-            style={{ "--scribble-delay": "0.95s" } as CSSProperties}
+      <div className="relative flex w-full max-w-md flex-col items-center gap-4 text-center lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:items-center lg:gap-x-16 lg:text-left">
+        {/* Десктоп по референсу: оффер слева, существо и живой чат справа.
+            На мобильном обе колонки схлопываются в display:contents,
+            порядок кадра задают order-классы (сцена → промис → чат → CTA) */}
+        <div className="contents lg:flex lg:flex-col lg:items-start lg:gap-5">
+          {/* Промис голосом персонажа: первая фраза — боль, вторая —
+            обещание от первого лица. Каракуля — под словом обещания */}
+          <h1
+            className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none"
+            style={{ "--rise-delay": "0.32s" } as CSSProperties}
           >
-            слиться
-            <svg viewBox="0 0 100 12" preserveAspectRatio="none" aria-hidden="true">
-              <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" pathLength={1} />
-            </svg>
-          </span>
-        </h1>
-
-        {/* Подзаголовок: конкретика + дифференциатор */}
-        <p
-          className="hero-rise text-pretty text-base leading-relaxed text-muted-foreground md:text-lg"
-          style={{ "--rise-delay": "0.46s" } as CSSProperties}
-        >
-          Помогает начать, сидит рядом во время работы и растит остров из твоих
-          стартов.{" "}
-          <span className="font-medium text-foreground/80">
-            Без стриков. Без стыда.
-          </span>
-        </p>
-
-        {/* Живой чат-вход: он здоровается, ты отвечаешь — премиальная реплика */}
-        <div
-          className="hero-rise mt-1 flex w-full flex-col gap-2.5"
-          style={{ "--rise-delay": "0.62s" } as CSSProperties}
-          aria-live="polite"
-        >
-          <div className="glass max-w-[92%] self-start rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
-            <WordReveal
-              text={OPENING_LINE}
-              startDelay={0.85}
-              className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
-            />
-          </div>
-
-          <AnimatePresence initial={false}>
-            {steps.map((step, i) =>
-              step.kind === "companion" ? (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                  className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md"
-                >
-                  <TypedLine text={step.text} onDone={() => setShowCta(true)} />
-                </motion.div>
-              ) : (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 24 }}
-                  className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_24px_-8px_oklch(0.86_0.22_130/0.5)]"
-                >
-                  <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
-                    {step.text}
-                  </p>
-                </motion.div>
-              ),
-            )}
-          </AnimatePresence>
-
-          {!answered && (
-            <div className="flex flex-wrap justify-end gap-2 pt-0.5">
-              {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
-                <Link
-                  key={key}
-                  href="/app"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    choose(key);
+            Начать — самое трудное. Я прихожу{" "}
+            <span
+              className="scribble-underline scribble-draw text-primary"
+              style={{ "--scribble-delay": "0.95s" } as CSSProperties}
+            >
+              первым
+              <svg
+                viewBox="0 0 100 12"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <path d="M2 8 Q 22 2 42 6 T 78 5 Q 90 5 98 7" pathLength={1} />
+                {/* Второй проход штриха: настоящая каракуля рисуется в два
+                  движения с разным нажимом — идеальная дуга выдаёт машину */}
+                <path
+                  d="M4 10 Q 30 6 55 8 T 97 9"
+                  pathLength={1}
+                  style={{
+                    strokeWidth: 2.5,
+                    opacity: 0.55,
+                    animationDelay: "1.35s",
                   }}
-                  // Микро-магнетизм: существо радуется, когда ты тянешься ответить —
-                  // сцена откликается на намерение раньше действия (живая, не картинка)
-                  onMouseEnter={() => setExpression("happy")}
-                  onMouseLeave={() => setExpression("calm")}
-                  className="group glass glass-interactive rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
-                >
-                  {REPLIES[key].visitor}
-                </Link>
-              ))}
-            </div>
-          )}
+                />
+              </svg>
+            </span>
+            {"."}
+          </h1>
 
-          {showCta && (
+          {/* Подзаголовок: конкретика + дифференциатор */}
+          <p
+            className="hero-rise order-3 text-pretty text-base leading-relaxed text-foreground/70 md:text-lg lg:order-none"
+            style={{ "--rise-delay": "0.46s" } as CSSProperties}
+          >
+            Напарник сидит рядом, пока ты работаешь, и растит остров из твоих
+            стартов.{" "}
+            <span className="font-medium text-foreground/95">
+              Без стриков. Без стыда.
+            </span>
+          </p>
+
+          {/* Главный CTA: на мобильном — последний в кадре (order-5), на
+            десктопе — в текстовой колонке сразу под оффером */}
+          <div
+            className="hero-rise order-5 mt-1 flex w-full flex-col items-center gap-2.5 lg:order-none lg:items-start"
+            style={{ "--rise-delay": "0.78s" } as CSSProperties}
+          >
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{
-                delay: 0.15,
-                type: "spring",
-                stiffness: 200,
-                damping: 20,
-              }}
-              className="flex justify-center pt-2"
+              animate={ctaBoost ? { scale: [1, 1.045, 1] } : {}}
+              transition={{ duration: 0.55, ease: "easeOut" }}
+              className="w-full sm:w-auto"
             >
               <Button
                 render={<Link href="/app" />}
                 nativeButton={false}
                 size="lg"
-                className="press font-semibold"
+                className={`press w-full max-w-xs font-semibold shadow-[0_12px_36px_-12px_oklch(0.86_0.22_130/0.55)] transition-shadow duration-500 sm:w-auto sm:px-10 ${
+                  ctaBoost
+                    ? "shadow-[0_16px_44px_-10px_oklch(0.86_0.22_130/0.75)]"
+                    : ""
+                }`}
               >
-                Пойдём попробуем
+                Начать первое дело →
               </Button>
             </motion.div>
-          )}
+            <span className="font-mono text-xs tracking-wide text-muted-foreground/75">
+              бесплатно · без карты и регистрации
+            </span>
+          </div>
         </div>
 
-        {/* Тихий прямой вход + доверие: не давит на «поговорить» тех, кто готов сразу */}
-        {!answered && (
-          <Link
-            href="/app"
-            className="hero-rise font-mono text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-primary"
-            style={{ "--rise-delay": "0.78s" } as CSSProperties}
+        <div className="contents lg:flex lg:flex-col lg:items-center lg:gap-2">
+          {/* Существо в пятне света очага. На коротких экранах сцена
+            ужимается, чтобы CTA оставался над сгибом */}
+          <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none [@media(max-height:740px)]:scale-90">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl"
+            />
+            <MascotSvg
+              expression={expression}
+              size={196}
+              label="Напарник — пушистое существо с зелёными глазами"
+              className="relative z-10"
+            />
+            <GroundPool className="-mt-10 -mb-12" />
+          </div>
+
+          {/* Живой чат-вход: он здоровается, ты отвечаешь — премиальная реплика */}
+          <div
+            className="hero-rise order-4 mt-1 flex w-full flex-col gap-2.5 lg:order-none"
+            style={{ "--rise-delay": "0.62s" } as CSSProperties}
+            aria-live="polite"
           >
-            или сразу в приложение →
-          </Link>
-        )}
-        <span
-          className="hero-rise font-mono text-[11px] tracking-wide text-muted-foreground/70"
-          style={{ "--rise-delay": "0.86s" } as CSSProperties}
-        >
-          бесплатно, без карты и регистрации
-        </span>
+            <div className="glass relative max-w-[92%] self-start rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
+              {/* Хвостик пузыря указывает вверх, на существо — без него реплика
+                «ничья» и висит между котом и кнопками */}
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 14 10"
+                className="absolute -top-[9px] left-7 h-[10px] w-[14px] text-white/25"
+              >
+                <path
+                  d="M2 10 Q 5 4 12 1"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <WordReveal
+                text={OPENING_LINE}
+                startDelay={0.85}
+                className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
+              />
+            </div>
+
+            <AnimatePresence initial={false}>
+              {steps.map((step, i) =>
+                step.kind === "companion" ? (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                    className="max-w-[92%] self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-5 py-3.5 text-left shadow-xl backdrop-blur-md"
+                  >
+                    <TypedLine
+                      text={step.text}
+                      onDone={() => setCtaBoost(true)}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 24 }}
+                    className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_24px_-8px_oklch(0.86_0.22_130/0.5)]"
+                  >
+                    <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
+                      {step.text}
+                    </p>
+                  </motion.div>
+                ),
+              )}
+            </AnimatePresence>
+
+            {!answered && (
+              <div className="flex flex-wrap justify-end gap-2 pt-0.5">
+                {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
+                  <Link
+                    key={key}
+                    href="/app"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      choose(key);
+                    }}
+                    // Микро-магнетизм: существо радуется, когда ты тянешься ответить —
+                    // сцена откликается на намерение раньше действия (живая, не картинка)
+                    onMouseEnter={() => setExpression("happy")}
+                    onMouseLeave={() => setExpression("calm")}
+                    className="group glass glass-interactive rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
+                  >
+                    {REPLIES[key].visitor}
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Рукописная заметка на полях: расширяет обещание H1, а не
+              повторяет его. Тёплый цвет пера, не лайм: лайм в кадре
+              остаётся за «первым» и CTA */}
+            <div
+              className="hero-rise flex items-start gap-1.5 self-start pl-1"
+              style={
+                {
+                  "--rise-delay": "1.2s",
+                  color: "oklch(0.85 0.15 88 / 0.85)",
+                } as CSSProperties
+              }
+            >
+              <svg
+                viewBox="0 0 20 24"
+                className="mt-0.5 h-5 w-4 shrink-0 opacity-80"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M16 22 Q 6 18 7 5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <path
+                  d="M3 10 L7 4 L11 9"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <p className="-rotate-2 font-hand text-lg leading-tight">
+                даже если ты
+                <br />
+                пропал на неделю
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Подсказка «ниже есть ещё»: hero занимает весь экран, и без якоря
+          нижняя кромка читается как конец страницы. */}
+      <a
+        href="#how"
+        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/60 transition-colors hover:text-primary [@media(max-height:680px)]:hidden"
+        style={{ "--rise-delay": "1.5s" } as CSSProperties}
+      >
+        как это работает
+        <svg
+          width="14"
+          height="8"
+          viewBox="0 0 14 8"
+          fill="none"
+          aria-hidden="true"
+          className="motion-safe:animate-bounce"
+        >
+          <path
+            d="M1 1 L7 7 L13 1"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </a>
     </section>
   );
 }
