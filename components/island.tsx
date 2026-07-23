@@ -194,7 +194,11 @@ export function Island() {
   }, [])
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-6">
+    // md:my-auto — на десктопе короткий остров центрируется по вертикали вместо
+    // липания к верху над пустотой; длинный дневник прокручивается (auto-поля
+    // схлопываются в ноль, когда контент выше вьюпорта — без обрезки сверху).
+    // md:max-w-lg — острову-герою на широком экране дают чуть больше présence.
+    <div className="mx-auto flex w-full max-w-md flex-col gap-6 px-4 pb-28 pt-6 md:my-auto md:max-w-lg">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold tracking-tight">Остров</h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
