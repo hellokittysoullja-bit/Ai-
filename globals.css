@@ -1,0 +1,649 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: var(--font-manrope), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), monospace;
+  --font-hand: var(--font-caveat), cursive;
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-reward: var(--reward);
+  --color-reward-foreground: var(--reward-foreground);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+/* Dark-first brand theme: charcoal + off-white + lime accent */
+:root {
+  color-scheme: dark;
+  --background: oklch(0.17 0.008 130);
+  --foreground: oklch(0.96 0.008 110);
+  --card: oklch(0.21 0.01 130);
+  --card-foreground: oklch(0.96 0.008 110);
+  --popover: oklch(0.21 0.01 130);
+  --popover-foreground: oklch(0.96 0.008 110);
+  --primary: oklch(0.86 0.22 130);
+  --primary-foreground: oklch(0.18 0.02 130);
+  /* Золото награды: тёплый жёлтый — сильнейший визуальный дофаминовый
+     триггер для rare (Supercell/miHoYo). Только для редких находок,
+     чтобы не девальвировать: 10% палитры по правилу 60-30-10 */
+  --reward: oklch(0.85 0.15 88);
+  --reward-foreground: oklch(0.24 0.04 88);
+  --secondary: oklch(0.26 0.01 130);
+  --secondary-foreground: oklch(0.96 0.008 110);
+  --muted: oklch(0.26 0.01 130);
+  --muted-foreground: oklch(0.68 0.01 120);
+  --accent: oklch(0.3 0.015 130);
+  --accent-foreground: oklch(0.96 0.008 110);
+  --destructive: oklch(0.66 0.19 25);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.86 0.22 130);
+  --chart-1: oklch(0.86 0.22 130);
+  --chart-2: oklch(0.68 0.01 120);
+  --chart-3: oklch(0.5 0.01 120);
+  --chart-4: oklch(0.37 0.01 120);
+  --chart-5: oklch(0.27 0.01 120);
+  --radius: 1rem;
+  --sidebar: oklch(0.21 0.01 130);
+  --sidebar-foreground: oklch(0.96 0.008 110);
+  --sidebar-primary: oklch(0.86 0.22 130);
+  --sidebar-primary-foreground: oklch(0.18 0.02 130);
+  --sidebar-accent: oklch(0.26 0.01 130);
+  --sidebar-accent-foreground: oklch(0.96 0.008 110);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.86 0.22 130);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Плёночное зерно поверх тёмных секций — снимает стерильность плоских заливок */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E");
+}
+
+/* Зерно чуть плотнее именно в hero: первый экран держит взгляд дольше всех
+   остальных секций, лёгкая избыточная текстура здесь читается как
+   кинематографичность, а не грязь. Компаунд-селектор — выше специфичность
+   .grain::before без !important, порядок объявления в файле не важен. */
+.grain.grain-hero::before {
+  opacity: 0.7;
+}
+
+/* Каракуля-подчёркивание под ключевым словом */
+.scribble-underline {
+  position: relative;
+  white-space: nowrap;
+}
+.scribble-underline > svg {
+  position: absolute;
+  left: -2%;
+  bottom: -0.18em;
+  width: 104%;
+  height: 0.32em;
+  overflow: visible;
+}
+.scribble-underline path {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 4;
+  stroke-linecap: round;
+}
+
+/* Рукописный штрих РИСУЕТСЯ, а не появляется целиком: живой почерк.
+   pathLength="1" на пути нормализует длину — dash-анимация не зависит
+   от геометрии. Чистый CSS: работает и без JS. */
+@keyframes scribble-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.scribble-draw path {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: scribble-draw 0.5s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+  animation-delay: var(--scribble-delay, 1s);
+}
+@media (prefers-reduced-motion: reduce) {
+  .scribble-draw path {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Новый элемент острова: мягкая пульсация, 3 цикла, затем покой */
+@keyframes island-new-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.island-new-element {
+  animation: island-new-pulse 1.6s ease-in-out 3;
+}
+
+/* Прорастание элемента острова: пружинный вход снизу с overshoot */
+@keyframes island-grow {
+  0% {
+    transform: scale(0);
+  }
+  62% {
+    transform: scale(1.12);
+  }
+  82% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.island-grow {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards;
+}
+
+/* Новый элемент: и прорастает, и пульсирует (оба класса задают animation) */
+.island-grow.island-new-element {
+  animation:
+    island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards,
+    island-new-pulse 1.6s ease-in-out 0.7s 3;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .island-new-element,
+  .island-grow,
+  .island-grow.island-new-element {
+    animation: none;
+  }
+}
+
+/* Первый кадр «статика прежде скрипта»: весь контент уже в серверном HTML,
+   появление хореографирует чистый CSS — работает даже с выключенным JS */
+@keyframes hero-word-in {
+  from {
+    opacity: 0;
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  animation: hero-word-in 0.32s ease-out forwards;
+}
+
+@keyframes hero-rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-rise {
+  opacity: 0;
+  animation: hero-rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation-delay: var(--rise-delay, 0s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-word,
+  .hero-rise {
+    animation-duration: 0.01s;
+    animation-delay: 0s;
+  }
+}
+
+/* Тёплый «прогрев» H1 при появлении: слова проявляются в свете очага и
+   остывают до резкого текста. Тот же bottom-up salience (нестабильность
+   ловит взгляд раньше чтения), но светом МИРА, а не RGB-глитчем: прежняя
+   хроматическая аберрация была техно-эстетикой, чужой тёплому бренду. */
+@keyframes chroma-flash {
+  0% {
+    text-shadow:
+      0 0 22px oklch(0.75 0.15 65 / 0.45),
+      0 0 3px oklch(0.75 0.15 65 / 0.5);
+    filter: blur(0.5px);
+  }
+  55% {
+    text-shadow:
+      0 0 10px oklch(0.75 0.15 65 / 0.16),
+      0 0 1px oklch(0.75 0.15 65 / 0.2);
+    filter: blur(0);
+  }
+  100% {
+    text-shadow: none;
+    filter: blur(0);
+  }
+}
+.chroma-appear {
+  animation: chroma-flash 0.85s ease-out both;
+  animation-delay: 0.34s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .chroma-appear {
+    animation: none;
+  }
+}
+
+/* === App page-in transition ===
+   Плавный въезд при переходе лендинг → /app.
+   Не teleport — мир продолжается, ты просто вошёл внутрь.
+   once: анимируется только при первом рендере, не при SPA-навигации внутри /app. */
+@keyframes app-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.app-page-enter {
+  animation: app-page-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-page-enter {
+    animation-duration: 0.01s;
+  }
+}
+
+/* Иммерсивный фокус: пока идёт сессия (body[data-focus-immersive]), нижний
+   таб-бар уезжает вниз и становится некликабельным — экран фокуса остаётся
+   единственной сценой без конкурирующих путей выхода. Целим только нижний
+   апп-нав (aria-label), не шапку лендинга с тем же .glass-nav.
+   Плавно, чтобы возврат навигации на фазе 'done' не мигал. */
+nav[aria-label="Основная навигация"] {
+  transition:
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.4s ease;
+}
+body[data-focus-immersive] nav[aria-label="Основная навигация"] {
+  transform: translateY(100%);
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  nav[aria-label="Основная навигация"] {
+    transition: opacity 0.15s ease;
+  }
+  body[data-focus-immersive] nav[aria-label="Основная навигация"] {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   ЭТАП 1 (финал) — полировка без побочных эффектов
+   Принцип: ничего глобального, что может задеть чужие компоненты.
+   ========================================================================== */
+
+/* Фирменное выделение текста */
+::selection {
+  background: oklch(0.86 0.22 130);
+  color: oklch(0.18 0.02 130);
+}
+
+/* Доступность: видимый фокус только при клавиатурной навигации.
+   :where() даёт нулевую специфичность → ничего не переопределяет насильно.
+   outline — намеренно, не Tailwind-ring (box-shadow): у .glass свой
+   unlayered box-shadow, который молча перекрыл бы layered ring-утилиту
+   (та же ловушка каскада, что и с border-primary/50 в дневнике острова).
+   outline — отдельный слой рендера, .glass его никак не задевает. */
+:where(a, button, [role="button"], [data-slot="button"], input):focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Микро-отклик нажатия — OPT-IN класс .press.
+   НАВЕШИВАЕТСЯ ТОЛЬКО на CTA без собственного active-transform
+   («Попробовать», «Пойдём попробуем», «Начать» в шапке).
+   Не конфликтует с таб-баром, отправкой в чате, motion/react и т.д. */
+.press {
+  transition: transform 120ms ease;
+}
+.press:active {
+  transform: scale(0.97);
+}
+
+/* Плавный скролл к якорям («Как это работает») — только если motion разрешён.
+   На чат не влияет: там свой overflow-контейнер с явным scrollIntoView. */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .press {
+    transition: none;
+  }
+  .press:active {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   LIQUID GLASS — настоящий материал, не окрашенная граница.
+   Прошлая версия (border-white/12 bg-white/[0.04] backdrop-blur-sm) была
+   заметна только в вычисленных стилях: blur-sm = 4px не даёт заметного
+   преломления, а alpha 0.04 на тёмном фоне читается как «чуть светлее
+   серый». Настоящее стекло держится на трёх вещах разом:
+     1) сильный blur + saturate — видимое преломление того, что позади
+        (звёзды AppBackdrop, сцена hero) — это и есть эффект «стекла»;
+     2) блик по верхнему краю (inset box-shadow) — свет, поймавшийся
+        на кромке, то, что продаёт объём;
+     3) мягкая тень вовне — стекло приподнято над поверхностью, а не
+        нарисовано на ней.
+   .glass — материал (для статичных карточек/контейнеров).
+   .glass-interactive — + подъём/поимка primary-света на hover/active
+   (только для одноразовых CTA, не для toggle/segmented-control — тот же
+   принцип, что уже применён к чипам длительности в фокус-сессии).
+   ========================================================================== */
+.glass {
+  /* Кастомное свойство, а не голый Tailwind-утилити-класс border-*: у
+     Tailwind v4 утилиты лежат внутри @layer utilities, а этот класс —
+     нет (unlayered). По спецификации CSS unlayered-правила ВСЕГДА
+     побеждают layered, вне зависимости от специфичности и порядка —
+     border-primary/50 рядом с .glass молча проигрывал бы. Через
+     переменную любой вызывающий компонент задаёт цвет инлайн-стилем
+     (высшая специфичность для samого свойства), не воюя с каскадом. */
+  background: linear-gradient(
+    155deg,
+    oklch(1 0 0 / 0.12) 0%,
+    oklch(1 0 0 / 0.045) 55%,
+    oklch(1 0 0 / 0.02) 100%
+  );
+  backdrop-filter: blur(20px) saturate(165%);
+  border: 1px solid var(--glass-border, oklch(1 0 0 / 0.16));
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.2),
+    inset 0 0 24px oklch(1 0 0 / 0.025),
+    0 10px 28px -14px oklch(0 0 0 / 0.5);
+}
+
+.glass-interactive {
+  transition:
+    transform 220ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background 220ms ease;
+}
+.glass-interactive:hover {
+  /* Закон света: UI не светится — светится мир. Подъём отыгрывается
+     светлотой поверхности и чёрной тенью; лайм остаётся только тонкой
+     кромкой бордера (свет, пойманный на грани, — материал, не glow). */
+  border-color: oklch(0.86 0.22 130 / 0.45);
+  background: linear-gradient(
+    155deg,
+    oklch(1 0 0 / 0.19) 0%,
+    oklch(1 0 0 / 0.08) 55%,
+    oklch(1 0 0 / 0.03) 100%
+  );
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.28),
+    inset 0 0 24px oklch(1 0 0 / 0.03),
+    0 16px 32px -18px oklch(0 0 0 / 0.55);
+}
+.glass-interactive:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 90ms;
+}
+
+/* Тот же материал для «выбранного» toggle-состояния был бы шумом —
+   активная пилюля должна оставаться solid-primary для контраста. */
+
+@media (prefers-reduced-motion: reduce) {
+  .glass-interactive {
+    transition:
+      border-color 150ms ease,
+      background 150ms ease;
+  }
+  .glass-interactive:hover {
+    transform: none;
+  }
+}
+
+/* Плотный вариант для постоянного хрома (шапка/таб-бар): та же формула,
+   но заметно непрозрачнее — эти поверхности обязаны быть легко читаемы
+   поверх любого скроллящегося контента, decorативная лёгкость здесь не к месту. */
+.glass-nav {
+  background: linear-gradient(
+    180deg,
+    oklch(0.17 0.008 130 / 0.82) 0%,
+    oklch(0.17 0.008 130 / 0.68) 100%
+  );
+  backdrop-filter: blur(24px) saturate(160%);
+}
+
+/* Третий материальный ярус, не второй .glass. У обычного стекла нет
+   ранга — оно одинаково для карточки, кнопки и чата, поэтому важное
+   неотличимо от второстепенного по глубине. Этот класс — сознательно
+   редкий: один такой элемент на секцию, не больше, иначе ранг исчезает
+   так же, как исчезает акцент, если лаймовый — это весь текст. */
+/* Глубина резкости у звёзд острова: ближние чётче и ярче, дальние —
+   размыты и тусклее. Статичный fallback для prefers-reduced-motion —
+   SMIL <animate> поверх него мерцает, когда движение разрешено. */
+.star-far {
+  filter: blur(0.6px);
+  opacity: 0.35;
+}
+.star-mid {
+  filter: blur(0.2px);
+  opacity: 0.5;
+}
+
+.glass-highlight {
+  background: linear-gradient(
+    155deg,
+    oklch(0.86 0.22 130 / 0.16) 0%,
+    oklch(0.86 0.22 130 / 0.06) 55%,
+    oklch(1 0 0 / 0.02) 100%
+  );
+  backdrop-filter: blur(20px) saturate(165%);
+  border: 1px solid oklch(0.86 0.22 130 / 0.4);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.22),
+    inset 0 0 28px oklch(0.86 0.22 130 / 0.07),
+    0 0 48px -16px oklch(0.86 0.22 130 / 0.45);
+}
+
+/* ==========================================================================
+   ЭФФЕКТЫ Э4–Э7: свет мира касается интерфейса, мир получает глубину.
+   Все — с reduced-motion фолбэком; ни один не светится неоном (закон Р1).
+   ========================================================================== */
+
+/* Э4 · Лунный блик по стеклу: ОДИН проход при появлении элемента (не hover).
+   Тёплая кость лунного света (hue 95), никогда не лайм. */
+@keyframes glass-shine {
+  from { transform: translateX(-140%) skewX(-18deg); }
+  to { transform: translateX(260%) skewX(-18deg); }
+}
+.glass-shine {
+  position: relative;
+  overflow: hidden;
+}
+.glass-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    oklch(0.92 0.02 95 / 0.13) 50%,
+    transparent 100%
+  );
+  transform: translateX(-140%) skewX(-18deg);
+  animation: glass-shine 0.7s ease-out 1 both;
+  animation-delay: 1.7s;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-shine::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Э5 · Дыхание очага: тёплое пятно за существом пульсирует в такт его
+   дыханию (4s — тот же цикл, что scale-дыхание маскота). Диегетический
+   свет живёт; НЕ вешать на элемент с собственным translate — только на
+   вложенный слой без позиционных трансформов. */
+@keyframes hearth-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.07); opacity: 0.9; }
+}
+.hearth-breathe {
+  animation: hearth-breathe 4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hearth-breathe { animation: none; }
+}
+
+/* Э6 · Скролл-параллакс сцены: при уходе вниз небо отстаёт от контента —
+   мир становится глубже экрана. Прогрессивное улучшение: только браузеры
+   с scroll-driven animations, только при разрешённом движении. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .parallax-scene {
+      animation: parallax-scene linear both;
+      animation-timeline: scroll();
+      animation-range: 0 130svh;
+    }
+    .parallax-moon {
+      animation: parallax-moon linear both;
+      animation-timeline: scroll();
+      animation-range: 0 130svh;
+    }
+  }
+}
+@keyframes parallax-scene {
+  to { transform: translateY(10svh); }
+}
+@keyframes parallax-moon {
+  to { transform: translateY(16svh); }
+}
+
+/* Э7 · Облако у луны: едва заметный силуэт, дрейф 60s. Небо дышит,
+   не отвлекая: почти порог различимости. */
+@keyframes cloud-drift {
+  from { transform: translateX(-14px); }
+  to { transform: translateX(14px); }
+}
+.cloud-drift {
+  animation: cloud-drift 60s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud-drift { animation: none; }
+}
+
+/* ==========================================================================
+   СЛОЙ «ИСКУССТВО»: двухточечный свет, пылинки, тепло на стекле.
+   ========================================================================== */
+
+/* А5 · Пылинки в лунном свете: живут в viewport-слое луны (не в slice-сцене
+   — урок светлячков), дрейфуют медленно, почти на пороге различимости */
+@keyframes mote-drift {
+  from { transform: translate(0, 0); }
+  to { transform: translate(7px, 16px); }
+}
+.mote {
+  animation: mote-drift 16s ease-in-out infinite alternate;
+}
+.mote-2 {
+  animation-duration: 21s;
+  animation-delay: -8s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mote { animation: none; }
+}
+
+/* А7 · Стекло у очага: ближний к сцене пузырь ловит тепло нижней кромкой —
+   та же формула .glass + едва тёплый внутренний отсвет снизу. Свет мира
+   касается материала (закон Р1), это не UI-glow. */
+.glass-hearthside {
+  background: linear-gradient(
+    155deg,
+    oklch(1 0 0 / 0.12) 0%,
+    oklch(1 0 0 / 0.045) 55%,
+    oklch(0.72 0.17 55 / 0.03) 100%
+  );
+  backdrop-filter: blur(20px) saturate(165%);
+  border: 1px solid var(--glass-border, oklch(1 0 0 / 0.16));
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.2),
+    inset 0 -12px 26px -20px oklch(0.72 0.17 55 / 0.5),
+    inset 0 0 24px oklch(1 0 0 / 0.025),
+    0 10px 28px -14px oklch(0 0 0 / 0.5);
+}
