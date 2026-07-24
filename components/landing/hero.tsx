@@ -9,7 +9,7 @@ import {
   useReducedMotion,
   useSpring,
 } from "motion/react";
-import { Loader2 } from "lucide-react";
+import { ArrowRight, Loader2 } from "lucide-react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene, Moon } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
@@ -534,6 +534,27 @@ export function Hero() {
                 ),
               )}
             </AnimatePresence>
+
+            {/* К-А · Диалог замыкается действием: после ответа существа в
+                чате появляется кнопка-продолжение — раньше разговор был
+                тупиком («Пойдём, покажу» — и ничего). Тихий glass-highlight:
+                командный лайм остаётся за главным CTA ниже */}
+            {ctaBoost && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={SPRING_SNAPPY}
+                className="self-start"
+              >
+                <Link
+                  href="/app"
+                  className="glass-highlight press inline-flex items-center gap-1.5 rounded-2xl rounded-tl-sm px-4 py-2.5 text-sm font-semibold text-primary"
+                >
+                  Пойдём попробуем
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              </motion.div>
+            )}
 
             {/* Ряд «поля письма»: слева рукописная приписка к реплике
                 напарника (стрелка вверх — на его пузырь: он придёт первым,

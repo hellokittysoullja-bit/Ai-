@@ -51,11 +51,13 @@ export function SectionNav() {
           <span className="pointer-events-none absolute right-6 whitespace-nowrap rounded-md border border-white/10 bg-card/90 px-2.5 py-1 font-mono text-[10px] tracking-wider text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
             {s.label}
           </span>
+          {/* Размер через scale (не w/h — layout-анимация), свойства
+              перечислены, без UI-glow (закон света Р1) */}
           <span
-            className={`block rounded-full transition-all duration-300 ${
+            className={`block size-3 rounded-full transition-[transform,background-color] duration-300 ${
               active === s.id
-                ? "h-3 w-3 bg-primary shadow-[0_0_8px_oklch(0.86_0.22_130/0.7)]"
-                : "h-2 w-2 bg-muted-foreground/35 group-hover:bg-muted-foreground/70"
+                ? "scale-100 bg-primary"
+                : "scale-[0.67] bg-muted-foreground/35 group-hover:bg-muted-foreground/70"
             }`}
           />
         </a>
