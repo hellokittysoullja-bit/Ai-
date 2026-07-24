@@ -326,6 +326,14 @@ export function MascotSvg({
           <stop offset="55%" stopColor={WARM} stopOpacity="0.06" />
           <stop offset="100%" stopColor={WARM} stopOpacity="0" />
         </radialGradient>
+        {/* А1 · Второй источник света: холодный лунный rim справа-сверху.
+            Двухточечное освещение (тёплый ближний + холодный дальний) —
+            базовый киноприём постановки кадра */}
+        <radialGradient id={`${uid}-moonrim`} cx="0.92" cy="0.06" r="0.85">
+          <stop offset="0%" stopColor="oklch(0.86 0.05 230)" stopOpacity="0.15" />
+          <stop offset="45%" stopColor="oklch(0.86 0.05 230)" stopOpacity="0.04" />
+          <stop offset="100%" stopColor="oklch(0.86 0.05 230)" stopOpacity="0" />
+        </radialGradient>
         <radialGradient id={`${uid}-top`} cx="0.42" cy="0.2" r="0.75">
           <stop offset="0%" stopColor={SHEEN} stopOpacity="0.5" />
           <stop offset="55%" stopColor={SHEEN} stopOpacity="0" />
@@ -383,6 +391,7 @@ export function MascotSvg({
       <use href={`#${uid}-body`} fill={`url(#${uid}-top)`} />
       <use href={`#${uid}-body`} fill={`url(#${uid}-bot)`} />
       <use href={`#${uid}-body`} fill={`url(#${uid}-rim)`} />
+      <use href={`#${uid}-body`} fill={`url(#${uid}-moonrim)`} />
       {/* тёплое пятно на груди */}
       <g clipPath={`url(#${uid}-bodyclip)`}>
         <ellipse

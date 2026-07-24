@@ -481,6 +481,7 @@ export function FocusSession() {
                   key={chip}
                   type="button"
                   onClick={() => setTask(chip)}
+                  aria-pressed={task === chip}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     task === chip
                       ? 'border-primary bg-primary text-primary-foreground'
@@ -643,9 +644,10 @@ export function FocusSession() {
           {hideDigits ? (
             <p className="font-hand text-3xl text-muted-foreground">время идёт — я слежу</p>
           ) : (
+            // U1: без aria-live — role="timer" имеет implicit "off";
+            // polite означал объявление КАЖДОЙ секунды скринридером
             <div
               role="timer"
-              aria-live="polite"
               className="text-7xl font-bold tabular-nums tracking-tight"
             >
               {mm}:{ss}
@@ -658,10 +660,11 @@ export function FocusSession() {
             />
           </div>
           <div className="flex items-center gap-4">
+            {/* U2: min-h-11 + padding — честная тап-зона 44px (Fitts) */}
             <button
               type="button"
               onClick={toggleDigits}
-              className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
+              className="min-h-11 px-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
             >
               {hideDigits ? 'показать цифры' : 'спрятать цифры'}
             </button>
@@ -669,7 +672,7 @@ export function FocusSession() {
               type="button"
               onClick={toggleAmbient}
               aria-pressed={ambientOn}
-              className={`font-mono text-[10px] uppercase tracking-widest underline-offset-2 hover:underline ${
+              className={`min-h-11 px-2 font-mono text-[11px] uppercase tracking-widest underline-offset-2 hover:underline ${
                 ambientOn ? 'text-primary' : 'text-muted-foreground'
               }`}
             >
@@ -682,7 +685,7 @@ export function FocusSession() {
             variant="ghost"
             size="sm"
             onClick={() => finish(true)}
-            className="text-muted-foreground"
+            className="h-11 px-5 text-sm text-muted-foreground"
           >
             Закончить раньше
           </Button>
@@ -784,7 +787,7 @@ export function FocusSession() {
               size="lg"
               onClick={saveTomorrowPlan}
               disabled={!tomorrowTask.trim() || !tomorrowStep.trim()}
-              className="font-semibold"
+              className="h-11 font-semibold"
             >
               Положить план
             </Button>

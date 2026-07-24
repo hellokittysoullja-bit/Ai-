@@ -183,11 +183,22 @@ export function HomeScreen() {
   const [checkinState, setCheckinState] = useState<CheckinState>("unsupported");
   const [checkinBusy, setCheckinBusy] = useState(false);
 
+  // U5: enableCheckins может вернуть "available" при выданном разрешении —
+  // это значит, что нужна установка PWA. Без подсказки кнопка была тупиком:
+  // тап → ничего не меняется → тап → ничего.
+  const [checkinHint, setCheckinHint] = useState(false);
   async function turnOnCheckins() {
     setCheckinBusy(true);
     const next = await enableCheckins();
     setCheckinState(next);
     setCheckinBusy(false);
+    if (
+      next === "available" &&
+      typeof Notification !== "undefined" &&
+      Notification.permission === "granted"
+    ) {
+      setCheckinHint(true);
+    }
   }
 
   // reduceMotion объявляем первым — используется ниже
@@ -359,6 +370,13 @@ export function HomeScreen() {
               >
                 {checkinBusy ? "Секунду…" : "Да, махай мне"}
               </Button>
+              {checkinHint && (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Почти получилось: чтобы я мог писать первым, добавь меня на
+                  экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
+                  раз.
+                </p>
+              )}
             </div>
           )}
 
@@ -399,7 +417,7 @@ export function HomeScreen() {
                   </Link>
                 ))}
               </div>
-              <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground/50">
+              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                 Каждый старт растит остров →
               </p>
             </div>

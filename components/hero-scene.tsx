@@ -264,9 +264,12 @@ export function HeroScene() {
           вьюпортах: позиция точечного яркого объекта в slice-сцене
           непредсказуема. Живой свет мира — очаг, огонёк хвоста и луна. */}
 
-      {/* передний план: трава у нижней кромки КЛАСТЕРАМИ по 3–4 стебля.
-          Одинокие разбросанные стебли читались царапинами на экране —
-          пучки с разной высотой читаются растительностью. */}
+      {/* Травяных штрихов в сцене больше НЕТ: на низких вьюпортах (SE 667)
+          нижняя кромка slice-сцены поднимается под чат — стебли вылезали
+          «царапинами» за пузырём. Точечные объекты в slice-сцене
+          непредсказуемы (тот же урок, что луна и светлячки). Травяная
+          кромка живёт в ground-continuation слое у самого низа hero
+          (hero.tsx) — там она всегда под контентом. */}
       <rect
         x="0"
         y="884"
@@ -274,26 +277,6 @@ export function HeroScene() {
         height="16"
         fill="oklch(0.15 0.014 135)"
       />
-      <g stroke="oklch(0.15 0.014 135)" strokeLinecap="round" fill="none">
-        {/* пучок 1 */}
-        <path d="M60 896 Q64 858 74 846" strokeWidth="7" />
-        <path d="M74 896 Q76 866 70 854" strokeWidth="6" />
-        <path d="M88 896 Q92 862 102 852" strokeWidth="7" />
-        <path d="M101 896 Q102 874 97 866" strokeWidth="5" />
-        {/* пучок 2 */}
-        <path d="M304 898 Q308 866 318 856" strokeWidth="7" />
-        <path d="M318 898 Q320 874 314 864" strokeWidth="6" />
-        <path d="M331 898 Q334 870 342 860" strokeWidth="6" />
-        {/* пучок 3 */}
-        <path d="M528 898 Q532 862 542 850" strokeWidth="8" />
-        <path d="M543 898 Q545 872 539 860" strokeWidth="6" />
-        <path d="M556 898 Q560 866 570 856" strokeWidth="7" />
-        <path d="M569 898 Q570 878 565 870" strokeWidth="5" />
-        {/* пучок 4 */}
-        <path d="M724 896 Q728 860 738 850" strokeWidth="7" />
-        <path d="M738 896 Q740 870 734 860" strokeWidth="6" />
-        <path d="M751 896 Q754 868 762 858" strokeWidth="6" />
-      </g>
 
       {/* Шов с LandingBackdrop под сценой намеренно без fade: низ холма
           oklch(0.2 0.01 130) и верх фона (~0.19 0.016 155) перцептивно
@@ -320,7 +303,7 @@ export function GroundPool({ className }: { className?: string }) {
     >
       <defs>
         <radialGradient id="gp-pool" cx="0.5" cy="0.4" r="0.62">
-          <stop offset="0%" stopColor="oklch(0.27 0.022 132)" />
+          <stop offset="0%" stopColor="oklch(0.285 0.032 95)" />
           <stop
             offset="55%"
             stopColor="oklch(0.23 0.016 130)"
@@ -481,6 +464,12 @@ export function MascotStatic({
           <stop offset="0%" stopColor={WARM} stopOpacity="0.28" />
           <stop offset="55%" stopColor={WARM} stopOpacity="0.08" />
           <stop offset="100%" stopColor={WARM} stopOpacity="0" />
+        </radialGradient>
+        {/* А1: холодный лунный rim — второй источник света (кино-постановка) */}
+        <radialGradient id="ms-moonrim" cx="0.92" cy="0.06" r="0.85">
+          <stop offset="0%" stopColor="oklch(0.86 0.05 230)" stopOpacity="0.15" />
+          <stop offset="45%" stopColor="oklch(0.86 0.05 230)" stopOpacity="0.04" />
+          <stop offset="100%" stopColor="oklch(0.86 0.05 230)" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="ms-top" cx="0.42" cy="0.2" r="0.75">
           <stop offset="0%" stopColor={SHEEN} stopOpacity="0.5" />
@@ -647,6 +636,7 @@ export function MascotStatic({
         <use href="#ms-body" fill="url(#ms-top)" />
         <use href="#ms-body" fill="url(#ms-bot)" />
         <use href="#ms-body" fill="url(#ms-rim)" />
+        <use href="#ms-body" fill="url(#ms-moonrim)" />
         {/* тёплое пятно на груди */}
         <g clipPath="url(#ms-bodyclip)">
           <ellipse cx={100} cy={142} rx={30} ry={27} fill="url(#ms-chest)" />

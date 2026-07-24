@@ -357,7 +357,8 @@ export function Island() {
 
       {starts !== null && count > 0 && count < LANDMARK_COUNT && (
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
-          Призрачные очертания — то, что вырастет за следующие старты. Всё уже ждёт тебя.
+          Призрачные очертания — то, что вырастет за следующие старты. Всё уже
+          ждёт тебя. Коснись острова — вспомню, как что появилось.
         </p>
       )}
 

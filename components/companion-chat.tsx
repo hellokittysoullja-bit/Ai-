@@ -32,9 +32,10 @@ type CompanionChatProps = {
 }
 
 function CompanionAvatar() {
+  // Кружок-подложка: тёмный кот на тёмном фоне читался пятнышком
   return (
-    <div className="flex size-8 shrink-0 items-center justify-center">
-      <MascotSvg expression="calm" size={34} />
+    <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80">
+      <MascotSvg expression="calm" size={30} />
     </div>
   )
 }
@@ -166,9 +167,12 @@ export function CompanionChat({
     saveChatMessages(messages)
   }, [messages, status])
 
+  // U4: скроллим по факту нового сообщения, а не на каждый чанк стрима —
+  // scrollIntoView на каждом токене дёргал ленту
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length, status])
 
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
@@ -189,7 +193,10 @@ export function CompanionChat({
           примыкают к шапке, а свободное место уходит вниз к полю ввода — это
           нормальный «пустой чат в ожидании», а не разрыв. Overflow и autoscroll
           на bottomRef не затронуты. */}
-      <div className="flex flex-1 flex-col justify-end overflow-y-auto md:justify-start">
+      {/* U3: сообщения растут сверху, инпут прижат к таб-бару (sticky) —
+          прежний justify-end на мобиле прижимал одинокий гритинг к низу и
+          оставлял мёртвую дыру посреди экрана */}
+      <div className="flex flex-1 flex-col overflow-y-auto">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
             className="flex items-start gap-2"
@@ -371,7 +378,7 @@ export function CompanionChat({
           e.preventDefault()
           submit()
         }}
-        className="border-t border-border bg-background px-4 py-3 pb-20"
+        className="sticky bottom-16 z-10 border-t border-border bg-background/92 px-4 py-3 backdrop-blur-md"
       >
         <div className="mx-auto flex max-w-md items-center gap-2">
           <input
