@@ -2,12 +2,18 @@
 
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, useReducedMotion } from "motion/react";
+import {
+  motion,
+  AnimatePresence,
+  LayoutGroup,
+  useReducedMotion,
+} from "motion/react";
 import { Loader2 } from "lucide-react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
-import { GroundPool, HeroScene } from "@/components/hero-scene";
+import { GroundPool, HeroScene, Moon } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
 import { SPRING_SNAPPY } from "@/lib/motion";
+import { hapticDone } from "@/lib/haptics";
 
 /**
  * Первый экран: одна плотная композиция вместо двух зон, разбросанных по
@@ -18,8 +24,9 @@ import { SPRING_SNAPPY } from "@/lib/motion";
  * Иерархия (сверху вниз, ни одного дубля):
  * - H1 — голос персонажа: «Начать — самое трудное. Я прихожу первым»
  *   с рукописным подчёркиванием слова-обещания (bespoke-деталь);
- * - под подзаголовком — рукописная пометка «даже если ты пропал на неделю»
- *   со стрелкой вверх на обещание H1 — расширяет его, а не повторяет;
+ * - слева от чипов ответа — рукописная пометка «даже если ты пропал на
+ *   неделю» со стрелкой вверх на пузырь напарника: он придёт первым,
+ *   даже если ты пропал — расширяет обещание H1, а не повторяет его;
  * - на lg+ — две колонки: оффер слева, существо и чат справа;
  * - подзаголовок — конкретика механики + дифференциатор «без стриков, без стыда»;
  * - живой чат-вход: существо здоровается, ты отвечаешь премиальной репликой —
@@ -48,7 +55,12 @@ type ReplyKey = keyof typeof REPLIES;
 
 const INTRO_CHOICE_KEY = "naparnik:intro";
 
-type SceneStep = { kind: "companion" | "visitor"; text: string };
+type SceneStep = {
+  kind: "companion" | "visitor";
+  text: string;
+  /** Для FLIP-морфа: реплика-ответ наследует layoutId своего чипа */
+  replyKey?: ReplyKey;
+};
 
 function WordReveal({
   text,
@@ -147,6 +159,20 @@ export function Hero() {
   // (:disabled — псевдокласс нативных форм, у <a> его не бывает).
   const [navigating, setNavigating] = useState(false);
 
+  // Э2 · Погладить кота: ни одно касание экрана не должно быть мёртвым.
+  // Тап → искренний восторг (искры, широкие зрачки, виляние хвостом) +
+  // едва ощутимая хаптика. Таймер сбрасывается при повторных тапах.
+  const petTimerRef = useRef<number | null>(null);
+  function petCat() {
+    hapticDone();
+    setExpression("excited");
+    if (petTimerRef.current) window.clearTimeout(petTimerRef.current);
+    petTimerRef.current = window.setTimeout(
+      () => setExpression("calm"),
+      1600,
+    );
+  }
+
   function choose(key: ReplyKey) {
     setAnswered(true);
     setExpression("happy");
@@ -155,7 +181,7 @@ export function Hero() {
     } catch {
       // приватный режим — не критично
     }
-    setSteps([{ kind: "visitor", text: REPLIES[key].visitor }]);
+    setSteps([{ kind: "visitor", text: REPLIES[key].visitor, replyKey: key }]);
     setTimeout(() => {
       setSteps((prev) => [
         ...prev,
@@ -167,7 +193,9 @@ export function Hero() {
   return (
     <section
       id="hero"
-      className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6"
+      // calc(100svh - 3.5rem): sticky-шапка h-14 съедает верх вьюпорта —
+      // с чистым 100svh низ секции (и скролл-хинт) выталкивались за экран
+      className="grain grain-hero relative flex min-h-[calc(100svh-3.5rem)] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6"
     >
       {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон.
           ВАЖНО: высота сцены зафиксирована 100svh, а не inset-0. На мобильном
@@ -177,9 +205,65 @@ export function Hero() {
           высотой композиция сцены совпадает с задуманной при любом контенте. */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-0 h-[100svh]"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[calc(100svh-3.5rem)]"
       >
-        <HeroScene />
+        {/* Э6 · Параллакс: при скролле небо отстаёт от контента (сцена
+            +10svh, луна +16svh к концу первого экрана) — мир глубже экрана.
+            Только браузеры со scroll-driven animations, только motion-safe */}
+        <div className="parallax-scene h-full w-full">
+          <HeroScene />
+        </div>
+        {/* Луна привязана к углу вьюпорта, а не к slice-сцене: видна целиком
+            на любом экране, никогда не сталкивается с котом и текстом */}
+        <div className="parallax-moon absolute right-1 top-6 w-24 md:right-[5%] md:top-[7%] md:w-28">
+          {/* Э7 · Облако: едва заметный силуэт дрейфует у луны, 60s цикл.
+              Классическая форма кучевого облачка: ровный тонкий низ + два
+              мягких бугра сверху — первый вариант из трёх эллипсов в ряд
+              читался «сигарой», особенно на десктопе */}
+          <svg
+            viewBox="0 0 140 44"
+            className="cloud-drift absolute -left-20 top-12 w-28 opacity-[0.05]"
+          >
+            <g fill="oklch(0.9 0.01 210)">
+              <ellipse cx="70" cy="34" rx="52" ry="7" />
+              <ellipse cx="52" cy="24" rx="24" ry="12" />
+              <ellipse cx="88" cy="27" rx="18" ry="9" />
+            </g>
+          </svg>
+          <Moon className="w-full" />
+        </div>
+      </div>
+
+      {/* Продолжение земли под сценой: на мобильном hero длиннее 100svh,
+          и без этого слоя зона ответов и CTA висела на плоском чёрном фоне —
+          мир заканчивался на первом экране. Градиент продолжает тон холма
+          вниз, травяная кромка прижимает низ hero к земле. На вьюпортах,
+          где hero = 100svh, слой схлопывается в ноль и не рендерит ничего. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 bottom-0 top-[calc(100svh-3.5rem)] overflow-hidden"
+      >
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to bottom, oklch(0.2 0.01 130) 0%, oklch(0.185 0.012 138) 55%, oklch(0.19 0.016 148) 100%)",
+          }}
+        />
+        <svg
+          className="absolute inset-x-0 bottom-0 h-10 w-full"
+          viewBox="0 0 400 40"
+          preserveAspectRatio="none"
+        >
+          <g stroke="oklch(0.155 0.014 135)" strokeLinecap="round" fill="none">
+            <path d="M36 40 Q39 18 46 10" strokeWidth="5" />
+            <path d="M46 40 Q48 24 44 16" strokeWidth="4" />
+            <path d="M57 40 Q60 26 66 20" strokeWidth="4" />
+            <path d="M338 40 Q342 16 350 8" strokeWidth="5" />
+            <path d="M350 40 Q352 26 347 18" strokeWidth="4" />
+            <path d="M361 40 Q364 22 371 14" strokeWidth="4" />
+          </g>
+        </svg>
       </div>
 
       <div className="relative flex w-full max-w-md flex-col items-center gap-4 text-center lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,1fr)_minmax(0,27rem)] lg:items-center lg:gap-x-16 lg:text-left">
@@ -193,11 +277,11 @@ export function Hero() {
             className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none"
             style={{ "--rise-delay": "0.32s" } as CSSProperties}
           >
-            {/* Хроматическая вспышка сходится в резкий текст ровно к моменту,
-              когда начинает рисоваться каракуля-подчёркивание (0.95s) —
-              взгляд сперва «фокусируется», потом ловит штрих */}
+            {/* Тёплый «прогрев» слов остывает до резкого текста ровно к
+              моменту, когда начинает рисоваться каракуля (0.95s) — взгляд
+              сперва ловит проявление света, потом штрих */}
             <span className="chroma-appear">
-              Начать — самое трудное. Я&nbsp;прихожу{" "}
+              Начать — самое трудное. Я прихожу{" "}
               <span
                 className="scribble-underline scribble-draw text-primary"
                 style={{ "--scribble-delay": "0.95s" } as CSSProperties}
@@ -213,10 +297,13 @@ export function Hero() {
                     pathLength={1}
                   />
                   {/* Второй проход штриха: настоящая каракуля рисуется в два
-                    движения с разным нажимом — идеальная дуга выдаёт машину */}
+                    движения с разным нажимом — идеальная дуга выдаёт машину.
+                    Только с md: на мобильном кегле два штриха сливались в
+                    одну жирную полосу-маркер */}
                   <path
                     d="M4 10 Q 30 6 55 8 T 97 9"
                     pathLength={1}
+                    className="hidden md:block"
                     style={{
                       strokeWidth: 2.5,
                       opacity: 0.55,
@@ -234,53 +321,14 @@ export function Hero() {
             className="hero-rise order-3 text-pretty text-base leading-relaxed text-foreground/70 md:text-lg lg:order-none"
             style={{ "--rise-delay": "0.46s" } as CSSProperties}
           >
-            Напарник сидит рядом, пока ты работаешь, и растит остров из твоих
+            {/* Первое лицо, как и H1: два голоса в одном кадре — шов.
+                Имя продукта остаётся в шапке прямо над заголовком */}
+            Я сижу рядом, пока ты работаешь, и&nbsp;выращиваю остров из твоих
             стартов.{" "}
             <span className="whitespace-nowrap font-medium text-foreground/95">
               Без стриков. Без стыда.
             </span>
           </p>
-
-          {/* Рукописная заметка на полях: расширяет обещание H1, стрелка
-              указывает вверх — на «прихожу первым». Раньше жила в чат-колонке
-              и на мобильном тыкала стрелкой в лес между чипами и CTA —
-              семантический якорь был потерян. Тёплый цвет пера, не лайм:
-              лайм в кадре остаётся за «первым» и CTA */}
-          <div
-            className="hero-rise order-4 flex items-start gap-1.5 self-center pl-1 lg:order-none lg:self-start"
-            style={
-              {
-                "--rise-delay": "0.55s",
-                color: "oklch(0.85 0.15 88 / 0.85)",
-              } as CSSProperties
-            }
-          >
-            <svg
-              viewBox="0 0 20 24"
-              className="mt-0.5 h-5 w-4 shrink-0 opacity-80"
-              fill="none"
-              aria-hidden="true"
-            >
-              <path
-                d="M16 22 Q 6 18 7 5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-              <path
-                d="M3 10 L7 4 L11 9"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <p className="-rotate-2 font-hand text-lg leading-tight">
-              даже если ты
-              <br />
-              пропал на неделю
-            </p>
-          </div>
 
           {/* Главный CTA: на мобильном — последний в кадре (order-5), на
             десктопе — в текстовой колонке сразу под оффером */}
@@ -304,10 +352,11 @@ export function Hero() {
                   }
                   setNavigating(true);
                 }}
-                // Закон света: UI не светится — светится мир (костёр, глаза,
-                // rare). Элевация CTA — чёрной тенью; заметность — светлотой
-                // самой заливки (primary и так ярчайшая поверхность кадра).
-                className="press w-full max-w-xs font-semibold shadow-[0_14px_28px_-14px_oklch(0_0_0/0.65)] sm:w-auto sm:px-10"
+                // Закон света: UI не светится неоном — но и не плоский.
+                // Объём леденца: блик по верхней кромке + тёплая тень нижней
+                // грани внутри заливки + чёрная тень вовне. Заметность — у
+                // самой светлоты primary, ярчайшей поверхности кадра.
+                className="press w-full max-w-xs font-semibold shadow-[inset_0_1px_0_oklch(1_0_0/0.45),inset_0_-8px_16px_-10px_oklch(0.55_0.18_130/0.6),0_14px_28px_-14px_oklch(0_0_0/0.6)] sm:w-auto sm:px-10"
               >
                 {navigating ? (
                   <>
@@ -329,17 +378,32 @@ export function Hero() {
           {/* Существо в пятне света очага. На коротких экранах сцена
             ужимается, чтобы CTA оставался над сгибом */}
           <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none [@media(max-height:740px)]:scale-90">
+            {/* Э5 · Очаг дышит: внешний div держит позиционирование
+                (translate), внутренний — только scale-пульс в такт дыханию
+                кота. Очаг ТЁПЛЫЙ (hue 55): лайм зарезервирован за глазами,
+                «первым» и CTA */}
             <div
               aria-hidden="true"
-              className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 -translate-y-1/4 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.86_0.22_130/0.22)_0%,transparent_70%)] blur-2xl"
-            />
-            <MascotSvg
-              expression={expression}
-              size={196}
-              label="Напарник — пушистое существо с зелёными глазами"
-              className="relative z-10"
-            />
-            <GroundPool className="-mt-10 -mb-12" />
+              className="pointer-events-none absolute left-1/2 top-0 h-56 w-56 -translate-x-1/2 -translate-y-1/4"
+            >
+              <div className="hearth-breathe h-full w-full rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.22)_0%,transparent_70%)] blur-2xl" />
+            </div>
+            {/* Э2 · Кот гладится: кнопка без визуального хрома, отклик —
+                сам персонаж (восторг + хаптика) */}
+            <button
+              type="button"
+              onClick={petCat}
+              aria-label="Погладить напарника"
+              className="press relative z-10 cursor-pointer rounded-full outline-offset-8"
+            >
+              <MascotSvg
+                expression={expression}
+                size={196}
+                label=""
+                className="lg:origin-bottom lg:scale-[1.15]"
+              />
+            </button>
+            <GroundPool className="-mt-12 -mb-12" />
           </div>
 
           {/* Живой чат-вход: он здоровается, ты отвечаешь — премиальная реплика */}
@@ -348,14 +412,15 @@ export function Hero() {
             style={{ "--rise-delay": "0.62s" } as CSSProperties}
             aria-live="polite"
           >
+            {/* LayoutGroup — общий контекст FLIP-морфа: layoutId чипа и
+                реплики должны жить в одной группе */}
+            <LayoutGroup>
             {/* Атрибуция реплики: на десктопе пузырь висит прямо под существом —
-                работает хвостик. На мобильном между котом и чатом лежат H1 и
-                подзаголовок: хвостик указывал в текст, и реплика была «ничья».
-                Мини-аватар слева возвращает голос владельцу без стрелок в пустоту. */}
-            <div className="flex items-end gap-2 self-start">
-              <div className="shrink-0 lg:hidden">
-                <MascotSvg expression="calm" size={30} label="" />
-              </div>
+                работает хвостик. На мобильном атрибуцию несут сама фраза
+                («Привет. Я Напарник») и живой кот в шапке — аватар у пузыря
+                был третьим котом в кадре и снят по правилу «убери один
+                аксессуар» (выбор владельца, вариант Б). */}
+            <div className="flex self-start">
               <div className="glass relative max-w-[92%] rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
                 <svg
                   aria-hidden="true"
@@ -394,9 +459,17 @@ export function Hero() {
                     />
                   </motion.div>
                 ) : (
+                  // Э3 · Морф-приёмник: реплика наследует layoutId чипа —
+                  // выбранный чип физически перелетает и становится
+                  // сообщением (непрерывность объекта, не телепорт)
                   <motion.div
                     key={i}
-                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                    layoutId={
+                      step.replyKey ? `reply-${step.replyKey}` : undefined
+                    }
+                    initial={
+                      step.replyKey ? false : { opacity: 0, y: 12, scale: 0.97 }
+                    }
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={SPRING_SNAPPY}
                     className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_20px_-10px_oklch(0_0_0/0.6)]"
@@ -409,29 +482,72 @@ export function Hero() {
               )}
             </AnimatePresence>
 
-            {!answered && (
-              <div className="flex flex-wrap justify-end gap-2 pt-0.5">
-                {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
-                  <Link
-                    key={key}
-                    href="/app"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      choose(key);
-                    }}
-                    // Микро-магнетизм: существо радуется, когда ты тянешься ответить —
-                    // сцена откликается на намерение раньше действия (живая, не картинка)
-                    onMouseEnter={() => setExpression("happy")}
-                    onMouseLeave={() => setExpression("calm")}
-                    className="group glass glass-interactive press rounded-2xl rounded-br-md px-5 py-3 text-[15px] font-medium text-foreground hover:text-primary"
-                  >
-                    {REPLIES[key].visitor}
-                  </Link>
-                ))}
+            {/* Ряд «поля письма»: слева рукописная приписка к реплике
+                напарника (стрелка вверх — на его пузырь: он придёт первым,
+                даже если ты пропал), справа — чипы твоих ответов. Заметка
+                больше не рвёт поток по центру и не тычет стрелкой в лес. */}
+            <div className="flex flex-col items-start gap-3 pt-0.5 min-[360px]:flex-row min-[360px]:items-start">
+              <div
+                className="flex min-w-0 flex-1 items-start gap-1.5 pl-1"
+                style={{ color: "oklch(0.85 0.15 88 / 0.85)" }}
+              >
+                <svg
+                  viewBox="0 0 20 24"
+                  className="mt-0.5 h-5 w-4 shrink-0 opacity-80"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="M16 22 Q 6 18 7 5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                  <path
+                    d="M3 10 L7 4 L11 9"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                <p className="-rotate-2 text-left font-hand text-lg leading-tight">
+                  даже если ты
+                  <br />
+                  пропал на&nbsp;неделю
+                </p>
               </div>
-            )}
-
+              <AnimatePresence>
+                {!answered && (
+                  <motion.div
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="flex shrink-0 flex-col items-end gap-2 self-end min-[360px]:self-auto"
+                  >
+                    {(Object.keys(REPLIES) as ReplyKey[]).map((key) => (
+                      // Э3+Э4 · Чип: настоящая кнопка (не Link с preventDefault),
+                      // при выборе FLIP-морфится в отправленную реплику через
+                      // layoutId; при появлении по стеклу проходит лунный блик
+                      <motion.button
+                        key={key}
+                        type="button"
+                        layoutId={`reply-${key}`}
+                        onClick={() => choose(key)}
+                        // Микро-магнетизм: существо радуется, когда ты тянешься
+                        // ответить — сцена откликается на намерение раньше действия
+                        onMouseEnter={() => setExpression("happy")}
+                        onMouseLeave={() => setExpression("calm")}
+                        className="group glass glass-interactive glass-shine press whitespace-nowrap rounded-2xl rounded-br-md px-4 py-3 text-[15px] font-medium text-foreground hover:text-primary"
+                      >
+                        {REPLIES[key].visitor}
+                      </motion.button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
+            </LayoutGroup>
+          </div>
         </div>
       </div>
 
@@ -439,17 +555,17 @@ export function Hero() {
           нижняя кромка читается как конец страницы. */}
       <a
         href="#how"
-        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/80 transition-colors hover:text-primary [@media(max-height:680px)]:hidden"
+        // К1: полный muted (4.6:1 на мелком кегле) вместо /80 (~3.5:1)
+        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground transition-colors hover:text-primary [@media(max-height:560px)]:hidden"
         style={{ "--rise-delay": "1.5s" } as CSSProperties}
       >
-        как это работает
+        листай — покажу
         <svg
           width="14"
           height="8"
           viewBox="0 0 14 8"
           fill="none"
           aria-hidden="true"
-          className="motion-safe:animate-bounce"
         >
           <path
             d="M1 1 L7 7 L13 1"
