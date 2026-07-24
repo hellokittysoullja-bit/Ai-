@@ -517,3 +517,93 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     inset 0 0 28px oklch(0.86 0.22 130 / 0.07),
     0 0 48px -16px oklch(0.86 0.22 130 / 0.45);
 }
+
+/* ==========================================================================
+   ЭФФЕКТЫ Э4–Э7: свет мира касается интерфейса, мир получает глубину.
+   Все — с reduced-motion фолбэком; ни один не светится неоном (закон Р1).
+   ========================================================================== */
+
+/* Э4 · Лунный блик по стеклу: ОДИН проход при появлении элемента (не hover).
+   Тёплая кость лунного света (hue 95), никогда не лайм. */
+@keyframes glass-shine {
+  from { transform: translateX(-140%) skewX(-18deg); }
+  to { transform: translateX(260%) skewX(-18deg); }
+}
+.glass-shine {
+  position: relative;
+  overflow: hidden;
+}
+.glass-shine::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 45%;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    oklch(0.92 0.02 95 / 0.13) 50%,
+    transparent 100%
+  );
+  transform: translateX(-140%) skewX(-18deg);
+  animation: glass-shine 0.7s ease-out 1 both;
+  animation-delay: 1.7s;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .glass-shine::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Э5 · Дыхание очага: тёплое пятно за существом пульсирует в такт его
+   дыханию (4s — тот же цикл, что scale-дыхание маскота). Диегетический
+   свет живёт; НЕ вешать на элемент с собственным translate — только на
+   вложенный слой без позиционных трансформов. */
+@keyframes hearth-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.07); opacity: 0.9; }
+}
+.hearth-breathe {
+  animation: hearth-breathe 4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hearth-breathe { animation: none; }
+}
+
+/* Э6 · Скролл-параллакс сцены: при уходе вниз небо отстаёт от контента —
+   мир становится глубже экрана. Прогрессивное улучшение: только браузеры
+   с scroll-driven animations, только при разрешённом движении. */
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .parallax-scene {
+      animation: parallax-scene linear both;
+      animation-timeline: scroll();
+      animation-range: 0 130svh;
+    }
+    .parallax-moon {
+      animation: parallax-moon linear both;
+      animation-timeline: scroll();
+      animation-range: 0 130svh;
+    }
+  }
+}
+@keyframes parallax-scene {
+  to { transform: translateY(10svh); }
+}
+@keyframes parallax-moon {
+  to { transform: translateY(16svh); }
+}
+
+/* Э7 · Облако у луны: едва заметный силуэт, дрейф 60s. Небо дышит,
+   не отвлекая: почти порог различимости. */
+@keyframes cloud-drift {
+  from { transform: translateX(-14px); }
+  to { transform: translateX(14px); }
+}
+.cloud-drift {
+  animation: cloud-drift 60s ease-in-out infinite alternate;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cloud-drift { animation: none; }
+}
