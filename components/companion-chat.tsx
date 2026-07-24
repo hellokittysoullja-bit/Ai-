@@ -181,11 +181,15 @@ export function CompanionChat({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* justify-end: сообщения примыкают к полю ввода, не зависают у
-          верха с пустотой внизу — короткий чат (1-2 реплики) выглядит
-          обжитым, а не оборванным. Переполнение по-прежнему скроллится
-          нормально, autoscroll на bottomRef ниже не задет. */}
-      <div className="flex flex-1 flex-col justify-end overflow-y-auto">
+      {/* justify-end на мобильном: сообщения примыкают к полю ввода, короткий
+          чат (1-2 реплики) выглядит обжитым, а не оборванным. На десктопе
+          (md:justify-start) высота вьюпорта велика — при justify-end единственная
+          реплика улетала к низу, а между ней и приветствием-шапкой зияла
+          пропасть, читавшаяся как «не прогрузилось». Сверху вниз реплики
+          примыкают к шапке, а свободное место уходит вниз к полю ввода — это
+          нормальный «пустой чат в ожидании», а не разрыв. Overflow и autoscroll
+          на bottomRef не затронуты. */}
+      <div className="flex flex-1 flex-col justify-end overflow-y-auto md:justify-start">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
             className="flex items-start gap-2"
