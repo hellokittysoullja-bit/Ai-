@@ -51,6 +51,21 @@ export function MascotSvg({
   const uid = useId();
   const [blink, setBlink] = useState(false);
 
+  // Перф-гейт: на лендинге живёт 5+ инстансов существа — без observer
+  // каждый слушал pointermove/scroll и моргал, даже стоя за кадром.
+  // Глаза и таймеры работают только у видимых котов.
+  const [inView, setInView] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      ([entry]) => setInView(entry.isIntersecting),
+      { rootMargin: "120px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
   const sleepy = expression === "sleepy";
   const focused = expression === "focused";
   const happy = expression === "happy";
@@ -61,7 +76,7 @@ export function MascotSvg({
   const py = useSpring(0, { stiffness: 140, damping: 16 });
 
   useEffect(() => {
-    if (reduceMotion || sleepy) {
+    if (reduceMotion || sleepy || !inView) {
       px.set(0);
       py.set(0);
       return;
@@ -79,14 +94,14 @@ export function MascotSvg({
     };
     window.addEventListener("pointermove", onMove, { passive: true });
     return () => window.removeEventListener("pointermove", onMove);
-  }, [reduceMotion, sleepy, px, py]);
+  }, [reduceMotion, sleepy, inView, px, py]);
 
   /* Э1 · Взгляд за скроллом: на таче pointermove мёртв — существо следило
      за курсором только на десктопе. Теперь листаешь — кот провожает
      взглядом (вниз/вверх по направлению), через полсекунды покоя глаза
      возвращаются к центру. Пружины те же, что у курсора. */
   useEffect(() => {
-    if (reduceMotion || sleepy) return;
+    if (reduceMotion || sleepy || !inView) return;
     let lastY = window.scrollY;
     let settle: ReturnType<typeof setTimeout>;
     const onScroll = () => {
@@ -102,11 +117,11 @@ export function MascotSvg({
       window.removeEventListener("scroll", onScroll);
       clearTimeout(settle);
     };
-  }, [reduceMotion, sleepy, py]);
+  }, [reduceMotion, sleepy, inView, py]);
 
   /* Моргание со случайным интервалом */
   useEffect(() => {
-    if (reduceMotion || sleepy) return;
+    if (reduceMotion || sleepy || !inView) return;
     let alive = true;
     let t: ReturnType<typeof setTimeout>;
     let t2: ReturnType<typeof setTimeout>;
@@ -130,7 +145,7 @@ export function MascotSvg({
       clearTimeout(t);
       clearTimeout(t2);
     };
-  }, [reduceMotion, sleepy]);
+  }, [reduceMotion, sleepy, inView]);
 
   const eye = (side: "l" | "r") => {
     const { x, y } = side === "l" ? EYE_L : EYE_R;

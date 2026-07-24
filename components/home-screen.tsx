@@ -10,13 +10,21 @@ import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
   getCompanionName,
+  getFinds,
   getPatterns,
   getPlan,
+  getStarts,
   saveCompanionName,
   todayKey,
   type Patterns,
   type Plan,
 } from "@/lib/memory";
+import {
+  ISLAND_ELEMENT_NAMES,
+  ISLAND_POOL,
+  LANDMARK_COUNT,
+} from "@/lib/island-elements";
+import { landmarkAnchors, landmarkNodes } from "@/lib/island-sprites";
 import {
   enableCheckins,
   getCheckinState,
@@ -53,15 +61,36 @@ const awayDiary = [
   "Я развёл костёр и просто ждал. Это не упрёк — я рад, что ты зашёл.",
 ];
 
+type IntroChoice = "procrastinate" | "curious" | null;
+
 function buildFirstWord(
   plan: Plan | null,
   patterns: Patterns,
   now: Date,
   companionName: string | null,
+  intro: IntroChoice = null,
+  lastFindName: string | null = null,
 ): FirstWord {
   const hour = now.getHours();
   const isEvening = hour >= 18 || hour < 4;
   const today = todayKey(now);
+
+  // М3 · Ночная весточка: новый день должен приносить новизну (R1).
+  // Вчера был — сегодня кот рассказывает, что было ночью. Вариативно
+  // (по дню и числу стартов), привязано к реальному острову.
+  const dayN = Math.floor(now.getTime() / 86_400_000);
+  const nightTales = [
+    lastFindName
+      ? `Ночью «${lastFindName}» тихо стояла под звёздами — я сторожил. `
+      : "Ночью остров тихо дышал под звёздами — я сторожил. ",
+    "Под утро над островом пролетела падающая звезда. Хороший знак. ",
+    "Ночью море было гладкое, как стекло. Остров ждёт первый старт дня. ",
+    lastFindName
+      ? `Мне ночью показалось, что «${lastFindName}» подросла. Проверим после старта? `
+      : "К утру на берегу прибавилось ракушек. Остров живёт. ",
+  ];
+  const nightLine =
+    patterns.daysAway === 1 ? nightTales[(patterns.totalStarts + dayN) % nightTales.length] : "";
 
   // Прощение как дефолт (механика Duolingo без её кнута): пауза — это
   // просто пауза. Длинная — дневник острова, короткая — тихая радость.
@@ -115,6 +144,24 @@ function buildFirstWord(
   // рвёт обещание «попробуй одно крошечное дело — увидишь» и убивает
   // весь эффект нулевого трения до первого старта.
   if (patterns.totalStarts === 0) {
+    // К-В · Тёплый старт: выбор, сделанный в диалоге на лендинге, продолжает
+    // разговор здесь — раньше он сохранялся и никогда не читался
+    if (intro === "procrastinate") {
+      return {
+        greeting:
+          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Выбери шаг ниже, я рядом.",
+        actionStep: null,
+        showStarterChips: true,
+      };
+    }
+    if (intro === "curious") {
+      return {
+        greeting:
+          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов. Попробуй один крошечный шаг — увидишь, как это работает.",
+        actionStep: null,
+        showStarterChips: true,
+      };
+    }
     return {
       greeting:
         "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
@@ -132,7 +179,7 @@ function buildFirstWord(
   }
 
   return {
-    greeting: `${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -153,8 +200,10 @@ function buildChatGreeting(
     return "Это наш чат. Вечером кладём план, днём дробим шаги, всегда — без стыда.";
   }
   const who = companionName ?? "Я";
-  const startsWord =
-    totalStarts === 1 ? "старт" : totalStarts < 5 ? "старта" : "стартов";
+  if (totalStarts === 1) {
+    return `${who} тут. Помню твой первый старт — пиши, что нужно.`;
+  }
+  const startsWord = totalStarts < 5 ? "старта" : "стартов";
   return `${who} тут. Помню ${totalStarts} твоих ${startsWord} — пиши, что нужно.`;
 }
 
@@ -231,13 +280,31 @@ export function HomeScreen() {
           ? "sleepy"
           : "calm";
 
+  const [lastStepLabel, setLastStepLabel] = useState<string | null>(null);
+  const [rareFound, setRareFound] = useState(0);
+
   async function refresh() {
-    const [plan, patterns, name] = await Promise.all([
+    const [plan, patterns, name, starts, finds] = await Promise.all([
       getPlan(),
       getPatterns(),
       getCompanionName(),
+      getStarts(),
+      getFinds(),
     ]);
-    setFirstWord(buildFirstWord(plan, patterns, new Date(), name));
+    const lastStart = starts.length > 0 ? starts[starts.length - 1] : null;
+    setLastStepLabel(lastStart?.label ?? null);
+    setRareFound(finds.filter((f) => f.rarity === "rare").length);
+    const lastFind = finds.length > 0 ? finds[finds.length - 1].name : null;
+    let intro: IntroChoice = null;
+    try {
+      const saved = window.localStorage.getItem("naparnik:intro");
+      if (saved === "procrastinate" || saved === "curious") intro = saved;
+    } catch {
+      /* приватный режим */
+    }
+    setFirstWord(
+      buildFirstWord(plan, patterns, new Date(), name, intro, lastFind),
+    );
     setStats(patterns);
     setCompanionName(name);
     setNameLoaded(true);
@@ -401,6 +468,48 @@ export function HomeScreen() {
             </Button>
           )}
 
+          {/* К-Б → М1 · Главное действие в ОДИН тап и с нулевым решением:
+              опытный пользователь получал больше трения, чем новичок
+              (3 тапа против 1). Повтор последнего шага — мгновенный старт;
+              «Другое дело» — путь в сетап для нового */}
+          {stats &&
+            stats.totalStarts > 0 &&
+            !firstWord?.actionStep &&
+            !firstWord?.showStarterChips && (
+              <div className="flex flex-col gap-2">
+                <Button
+                  size="lg"
+                  className="w-full gap-2 font-semibold"
+                  onClick={() =>
+                    lastStepLabel
+                      ? router.push(
+                          `/app/session?step=${encodeURIComponent(lastStepLabel)}&d=15`,
+                        )
+                      : router.push("/app/session")
+                  }
+                >
+                  <Play className="size-4" aria-hidden="true" />
+                  {lastStepLabel
+                    ? `Повторить: «${
+                        lastStepLabel.length > 22
+                          ? lastStepLabel.slice(0, 21).trimEnd() + "…"
+                          : lastStepLabel
+                      }»`
+                    : "Начать сессию"}
+                </Button>
+                {lastStepLabel && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 self-center text-muted-foreground"
+                    onClick={() => router.push("/app/session")}
+                  >
+                    Другое дело
+                  </Button>
+                )}
+              </div>
+            )}
+
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">
               <p className="text-xs leading-relaxed text-muted-foreground">
@@ -423,23 +532,44 @@ export function HomeScreen() {
             </div>
           )}
 
-          {/* Одна служебная строка на экран: предвкушение находки — или тихий итог.
-              Обещание без таймера сгорания: не сделал — ничего не потерял. */}
+          {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
+              Дома (раньше — только в Мире). До 10-го старта — следующий
+              ориентир с призрачным силуэтом; дальше — счёт редких находок */}
           {stats && stats.totalStarts > 0 && (
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              {stats.lastStartDate !== todayKey(new Date()) ? (
-                <span className="text-primary">
-                  Первый старт дня ещё впереди — за ним находка для острова.
-                </span>
+            <Link
+              href="/app/world"
+              className="glass press flex items-center gap-3 rounded-2xl px-4 py-2.5"
+            >
+              {stats.totalStarts < LANDMARK_COUNT ? (
+                <>
+                  <svg
+                    viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
+                    className="h-9 w-9 shrink-0 opacity-60 saturate-[0.35]"
+                    aria-hidden="true"
+                  >
+                    {landmarkNodes[stats.totalStarts]}
+                  </svg>
+                  <span className="min-w-0 text-sm leading-snug text-muted-foreground">
+                    Следующий старт вырастит{" "}
+                    <span className="font-semibold text-foreground">
+                      «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                    </span>
+                    {stats.lastStartDate === todayKey(new Date())
+                      ? " — остров уже вырос сегодня, смотри →"
+                      : " →"}
+                  </span>
+                </>
               ) : (
-                <Link
-                  href="/app/world"
-                  className="font-medium text-primary underline-offset-2 hover:underline"
-                >
-                  Остров вырос — смотри &rarr;
-                </Link>
+                <span className="text-sm leading-snug text-muted-foreground">
+                  Редких находок:{" "}
+                  <span className="font-semibold text-reward">
+                    {rareFound} из{" "}
+                    {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
+                  </span>{" "}
+                  — полная сессия повышает шанс →
+                </span>
               )}
-            </p>
+            </Link>
           )}
         </div>
       </section>

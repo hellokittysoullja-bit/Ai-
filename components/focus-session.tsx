@@ -654,9 +654,11 @@ export function FocusSession() {
             </div>
           )}
           <div className="h-1.5 w-64 overflow-hidden rounded-full bg-secondary">
+            {/* scaleX вместо width: width-анимация каждый тик — layout+paint
+                (гейт 14); transform живёт на GPU */}
             <div
-              className="h-full rounded-full bg-primary transition-all duration-1000"
-              style={{ width: `${progress * 100}%` }}
+              className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-1000 ease-linear"
+              style={{ transform: `scaleX(${progress})` }}
             />
           </div>
           <div className="flex items-center gap-4">
