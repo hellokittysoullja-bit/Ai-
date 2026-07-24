@@ -260,20 +260,21 @@
   }
 }
 
-/* Хроматическая аберрация H1 при появлении: RGB-расслоение сходится в
-   резкий текст за 0.65s — глаз цепляется за нестабильность раньше, чем
-   успевает читать (bottom-up salience), затем текст «фокусируется». */
+/* Тёплый «прогрев» H1 при появлении: слова проявляются в свете очага и
+   остывают до резкого текста. Тот же bottom-up salience (нестабильность
+   ловит взгляд раньше чтения), но светом МИРА, а не RGB-глитчем: прежняя
+   хроматическая аберрация была техно-эстетикой, чужой тёплому бренду. */
 @keyframes chroma-flash {
   0% {
     text-shadow:
-      -4px 0 oklch(0.7 0.25 29 / 0.55),
-      4px 0 oklch(0.6 0.2 230 / 0.55);
-    filter: blur(0.6px);
+      0 0 22px oklch(0.75 0.15 65 / 0.45),
+      0 0 3px oklch(0.75 0.15 65 / 0.5);
+    filter: blur(0.5px);
   }
-  45% {
+  55% {
     text-shadow:
-      -1.5px 0 oklch(0.7 0.25 29 / 0.2),
-      1.5px 0 oklch(0.6 0.2 230 / 0.2);
+      0 0 10px oklch(0.75 0.15 65 / 0.16),
+      0 0 1px oklch(0.75 0.15 65 / 0.2);
     filter: blur(0);
   }
   100% {
@@ -282,7 +283,7 @@
   }
 }
 .chroma-appear {
-  animation: chroma-flash 0.65s ease-out both;
+  animation: chroma-flash 0.85s ease-out both;
   animation-delay: 0.34s;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -438,18 +439,21 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     background 220ms ease;
 }
 .glass-interactive:hover {
+  /* Закон света: UI не светится — светится мир. Подъём отыгрывается
+     светлотой поверхности и чёрной тенью; лайм остаётся только тонкой
+     кромкой бордера (свет, пойманный на грани, — материал, не glow). */
   border-color: oklch(0.86 0.22 130 / 0.45);
   background: linear-gradient(
     155deg,
-    oklch(1 0 0 / 0.17) 0%,
-    oklch(0.86 0.22 130 / 0.1) 55%,
+    oklch(1 0 0 / 0.19) 0%,
+    oklch(1 0 0 / 0.08) 55%,
     oklch(1 0 0 / 0.03) 100%
   );
   transform: translateY(-2px);
   box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.26),
-    inset 0 0 24px oklch(0.86 0.22 130 / 0.04),
-    0 18px 40px -16px oklch(0.86 0.22 130 / 0.4);
+    inset 0 1px 0 oklch(1 0 0 / 0.28),
+    inset 0 0 24px oklch(1 0 0 / 0.03),
+    0 16px 32px -18px oklch(0 0 0 / 0.55);
 }
 .glass-interactive:active {
   transform: translateY(0) scale(0.97);
