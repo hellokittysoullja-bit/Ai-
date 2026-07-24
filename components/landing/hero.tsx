@@ -18,8 +18,8 @@ import { SPRING_SNAPPY } from "@/lib/motion";
  * Иерархия (сверху вниз, ни одного дубля):
  * - H1 — голос персонажа: «Начать — самое трудное. Я прихожу первым»
  *   с рукописным подчёркиванием слова-обещания (bespoke-деталь);
- * - рядом с чатом — рукописная пометка «даже если ты пропал на неделю» —
- *   расширяет обещание H1, а не повторяет его;
+ * - под подзаголовком — рукописная пометка «даже если ты пропал на неделю»
+ *   со стрелкой вверх на обещание H1 — расширяет его, а не повторяет;
  * - на lg+ — две колонки: оффер слева, существо и чат справа;
  * - подзаголовок — конкретика механики + дифференциатор «без стриков, без стыда»;
  * - живой чат-вход: существо здоровается, ты отвечаешь премиальной репликой —
@@ -169,8 +169,16 @@ export function Hero() {
       id="hero"
       className="grain grain-hero relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden px-4 pb-20 pt-6"
     >
-      {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+      {/* Атмосфера: ночная сцена с луной и звёздами — иммерсивный фон.
+          ВАЖНО: высота сцены зафиксирована 100svh, а не inset-0. На мобильном
+          hero выше вьюпорта (контент переполняет min-h), и slice-кроп растягивал
+          сцену вертикально: луна опускалась на линию земли, холмы и трава
+          уезжали в зону CTA, звёзды мобильной полосы — за кадр. С фиксированной
+          высотой композиция сцены совпадает с задуманной при любом контенте. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[100svh]"
+      >
         <HeroScene />
       </div>
 
@@ -189,7 +197,7 @@ export function Hero() {
               когда начинает рисоваться каракуля-подчёркивание (0.95s) —
               взгляд сперва «фокусируется», потом ловит штрих */}
             <span className="chroma-appear">
-              Начать — самое трудное. Я прихожу{" "}
+              Начать — самое трудное. Я&nbsp;прихожу{" "}
               <span
                 className="scribble-underline scribble-draw text-primary"
                 style={{ "--scribble-delay": "0.95s" } as CSSProperties}
@@ -228,10 +236,51 @@ export function Hero() {
           >
             Напарник сидит рядом, пока ты работаешь, и растит остров из твоих
             стартов.{" "}
-            <span className="font-medium text-foreground/95">
+            <span className="whitespace-nowrap font-medium text-foreground/95">
               Без стриков. Без стыда.
             </span>
           </p>
+
+          {/* Рукописная заметка на полях: расширяет обещание H1, стрелка
+              указывает вверх — на «прихожу первым». Раньше жила в чат-колонке
+              и на мобильном тыкала стрелкой в лес между чипами и CTA —
+              семантический якорь был потерян. Тёплый цвет пера, не лайм:
+              лайм в кадре остаётся за «первым» и CTA */}
+          <div
+            className="hero-rise order-4 flex items-start gap-1.5 self-center pl-1 lg:order-none lg:self-start"
+            style={
+              {
+                "--rise-delay": "0.55s",
+                color: "oklch(0.85 0.15 88 / 0.85)",
+              } as CSSProperties
+            }
+          >
+            <svg
+              viewBox="0 0 20 24"
+              className="mt-0.5 h-5 w-4 shrink-0 opacity-80"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M16 22 Q 6 18 7 5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+              <path
+                d="M3 10 L7 4 L11 9"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <p className="-rotate-2 font-hand text-lg leading-tight">
+              даже если ты
+              <br />
+              пропал на неделю
+            </p>
+          </div>
 
           {/* Главный CTA: на мобильном — последний в кадре (order-5), на
             десктопе — в текстовой колонке сразу под оффером */}
@@ -255,11 +304,10 @@ export function Hero() {
                   }
                   setNavigating(true);
                 }}
-                className={`press w-full max-w-xs font-semibold shadow-[0_12px_36px_-12px_oklch(0.86_0.22_130/0.55)] transition-shadow duration-500 sm:w-auto sm:px-10 ${
-                  ctaBoost
-                    ? "shadow-[0_16px_44px_-10px_oklch(0.86_0.22_130/0.75)]"
-                    : ""
-                }`}
+                // Закон света: UI не светится — светится мир (костёр, глаза,
+                // rare). Элевация CTA — чёрной тенью; заметность — светлотой
+                // самой заливки (primary и так ярчайшая поверхность кадра).
+                className="press w-full max-w-xs font-semibold shadow-[0_14px_28px_-14px_oklch(0_0_0/0.65)] sm:w-auto sm:px-10"
               >
                 {navigating ? (
                   <>
@@ -271,7 +319,7 @@ export function Hero() {
                 )}
               </Button>
             </motion.div>
-            <span className="font-mono text-xs tracking-wide text-muted-foreground/75">
+            <span className="text-[13px] font-medium text-muted-foreground">
               бесплатно · без карты и регистрации
             </span>
           </div>
@@ -300,27 +348,34 @@ export function Hero() {
             style={{ "--rise-delay": "0.62s" } as CSSProperties}
             aria-live="polite"
           >
-            <div className="glass relative max-w-[92%] self-start rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
-              {/* Хвостик пузыря указывает вверх, на существо — без него реплика
-                «ничья» и висит между котом и кнопками */}
-              <svg
-                aria-hidden="true"
-                viewBox="0 0 14 10"
-                className="absolute -top-[9px] left-7 h-[10px] w-[14px] text-white/25"
-              >
-                <path
-                  d="M2 10 Q 5 4 12 1"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
+            {/* Атрибуция реплики: на десктопе пузырь висит прямо под существом —
+                работает хвостик. На мобильном между котом и чатом лежат H1 и
+                подзаголовок: хвостик указывал в текст, и реплика была «ничья».
+                Мини-аватар слева возвращает голос владельцу без стрелок в пустоту. */}
+            <div className="flex items-end gap-2 self-start">
+              <div className="shrink-0 lg:hidden">
+                <MascotSvg expression="calm" size={30} label="" />
+              </div>
+              <div className="glass relative max-w-[92%] rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 14 10"
+                  className="absolute -top-[9px] left-7 hidden h-[10px] w-[14px] text-white/25 lg:block"
+                >
+                  <path
+                    d="M2 10 Q 5 4 12 1"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <WordReveal
+                  text={OPENING_LINE}
+                  startDelay={0.85}
+                  className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
                 />
-              </svg>
-              <WordReveal
-                text={OPENING_LINE}
-                startDelay={0.85}
-                className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
-              />
+              </div>
             </div>
 
             <AnimatePresence initial={false}>
@@ -344,7 +399,7 @@ export function Hero() {
                     initial={{ opacity: 0, y: 12, scale: 0.97 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     transition={SPRING_SNAPPY}
-                    className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_24px_-8px_oklch(0.86_0.22_130/0.5)]"
+                    className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-primary px-5 py-2.5 shadow-[0_8px_20px_-10px_oklch(0_0_0/0.6)]"
                   >
                     <p className="text-sm font-semibold leading-relaxed text-primary-foreground">
                       {step.text}
@@ -376,45 +431,7 @@ export function Hero() {
               </div>
             )}
 
-            {/* Рукописная заметка на полях: расширяет обещание H1, а не
-              повторяет его. Тёплый цвет пера, не лайм: лайм в кадре
-              остаётся за «первым» и CTA */}
-            <div
-              className="hero-rise flex items-start gap-1.5 self-start pl-1"
-              style={
-                {
-                  "--rise-delay": "1.2s",
-                  color: "oklch(0.85 0.15 88 / 0.85)",
-                } as CSSProperties
-              }
-            >
-              <svg
-                viewBox="0 0 20 24"
-                className="mt-0.5 h-5 w-4 shrink-0 opacity-80"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M16 22 Q 6 18 7 5"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M3 10 L7 4 L11 9"
-                  stroke="currentColor"
-                  strokeWidth="1.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              <p className="-rotate-2 font-hand text-lg leading-tight">
-                даже если ты
-                <br />
-                пропал на неделю
-              </p>
             </div>
-          </div>
         </div>
       </div>
 
@@ -422,7 +439,7 @@ export function Hero() {
           нижняя кромка читается как конец страницы. */}
       <a
         href="#how"
-        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/60 transition-colors hover:text-primary [@media(max-height:680px)]:hidden"
+        className="hero-rise absolute bottom-4 left-1/2 flex -translate-x-1/2 flex-col items-center gap-1 font-mono text-xs uppercase tracking-[0.2em] text-muted-foreground/80 transition-colors hover:text-primary [@media(max-height:680px)]:hidden"
         style={{ "--rise-delay": "1.5s" } as CSSProperties}
       >
         как это работает
