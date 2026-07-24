@@ -7,6 +7,7 @@ import {
   AnimatePresence,
   LayoutGroup,
   useReducedMotion,
+  useSpring,
 } from "motion/react";
 import { Loader2 } from "lucide-react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
@@ -14,6 +15,7 @@ import { GroundPool, HeroScene, Moon } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
 import { SPRING_SNAPPY } from "@/lib/motion";
 import { hapticDone } from "@/lib/haptics";
+import { playPurr } from "@/lib/reward-sound";
 
 /**
  * Первый экран: одна плотная композиция вместо двух зон, разбросанных по
@@ -159,12 +161,37 @@ export function Hero() {
   // (:disabled — псевдокласс нативных форм, у <a> его не бывает).
   const [navigating, setNavigating] = useState(false);
 
+  const reduceMotion = useReducedMotion();
+
+  // А6 · Глубина за курсором (десктоп): слои сцены едва смещаются за
+  // мышью с ленивой пружиной — кадр получает объём (приём tvOS/дорогих
+  // лендингов). Луна дальше — двигается сильнее (обратный параллакс дали).
+  const sceneX = useSpring(0, { stiffness: 40, damping: 18 });
+  const sceneY = useSpring(0, { stiffness: 40, damping: 18 });
+  const moonX = useSpring(0, { stiffness: 40, damping: 18 });
+  const moonY = useSpring(0, { stiffness: 40, damping: 18 });
+  useEffect(() => {
+    if (reduceMotion) return;
+    if (!window.matchMedia("(pointer: fine)").matches) return;
+    const onMove = (e: PointerEvent) => {
+      const nx = e.clientX / window.innerWidth - 0.5;
+      const ny = e.clientY / window.innerHeight - 0.5;
+      sceneX.set(nx * -8);
+      sceneY.set(ny * -5);
+      moonX.set(nx * -15);
+      moonY.set(ny * -9);
+    };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    return () => window.removeEventListener("pointermove", onMove);
+  }, [reduceMotion, sceneX, sceneY, moonX, moonY]);
+
   // Э2 · Погладить кота: ни одно касание экрана не должно быть мёртвым.
   // Тап → искренний восторг (искры, широкие зрачки, виляние хвостом) +
   // едва ощутимая хаптика. Таймер сбрасывается при повторных тапах.
   const petTimerRef = useRef<number | null>(null);
   function petCat() {
     hapticDone();
+    playPurr();
     setExpression("excited");
     if (petTimerRef.current) window.clearTimeout(petTimerRef.current);
     petTimerRef.current = window.setTimeout(
@@ -211,11 +238,24 @@ export function Hero() {
             +10svh, луна +16svh к концу первого экрана) — мир глубже экрана.
             Только браузеры со scroll-driven animations, только motion-safe */}
         <div className="parallax-scene h-full w-full">
-          <HeroScene />
+          {/* А6: мышиная глубина живёт на вложенном слое (scale 1.03 прячет
+              кромки при сдвиге), scroll-параллакс — на внешнем: трансформы
+              не воюют */}
+          <motion.div
+            style={{ x: sceneX, y: sceneY, scale: 1.03 }}
+            className="h-full w-full"
+          >
+            <HeroScene />
+          </motion.div>
         </div>
         {/* Луна привязана к углу вьюпорта, а не к slice-сцене: видна целиком
             на любом экране, никогда не сталкивается с котом и текстом */}
         <div className="parallax-moon absolute right-1 top-6 w-24 md:right-[5%] md:top-[7%] md:w-28">
+          <motion.div style={{ x: moonX, y: moonY }} className="relative">
+          {/* А5 · Пылинки в лунном свете: живут в viewport-слое (урок
+              светлячков — не в slice-сцене), дрейф на пороге различимости */}
+          <span className="mote absolute left-[16%] top-[64%] size-[3px] rounded-full bg-[oklch(0.9_0.03_95)] opacity-[0.17]" />
+          <span className="mote mote-2 absolute left-[42%] top-[46%] size-[2px] rounded-full bg-[oklch(0.9_0.03_95)] opacity-[0.12]" />
           {/* Э7 · Облако: едва заметный силуэт дрейфует у луны, 60s цикл.
               Классическая форма кучевого облачка: ровный тонкий низ + два
               мягких бугра сверху — первый вариант из трёх эллипсов в ряд
@@ -231,6 +271,7 @@ export function Hero() {
             </g>
           </svg>
           <Moon className="w-full" />
+          </motion.div>
         </div>
       </div>
 
@@ -274,7 +315,7 @@ export function Hero() {
           {/* Промис голосом персонажа: первая фраза — боль, вторая —
             обещание от первого лица. Каракуля — под словом обещания */}
           <h1
-            className="hero-rise order-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none"
+            className="hero-rise order-2 mt-2 text-balance text-[2.6rem] font-bold leading-[1.03] tracking-tight md:text-5xl lg:order-none lg:mt-0"
             style={{ "--rise-delay": "0.32s" } as CSSProperties}
           >
             {/* Тёплый «прогрев» слов остывает до резкого текста ровно к
@@ -316,9 +357,11 @@ export function Hero() {
             </span>
           </h1>
 
-          {/* Подзаголовок: конкретика + дифференциатор */}
+          {/* Подзаголовок: конкретика + дифференциатор. Визуально ТИШЕ
+              заголовка на два шага (кегль, тон, ширина колонки): на экране
+              один главный текст — обещание H1; sub объясняет, не спорит */}
           <p
-            className="hero-rise order-3 text-pretty text-base leading-relaxed text-foreground/70 md:text-lg lg:order-none"
+            className="hero-rise order-3 max-w-[36ch] text-pretty text-[15px] leading-relaxed text-foreground/60 md:text-base lg:order-none lg:max-w-[44ch]"
             style={{ "--rise-delay": "0.46s" } as CSSProperties}
           >
             {/* Первое лицо, как и H1: два голоса в одном кадре — шов.
@@ -333,7 +376,7 @@ export function Hero() {
           {/* Главный CTA: на мобильном — последний в кадре (order-5), на
             десктопе — в текстовой колонке сразу под оффером */}
           <div
-            className="hero-rise order-5 mt-1 flex w-full flex-col items-center gap-2.5 lg:order-none lg:items-start"
+            className="hero-rise order-5 mt-3 flex w-full flex-col items-center gap-2.5 lg:order-none lg:mt-1 lg:items-start"
             style={{ "--rise-delay": "0.78s" } as CSSProperties}
           >
             <motion.div
@@ -356,7 +399,15 @@ export function Hero() {
                 // Объём леденца: блик по верхней кромке + тёплая тень нижней
                 // грани внутри заливки + чёрная тень вовне. Заметность — у
                 // самой светлоты primary, ярчайшей поверхности кадра.
-                className="press w-full max-w-xs font-semibold shadow-[inset_0_1px_0_oklch(1_0_0/0.45),inset_0_-8px_16px_-10px_oklch(0.55_0.18_130/0.6),0_14px_28px_-14px_oklch(0_0_0/0.6)] sm:w-auto sm:px-10"
+                // rounded-2xl: радиус единый с чипами и пузырём. А4: после
+                // ответа в диалоге кнопка «нагревается» — тёплая нижняя грань
+                // усиливается (событийное изменение, дофаминовый мостик
+                // диалог → действие), переход мягкий 700мс
+                className={`press w-full max-w-xs rounded-2xl font-semibold transition-shadow duration-700 sm:w-auto sm:px-10 ${
+                  ctaBoost
+                    ? "shadow-[inset_0_1px_0_oklch(1_0_0/0.5),inset_0_-9px_18px_-9px_oklch(0.68_0.17_75/0.75),0_14px_30px_-14px_oklch(0_0_0/0.6)]"
+                    : "shadow-[inset_0_1px_0_oklch(1_0_0/0.45),inset_0_-8px_16px_-10px_oklch(0.55_0.18_130/0.6),0_14px_28px_-14px_oklch(0_0_0/0.6)]"
+                }`}
               >
                 {navigating ? (
                   <>
@@ -421,7 +472,9 @@ export function Hero() {
                 был третьим котом в кадре и снят по правилу «убери один
                 аксессуар» (выбор владельца, вариант Б). */}
             <div className="flex self-start">
-              <div className="glass relative max-w-[92%] rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
+              {/* А7: ближний к сцене пузырь ловит тепло очага нижней кромкой
+                  стекла — свет мира касается материала */}
+              <div className="glass-hearthside relative max-w-[92%] rounded-2xl rounded-tl-sm px-5 py-3.5 text-left">
                 <svg
                   aria-hidden="true"
                   viewBox="0 0 14 10"
@@ -511,7 +564,7 @@ export function Hero() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                <p className="-rotate-2 text-left font-hand text-lg leading-tight">
+                <p className="-rotate-2 text-left font-hand text-base leading-tight">
                   даже если ты
                   <br />
                   пропал на&nbsp;неделю
@@ -537,7 +590,9 @@ export function Hero() {
                         // ответить — сцена откликается на намерение раньше действия
                         onMouseEnter={() => setExpression("happy")}
                         onMouseLeave={() => setExpression("calm")}
-                        className="group glass glass-interactive glass-shine press whitespace-nowrap rounded-2xl rounded-br-md px-4 py-3 text-[15px] font-medium text-foreground hover:text-primary"
+                        // Реплики легче команды: чипы — «что сказать», CTA —
+                        // «что сделать». Один командный вес на экран
+                        className="group glass glass-interactive glass-shine press whitespace-nowrap rounded-2xl rounded-br-md px-3.5 py-2.5 text-sm font-medium text-foreground hover:text-primary"
                       >
                         {REPLIES[key].visitor}
                       </motion.button>
