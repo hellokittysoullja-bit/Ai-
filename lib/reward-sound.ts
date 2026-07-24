@@ -98,3 +98,56 @@ export function playStartSigh() {
   note(ac, SCALE[3], t, 0.5, 0.035)
   note(ac, SCALE[1], t + 0.18, 0.9, 0.03)
 }
+
+/**
+ * А3 · Мурчание при поглаживании: низкий тон с тремоло 24 Гц —
+ * акустическая сигнатура настоящего кошачьего мурлыканья. Тихое
+ * (gain ≤ 0.05), короткое, только по явному тапу пользователя.
+ * Мультисенсорная награда: визуал (восторг) + хаптика + звук.
+ */
+export function playPurr() {
+  if (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    return
+  }
+  const ac = audioCtx()
+  if (!ac) return
+  const t = ac.currentTime + 0.01
+  const dur = 0.7
+
+  const master = ac.createGain()
+  master.gain.setValueAtTime(0, t)
+  master.gain.linearRampToValueAtTime(0.05, t + 0.09)
+  master.gain.setValueAtTime(0.05, t + dur - 0.22)
+  master.gain.exponentialRampToValueAtTime(0.0001, t + dur)
+  master.connect(ac.destination)
+
+  // Тремоло мурчания
+  const lfo = ac.createOscillator()
+  lfo.frequency.value = 24
+  const lfoGain = ac.createGain()
+  lfoGain.gain.value = 0.03
+  lfo.connect(lfoGain)
+  lfoGain.connect(master.gain)
+
+  const low = ac.createOscillator()
+  low.type = 'sine'
+  low.frequency.value = 52
+  const mid = ac.createOscillator()
+  mid.type = 'sine'
+  mid.frequency.value = 78
+  const midGain = ac.createGain()
+  midGain.gain.value = 0.4
+  low.connect(master)
+  mid.connect(midGain)
+  midGain.connect(master)
+
+  low.start(t)
+  mid.start(t)
+  lfo.start(t)
+  low.stop(t + dur + 0.05)
+  mid.stop(t + dur + 0.05)
+  lfo.stop(t + dur + 0.05)
+}
