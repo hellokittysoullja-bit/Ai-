@@ -81,6 +81,29 @@ export function MascotSvg({
     return () => window.removeEventListener("pointermove", onMove);
   }, [reduceMotion, sleepy, px, py]);
 
+  /* Э1 · Взгляд за скроллом: на таче pointermove мёртв — существо следило
+     за курсором только на десктопе. Теперь листаешь — кот провожает
+     взглядом (вниз/вверх по направлению), через полсекунды покоя глаза
+     возвращаются к центру. Пружины те же, что у курсора. */
+  useEffect(() => {
+    if (reduceMotion || sleepy) return;
+    let lastY = window.scrollY;
+    let settle: ReturnType<typeof setTimeout>;
+    const onScroll = () => {
+      const dy = window.scrollY - lastY;
+      lastY = window.scrollY;
+      if (Math.abs(dy) < 2) return;
+      py.set(Math.max(-1, Math.min(1, dy / 48)) * 4.5);
+      clearTimeout(settle);
+      settle = setTimeout(() => py.set(0), 500);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      clearTimeout(settle);
+    };
+  }, [reduceMotion, sleepy, py]);
+
   /* Моргание со случайным интервалом */
   useEffect(() => {
     if (reduceMotion || sleepy) return;

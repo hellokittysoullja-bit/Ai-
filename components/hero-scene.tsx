@@ -83,7 +83,8 @@ const STARS: ReadonlyArray<
   [452, 40, 1.1, 3.2, 0.9, 0.28, 0.72],
   [508, 132, 0.8, 5.1, 2, 0.2, 0.52],
   [246, 176, 1, 4, 0.3, 0.24, 0.6],
-  [584, 96, 1.3, 3.5, 1.7, 0.3, 0.75],
+  // сдвинута с (584,96): попадала внутрь диска луны на (590,110)
+  [652, 190, 1.3, 3.5, 1.7, 0.3, 0.75],
   [418, 210, 0.8, 5.4, 1.1, 0.2, 0.5],
   [382, 262, 0.8, 3.9, 2.4, 0.2, 0.52],
   [42, 224, 1.1, 4.4, 1, 0.24, 0.62],
@@ -95,6 +96,11 @@ const STARS: ReadonlyArray<
   // читаться пустым чёрным полем на первом экране
   [160, 84, 1.2, 3.8, 0.6, 0.28, 0.7],
   [396, 96, 0.9, 4.6, 1.9, 0.22, 0.58],
+  // Десктопная полоса (вертикальный кроп показывает y 200–700): без этих
+  // звёзд небо над заголовком на 1280×800 стояло пустым
+  [150, 252, 1.1, 4.1, 0.8, 0.26, 0.66],
+  [338, 298, 0.9, 4.9, 1.6, 0.2, 0.55],
+  [516, 236, 1.0, 3.7, 0.4, 0.24, 0.62],
   [92, 438, 0.8, 5.8, 0.5, 0.16, 0.44],
   [696, 420, 0.9, 4.9, 1.7, 0.18, 0.47],
   [356, 402, 0.7, 5.6, 2.2, 0.16, 0.42],
@@ -127,19 +133,6 @@ export function HeroScene() {
           <stop offset="72%" stopColor="oklch(0 0 0)" stopOpacity="0" />
           <stop offset="100%" stopColor="oklch(0 0 0)" stopOpacity="0.2" />
         </radialGradient>
-        <radialGradient id="hs-moon-glow" cx="0.5" cy="0.5" r="0.5">
-          <stop
-            offset="0%"
-            stopColor="oklch(0.85 0.03 95)"
-            stopOpacity="0.22"
-          />
-          <stop
-            offset="55%"
-            stopColor="oklch(0.85 0.03 95)"
-            stopOpacity="0.07"
-          />
-          <stop offset="100%" stopColor="oklch(0.85 0.03 95)" stopOpacity="0" />
-        </radialGradient>
         <linearGradient id="hs-hill-back" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="oklch(0.2 0.014 140)" />
           <stop offset="100%" stopColor="oklch(0.185 0.01 135)" />
@@ -160,31 +153,12 @@ export function HeroScene() {
       </defs>
       <rect width="800" height="900" fill="url(#hs-sky)" />
 
-      {/* луна с кратерами и дышащим гало.
-          Позиция (500, 170): верхняя правая треть НЕБА при любом кропе —
-          контейнер сцены зафиксирован 100svh (hero.tsx), поэтому небесное
-          тело больше не съезжает к линии земли на мобильном. Чуть меньше и
-          тише прежнего: луна — свидетель сцены, а не конкурент кота и CTA. */}
-      <circle cx="500" cy="170" r="92" fill="url(#hs-moon-glow)">
-        <animate
-          attributeName="opacity"
-          values="0.85;1;0.85"
-          dur="7s"
-          repeatCount="indefinite"
-        />
-      </circle>
-      <circle
-        cx="500"
-        cy="170"
-        r="21"
-        fill="oklch(0.84 0.035 95)"
-        opacity="0.9"
-      />
-      <g fill={INK} opacity="0.12">
-        <circle cx="493" cy="163" r="5" />
-        <circle cx="508" cy="176" r="3.4" />
-        <circle cx="497" cy="181" r="2.2" />
-      </g>
+      {/* Луны в пейзажном SVG больше НЕТ — и это принципиально. Slice-кроп
+          делает позицию внутри сцены зависимой от пропорций вьюпорта: на
+          мобильном 844 луна резалась правым краем, на десктопе 1280×800
+          уходила за верх кадра (видимая полоса y 200–700). Небесный якорь
+          живёт отдельным слоем <Moon/>, привязанным к углу вьюпорта
+          (hero.tsx) — виден всегда, ни в кота, ни за кадр не уезжает. */}
 
       {/* звёзды: каждая мерцает в своём ритме */}
       <g fill="oklch(0.92 0.01 210)">
@@ -249,15 +223,14 @@ export function HeroScene() {
           Высоты и ширины варьируются: настоящий лес не растёт по линейке.
           Мобильные группы (x 218–296 и 540–598) держат горизонт в видимой
           полосе телефона, центр остаётся существу. */}
+      {/* Центральных групп леса больше нет: на высоких мобильных вьюпортах
+          (844+) они вставали «на строку» заметки и чипов — силуэты за текстом
+          читались мусором. Мобильный горизонт держат земля и травяная кромка;
+          фланговые ели остаются глубиной для десктопного кадра. */}
       <g fill="oklch(0.165 0.014 145)">
         <Pine cx={50} base={694} h={46} w={15} />
         <Pine cx={78} base={692} h={56} w={18} />
         <Pine cx={104} base={690} h={38} w={13} />
-        <Pine cx={230} base={690} h={36} w={12} />
-        <Pine cx={258} base={688} h={46} w={15} />
-        <Pine cx={286} base={690} h={30} w={11} />
-        <Pine cx={552} base={700} h={38} w={13} />
-        <Pine cx={582} base={700} h={50} w={16} />
         <Pine cx={680} base={676} h={44} w={15} />
         <Pine cx={708} base={674} h={54} w={17} />
         <Pine cx={734} base={672} h={34} w={12} />
@@ -286,78 +259,10 @@ export function HeroScene() {
         <path d="M660 742 q2 -9 6 -12" />
       </g>
 
-      {/* светлячки у земли */}
-      <g fill="oklch(0.8 0.14 80)">
-        <circle cx="214" cy="712" r="2.2" opacity="0.5">
-          <animate
-            attributeName="opacity"
-            values="0.15;0.75;0.15"
-            dur="3.8s"
-            repeatCount="indefinite"
-          />
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values="0 0; 6 -12; 0 0"
-            dur="9s"
-            repeatCount="indefinite"
-          />
-        </circle>
-        <circle cx="596" cy="700" r="1.8" opacity="0.4">
-          <animate
-            attributeName="opacity"
-            values="0.12;0.65;0.12"
-            dur="4.6s"
-            begin="1.2s"
-            repeatCount="indefinite"
-          />
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values="0 0; -8 -9; 0 0"
-            dur="11s"
-            begin="0.5s"
-            repeatCount="indefinite"
-          />
-        </circle>
-        <circle cx="420" cy="788" r="1.6" opacity="0.35">
-          <animate
-            attributeName="opacity"
-            values="0.1;0.55;0.1"
-            dur="5.4s"
-            begin="2s"
-            repeatCount="indefinite"
-          />
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values="0 0; 5 -14; 0 0"
-            dur="12s"
-            begin="1s"
-            repeatCount="indefinite"
-          />
-        </circle>
-        <circle cx="272" cy="820" r="2" opacity="0.4">
-          <animate
-            attributeName="opacity"
-            values="0.12;0.6;0.12"
-            dur="4.2s"
-            begin="0.7s"
-            repeatCount="indefinite"
-          />
-          <animateTransform
-            attributeName="transform"
-            type="translate"
-            values="0 0; -6 -10; 0 0"
-            dur="10s"
-            begin="1.4s"
-            repeatCount="indefinite"
-          />
-        </circle>
-        {/* Светлячков у нижней кромки больше нет: в зоне CTA медленные
-            статичные точки читались не «миром», а битыми пикселями возле
-            кнопки. Живой свет остаётся у земли рядом с существом. */}
-      </g>
+      {/* Светлячков в сцене больше нет — окончательно. Три захода они
+          создавали «жёлтые битые пиксели» возле текста и CTA на разных
+          вьюпортах: позиция точечного яркого объекта в slice-сцене
+          непредсказуема. Живой свет мира — очаг, огонёк хвоста и луна. */}
 
       {/* передний план: трава у нижней кромки КЛАСТЕРАМИ по 3–4 стебля.
           Одинокие разбросанные стебли читались царапинами на экране —
@@ -461,6 +366,40 @@ export function GroundPool({ className }: { className?: string }) {
         <path d="M263 41 q1 -8 5 -11" />
         <path d="M160 62 q2 -9 6 -12" />
         <path d="M214 66 q-2 -9 -6 -12" />
+      </g>
+    </svg>
+  );
+}
+
+/**
+ * Луна — небесный якорь, привязанный к углу ВЬЮПОРТА, а не к пейзажной
+ * сцене: slice-кроп сцены делает позицию зависимой от пропорций экрана
+ * (на мобильном резалась краем, на десктопе уходила за кадр). Отдельный
+ * компактный SVG: гало дышит на SMIL, диск с кратерами тёплой кости.
+ */
+export function Moon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 120 120" className={className} aria-hidden="true">
+      <defs>
+        <radialGradient id="moon-halo" cx="0.5" cy="0.5" r="0.5">
+          <stop offset="0%" stopColor="oklch(0.85 0.03 95)" stopOpacity="0.22" />
+          <stop offset="55%" stopColor="oklch(0.85 0.03 95)" stopOpacity="0.07" />
+          <stop offset="100%" stopColor="oklch(0.85 0.03 95)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <circle cx="60" cy="60" r="58" fill="url(#moon-halo)">
+        <animate
+          attributeName="opacity"
+          values="0.85;1;0.85"
+          dur="7s"
+          repeatCount="indefinite"
+        />
+      </circle>
+      <circle cx="60" cy="60" r="21" fill="oklch(0.84 0.035 95)" opacity="0.9" />
+      <g fill={INK} opacity="0.12">
+        <circle cx="53" cy="53" r="5" />
+        <circle cx="68" cy="66" r="3.4" />
+        <circle cx="57" cy="71" r="2.2" />
       </g>
     </svg>
   );
