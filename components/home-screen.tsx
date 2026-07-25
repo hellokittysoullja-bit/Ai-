@@ -14,6 +14,7 @@ import {
   getPatterns,
   getPlan,
   getStarts,
+  getStepQueue,
   saveCompanionName,
   todayKey,
   type Patterns,
@@ -32,6 +33,7 @@ import {
   registerServiceWorker,
   type CheckinState,
 } from "@/lib/checkin";
+import { trimLabel } from "@/lib/utils";
 import { Bell } from "lucide-react";
 
 type FirstWord = {
@@ -281,19 +283,31 @@ export function HomeScreen() {
           : "calm";
 
   const [lastStepLabel, setLastStepLabel] = useState<string | null>(null);
+  // Очередь дробления приоритетнее повтора: «следующий шаг той же задачи» —
+  // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
+  const [queuedStep, setQueuedStep] = useState<string | null>(null);
   const [rareFound, setRareFound] = useState(0);
+  // Pity дозрел (5+ обычных находок подряд): следующая гарантированно
+  // необычная+ (см. drawFind) — утренний триггер вправе это знать
+  const [pityRipe, setPityRipe] = useState(false);
 
   async function refresh() {
-    const [plan, patterns, name, starts, finds] = await Promise.all([
+    const [plan, patterns, name, starts, finds, queue] = await Promise.all([
       getPlan(),
       getPatterns(),
       getCompanionName(),
       getStarts(),
       getFinds(),
+      getStepQueue(),
     ]);
     const lastStart = starts.length > 0 ? starts[starts.length - 1] : null;
     setLastStepLabel(lastStart?.label ?? null);
+    setQueuedStep(queue?.steps[0] ?? null);
     setRareFound(finds.filter((f) => f.rarity === "rare").length);
+    let pity = 0;
+    for (let i = finds.length - 1; i >= 0 && finds[i].rarity === "common"; i--)
+      pity++;
+    setPityRipe(pity >= 5);
     const lastFind = finds.length > 0 ? finds[finds.length - 1].name : null;
     let intro: IntroChoice = null;
     try {
@@ -468,10 +482,11 @@ export function HomeScreen() {
             </Button>
           )}
 
-          {/* К-Б → М1 · Главное действие в ОДИН тап и с нулевым решением:
+          {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
               опытный пользователь получал больше трения, чем новичок
-              (3 тапа против 1). Повтор последнего шага — мгновенный старт;
-              «Другое дело» — путь в сетап для нового */}
+              (3 тапа против 1). Очередь дробления приоритетнее повтора:
+              «следующий шаг» продолжает начатую задачу; без очереди —
+              повтор последнего шага; «Другое дело» — сетап для нового */}
           {stats &&
             stats.totalStarts > 0 &&
             !firstWord?.actionStep &&
@@ -480,22 +495,26 @@ export function HomeScreen() {
                 <Button
                   size="lg"
                   className="w-full gap-2 font-semibold"
-                  onClick={() =>
-                    lastStepLabel
+                  onClick={() => {
+                    const quick = queuedStep ?? lastStepLabel;
+                    return quick
                       ? router.push(
-                          `/app/session?step=${encodeURIComponent(lastStepLabel)}&d=15`,
+                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
                         )
-                      : router.push("/app/session")
-                  }
+                      : router.push("/app/session");
+                  }}
                 >
                   <Play className="size-4" aria-hidden="true" />
-                  {lastStepLabel
-                    ? `Повторить: «${
-                        lastStepLabel.length > 22
-                          ? lastStepLabel.slice(0, 21).trimEnd() + "…"
-                          : lastStepLabel
-                      }»`
-                    : "Начать сессию"}
+                  {(() => {
+                    const quick = queuedStep ?? lastStepLabel;
+                    if (!quick) return "Начать сессию";
+                    // Обрезка по границе слова: рваное «созда…» на
+                    // кнопке-герое читается как брак
+                    const short = trimLabel(quick, 22);
+                    return queuedStep
+                      ? `Следующий шаг: «${short}»`
+                      : `Повторить: «${short}»`;
+                  })()}
                 </Button>
                 {lastStepLabel && (
                   <Button
@@ -559,6 +578,14 @@ export function HomeScreen() {
                       : " →"}
                   </span>
                 </>
+              ) : pityRipe ? (
+                <span className="text-sm leading-snug text-muted-foreground">
+                  Следующая находка будет{" "}
+                  <span className="font-semibold text-reward">
+                    необычной — или лучше
+                  </span>
+                  . Она уже ждёт →
+                </span>
               ) : (
                 <span className="text-sm leading-snug text-muted-foreground">
                   Редких находок:{" "}

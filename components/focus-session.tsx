@@ -12,15 +12,18 @@ import {
   addFind,
   clearActiveSession,
   clearPlan,
+  consumeQueueStep,
   getActiveSession,
   getCompanionName,
   getFinds,
   getPatterns,
   getPlan,
   getStarts,
+  getStepQueue,
   recordStart,
   saveActiveSession,
   savePlan,
+  saveStepQueue,
   todayKey,
   updateStartMinutes,
   type IslandFindEntry,
@@ -28,6 +31,7 @@ import {
 import {
   drawFind,
   elementNameForStartNumber,
+  ISLAND_POOL,
   LANDMARK_COUNT,
   RARITY_LABEL,
   type Rarity,
@@ -35,8 +39,21 @@ import {
 import { playStartSigh } from '@/lib/reward-sound'
 import { startCampfire, stopCampfire } from '@/lib/ambient'
 import { hapticDone, hapticStart } from '@/lib/haptics'
+import { trimLabel } from '@/lib/utils'
 
 const durations = [15, 25, 45]
+
+// Русская плюрализация «N ненайденных находок»: без неё тизер на малых
+// остатках («ещё 2 ненайденных находок») читается машинным — ровно в момент,
+// когда коллекция почти собрана и каждый знак внимания на счету
+function pluralFinds(n: number): string {
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return 'ненайденная находка'
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14))
+    return 'ненайденные находки'
+  return 'ненайденных находок'
+}
 
 // Готовые шаги: пустое поле для СДВГ — стена. Нажал чип — поехали.
 const stepChips = ['Открыть документ', 'Убрать одну вещь', 'Ответить на одно сообщение']
@@ -161,6 +178,18 @@ export function FocusSession() {
   const [tomorrowStep, setTomorrowStep] = useState('')
   const [planSaved, setPlanSaved] = useState(false)
   const [planFormOpen, setPlanFormOpen] = useState(false)
+
+  // «Ещё разок» на пике (one-more-time hook): следующая цель острова и
+  // следующий микрошаг из очереди дробления видны прямо на финальном экране —
+  // сессия заканчивается не точкой, а приглашением.
+  const [nextUp, setNextUp] = useState<{
+    /** Следующий микрошаг из очереди дробления, если остался */
+    step: string | null
+    /** Задача, из которой раздроблен шаг (для однотапового плана) */
+    queueTask: string | null
+    /** Честный тизер следующего роста острова */
+    tease: string | null
+  }>({ step: null, queueTask: null, tease: null })
 
   // Раскрытие формы добавляет ~140px под сгиб (2 поля + кнопка + CTA
   // «Ещё одна сессия» ниже) — без автоскролла кнопка сохранения формы
@@ -374,6 +403,9 @@ export function FocusSession() {
     const entry = await recordStart({ label: task, fromPlan })
     startIdRef.current = entry.id
 
+    // Если шаг взят из очереди дробления — он исполнен, очередь короче
+    await consumeQueueStep(task)
+
     // Сессия переживает закрытие вкладки
     await saveActiveSession({
       startedAt: startedAtRef.current,
@@ -382,10 +414,12 @@ export function FocusSession() {
       startId: entry.id,
     })
 
-    // Если это был первый шаг из плана — план исполнен
-    if (fromPlan) {
-      const plan = await getPlan()
-      if (plan && plan.forDate === todayKey()) await clearPlan()
+    // План исполнен — убираем: и когда старт пришёл из плана, и когда
+    // человек сам начал шаг, лежащий в плане (иначе утром продукт
+    // предложит уже сделанное — стейл-план подрывает доверие к памяти)
+    const plan = await getPlan()
+    if (plan && ((fromPlan && plan.forDate === todayKey()) || plan.firstStep === task)) {
+      await clearPlan()
     }
 
     speak('start', task, minutes)
@@ -445,6 +479,40 @@ export function FocusSession() {
     setRestRevealed(false)
     setTomorrowTask('')
     setTomorrowStep('')
+
+    // «Ещё разок»: следующая цель видна в момент пика, не после него.
+    // Тизер честный: ориентиры детерминированы — называем; пул случаен —
+    // называем только реальное число ненайденного.
+    const queue = await getStepQueue()
+    let tease: string | null = null
+    if (n < LANDMARK_COUNT) {
+      const nextName = elementNameForStartNumber(n + 1)
+      if (nextName) tease = `следующий старт вырастит «${nextName}»`
+    } else {
+      const allFinds = await getFinds()
+      const foundKeys = new Set(allFinds.map((f) => f.key))
+      const unfound = ISLAND_POOL.filter((e) => !foundKeys.has(e.key)).length
+      // Pity дозрел (5+ обычных подряд) — drawFind ГАРАНТИРУЕТ необычную+,
+      // и это честно сказать вслух: далёкая цель «ещё N находок» превращается
+      // в близкую «следующая будет особенной» (variable ratio + goal gradient)
+      let pityNow = 0
+      for (let i = allFinds.length - 1; i >= 0 && allFinds[i].rarity === 'common'; i--)
+        pityNow++
+      tease =
+        pityNow >= 5
+          ? 'следующая находка будет необычной — или лучше'
+          : unfound === 1
+            ? 'на острове осталась последняя ненайденная находка'
+            : unfound > 0
+              ? `на острове ещё ${unfound} ${pluralFinds(unfound)}`
+              : 'остров собран полностью — теперь он густеет'
+    }
+    setNextUp({
+      step: queue?.steps[0] ?? null,
+      queueTask: queue?.task ?? null,
+      tease,
+    })
+
     setPhase('done')
     fetchVoice(early ? 'early-exit' : 'done', task, minutes).then(setDoneVoice)
   }
@@ -525,6 +593,13 @@ export function FocusSession() {
                     key={step}
                     type="button"
                     onClick={() => {
+                      // Остальные шаги не выбрасываются: очередь помнит их
+                      // и сама предложит следующий после этой сессии
+                      // (на финале и на Доме). Продукт помнит сказанное.
+                      void saveStepQueue(
+                        task,
+                        brokenSteps.filter((s) => s !== step),
+                      )
                       setTask(step)
                       setBrokenSteps(null)
                     }}
@@ -760,14 +835,42 @@ export function FocusSession() {
       >
       {!planSaved ? (
         !planFormOpen ? (
-          <button
-            type="button"
-            onClick={() => setPlanFormOpen(true)}
-            className="glass glass-interactive press flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
-          >
-            <span className="text-sm font-semibold">Договориться с завтрашним собой</span>
-            <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
-          </button>
+          <div className="flex w-full flex-col gap-2">
+            {/* Однотаповый договор: на пике дофамина печатать — стена.
+                Если из дробления остался следующий шаг — план продолжает
+                ту же задачу; иначе — «это же дело» повторяется завтра. */}
+            <button
+              type="button"
+              onClick={() => {
+                void savePlan({
+                  task: nextUp.queueTask ?? task,
+                  firstStep: nextUp.step ?? task,
+                })
+                setPlanSaved(true)
+              }}
+              className="glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left"
+            >
+              <span className="flex min-w-0 flex-col">
+                <span className="text-sm font-semibold">
+                  {nextUp.step ? 'Завтра — следующий шаг' : 'Это же дело — завтра'}
+                </span>
+                <span className="truncate text-sm text-muted-foreground">
+                  «{nextUp.step ?? task}»
+                </span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-primary">
+                один тап
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlanFormOpen(true)}
+              className="glass glass-interactive press flex w-full items-center justify-between rounded-2xl px-4 py-3 text-left"
+            >
+              <span className="text-sm font-semibold">Своё дело на завтра</span>
+              <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+            </button>
+          </div>
         ) : (
           <div className="glass flex w-full flex-col gap-3 rounded-2xl p-4">
             <p className="text-sm font-semibold">Договоримся с завтрашним собой?</p>
@@ -808,18 +911,27 @@ export function FocusSession() {
       )}
 
       <div className="flex w-full flex-col gap-2">
+        {/* One-more-time hook: следующая цель острова названа прямо над
+            кнопкой — сессия заканчивается на «ещё разок», не на точке */}
+        {nextUp.tease && (
+          <p className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+            {nextUp.tease}
+          </p>
+        )}
         <Button
           size="lg"
           className="font-semibold"
           onClick={() => {
-            setTask('')
+            // Очередь дробления сама подставляет следующий микрошаг —
+            // продолжение той же работы в один тап
+            setTask(nextUp.step ?? '')
             setDoneVoice(null)
             setEndedEarly(false)
             setGrownElement(null)
             setPhase('setup')
           }}
         >
-          Ещё одна сессия
+          {nextUp.step ? `Ещё одна: «${trimLabel(nextUp.step, 26)}»` : 'Ещё одна сессия'}
         </Button>
         <Button
           render={<Link href="/app/world" />}
