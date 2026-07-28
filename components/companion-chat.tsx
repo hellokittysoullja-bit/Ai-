@@ -4,10 +4,11 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
-import { ArrowRight, ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
+import { ArrowDown, ArrowRight, ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
+import { hapticStart } from '@/lib/haptics'
 import Link from 'next/link'
 import {
   addNote,
@@ -31,11 +32,23 @@ type CompanionChatProps = {
   showSuggestions?: boolean
 }
 
-function CompanionAvatar() {
-  // Кружок-подложка: тёмный кот на тёмном фоне читался пятнышком
+function CompanionAvatar({ reacting = false }: { reacting?: boolean }) {
+  // Кружок-подложка: тёмный кот на тёмном фоне читался пятнышком.
+  // Тёплое кольцо — тот же очаг, что горит на лендинге и на «Доме»:
+  // отделяет существо от фона и держит один световой язык во всём
+  // продукте. Реакция на новую реплику — контингентный социальный
+  // отклик: существо отзывается на СОБЫТИЕ, а не мигает по таймеру.
   return (
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80">
-      <MascotSvg expression="calm" size={30} />
+    <div
+      className="relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80"
+      style={{
+        boxShadow: reacting
+          ? '0 0 0 2px oklch(0.72 0.17 55 / 0.35), 0 0 14px -2px oklch(0.72 0.17 55 / 0.5)'
+          : '0 0 0 1px oklch(0.72 0.17 55 / 0.12)',
+        transition: 'box-shadow 260ms ease-out',
+      }}
+    >
+      <MascotSvg expression={reacting ? 'happy' : 'calm'} size={30} />
     </div>
   )
 }
@@ -207,17 +220,60 @@ export function CompanionChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
+  // Контингентный отклик существа: реагирует на ПРИХОД новой реплики, а не
+  // на каждый рендер. Восстановленную из памяти историю не отыгрываем —
+  // иначе кот «радуется» вчерашнему сообщению при каждом открытии.
+  const [reactingId, setReactingId] = useState<string | null>(null)
+  const lastAssistantIdRef = useRef<string | null>(null)
+  const seenHistoryRef = useRef(false)
+  useEffect(() => {
+    let lastAssistant: (typeof messages)[number] | undefined
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === 'assistant') {
+        lastAssistant = messages[i]
+        break
+      }
+    }
+    if (!lastAssistant) return
+    if (!seenHistoryRef.current) {
+      seenHistoryRef.current = true
+      lastAssistantIdRef.current = lastAssistant.id
+      return
+    }
+    if (lastAssistant.id === lastAssistantIdRef.current) return
+    lastAssistantIdRef.current = lastAssistant.id
+    setReactingId(lastAssistant.id)
+    const t = window.setTimeout(() => setReactingId(null), 1600)
+    return () => window.clearTimeout(t)
+  }, [messages])
+
+  // Ушёл вверх по переписке — показываем возврат вниз. Стандартная
+  // аффорданса чата, без неё длинная история становится ловушкой.
+  const [atBottom, setAtBottom] = useState(true)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () =>
+      setAtBottom(el.scrollHeight - el.clientHeight - el.scrollTop < 24)
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [messages.length])
+
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
   function submit() {
     if (!input.trim() || !canSend) return
+    // Подтверждение телом в момент отправки: действие получает отклик
+    // раньше, чем придёт ответ по сети.
+    hapticStart()
     sendMessage({ text: input })
     setInput('')
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="relative flex min-h-0 flex-1 flex-col">
       {/* justify-end на мобильном: сообщения примыкают к полю ввода, короткий
           чат (1-2 реплики) выглядит обжитым, а не оборванным. На десктопе
           (md:justify-start) высота вьюпорта велика — при justify-end единственная
@@ -261,15 +317,30 @@ export function CompanionChat({
                   'Не могу заставить себя начать',
                   'Раздроби мне задачу',
                   'Просто тяжело сегодня',
-                ].map((chip) => (
-                  <button
+                ].map((chip, ci) => (
+                  // Stagger 45мс — в стандартном диапазоне 20–80мс и только
+                  // при первом появлении списка: ряд «собирается», а не
+                  // выпрыгивает плитой. Дальше чипы исчезают навсегда, так
+                  // что повторной ценой это не станет.
+                  <motion.button
                     key={chip}
                     type="button"
-                    onClick={() => sendMessage({ text: chip })}
+                    onClick={() => {
+                      hapticStart()
+                      sendMessage({ text: chip })
+                    }}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{
+                      delay: 0.4 + ci * 0.045,
+                      type: 'spring',
+                      stiffness: 300,
+                      damping: 24,
+                    }}
                     className="glass glass-interactive press rounded-full px-3.5 py-2 text-sm text-foreground hover:text-primary"
                   >
                     {chip}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
               {/* min-h-11: цель была 143×17px — ниже минимума 24px по
@@ -285,11 +356,20 @@ export function CompanionChat({
             </motion.div>
           )}
 
-          {messages.map((message) => (
+          {messages.map((message, mi) => {
+            // Группировка подряд идущих реплик одного говорящего — то, что
+            // отличает переписку от списка блоков. Хвостик у пузыря здесь
+            // сверху (rounded-tl-sm/tr-sm), поэтому «голова» группы — ПЕРВОЕ
+            // сообщение: только оно получает хвост и аватар, остальные
+            // прижимаются к нему и идут с ровными углами.
+            const prev = messages[mi - 1]
+            const isFirstOfGroup = !prev || prev.role !== message.role
+            const isUser = message.role === 'user'
+            return (
             <div
               key={message.id}
-              className={`flex flex-col gap-2 ${
-                message.role === 'user' ? 'items-end' : 'items-start'
+              className={`flex flex-col gap-2 ${isFirstOfGroup ? '' : '-mt-2'} ${
+                isUser ? 'items-end' : 'items-start'
               }`}
             >
               {message.parts.map((part, i) => {
@@ -302,12 +382,19 @@ export function CompanionChat({
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
                     >
-                      {message.role !== 'user' && <CompanionAvatar />}
+                      {!isUser &&
+                        (isFirstOfGroup ? (
+                          <CompanionAvatar reacting={reactingId === message.id} />
+                        ) : (
+                          // Место аватара держим всегда: без распорки вторая
+                          // реплика группы уезжала под аватар и колонка «плыла»
+                          <div className="size-9 shrink-0" aria-hidden="true" />
+                        ))}
                       <div
                         className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
-                          message.role === 'user'
-                            ? 'ml-auto rounded-tr-sm bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground'
-                            : 'glass rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
+                          isUser
+                            ? `ml-auto bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
+                            : `glass px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
                         }`}
                       >
                         {part.text}
@@ -387,7 +474,8 @@ export function CompanionChat({
                 return null
               })}
             </div>
-          ))}
+            )
+          })}
 
           {status === 'submitted' && (
             <div className="flex items-center gap-2">
@@ -411,6 +499,33 @@ export function CompanionChat({
           <div ref={bottomRef} />
         </div>
       </div>
+
+      {/* Возврат к свежему: появляется только когда лента реально уведена
+          вверх. Выход быстрее входа (140 против 200мс) — появление можно
+          рассматривать, исчезновение только ждать. */}
+      <AnimatePresence>
+        {!atBottom && messages.length > 0 && (
+          <motion.button
+            type="button"
+            onClick={() => {
+              const el = scrollRef.current
+              el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+            }}
+            aria-label="К свежим сообщениям"
+            initial={{ opacity: 0, y: 6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 4, scale: 0.98 }}
+            transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
+            // Справа и НЕпрозрачная: кнопка плавает над лентой, а стекло
+            // пропускало текст сообщения насквозь и читалось как дефект.
+            // Край вместо центра — тот же выбор, что в мессенджерах: не
+            // закрывает середину реплики, куда смотрят при чтении.
+            className="press pointer-events-auto absolute bottom-20 right-4 z-20 flex size-11 items-center justify-center rounded-full border border-white/12 bg-secondary shadow-[0_6px_18px_-6px_oklch(0_0_0/0.7)]"
+          >
+            <ArrowDown className="size-4 text-foreground" aria-hidden="true" />
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       <form
         onSubmit={(e) => {
