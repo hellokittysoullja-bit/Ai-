@@ -380,7 +380,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    unlayered box-shadow, который молча перекрыл бы layered ring-утилиту
    (та же ловушка каскада, что и с border-primary/50 в дневнике острова).
    outline — отдельный слой рендера, .glass его никак не задевает. */
-:where(a, button, [role="button"], [data-slot="button"], input):focus-visible {
+:where(a, button, [role="button"], [data-slot="button"], input, textarea):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);

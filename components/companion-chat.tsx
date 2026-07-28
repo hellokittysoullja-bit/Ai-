@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
 import { ArrowDown, ArrowRight, ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
@@ -53,6 +53,30 @@ function CompanionAvatar({ reacting = false }: { reacting?: boolean }) {
   )
 }
 
+// Тот же рукотворный хвостик, что уже держит атрибуцию реплики на лендинге
+// (viewBox 0 0 14 10, один росчерк пера) — здесь он сидит ровно в срезанном
+// углу первой реплики группы (rounded-tl-sm/tr-sm), связывая геометрию
+// с тем же почерком, а не изобретая новый декоративный элемент.
+function MessageTail({ side }: { side: 'left' | 'right' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 14 10"
+      className={`pointer-events-none absolute -top-[7px] h-[10px] w-[14px] ${
+        side === 'left' ? 'left-[10px] text-white/25' : 'right-[10px] scale-x-[-1] text-primary'
+      }`}
+    >
+      <path
+        d="M2 10 Q 5 4 12 1"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
 export function CompanionChat({
   mode,
   greeting,
@@ -63,6 +87,22 @@ export function CompanionChat({
   const router = useRouter()
   const [input, setInput] = useState('')
   const memoryRef = useRef<MemoryContext | null>(null)
+  const reduceMotion = useReducedMotion()
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Счётчик отправок — ключ для "запуска" стрелки: старая улетает вверх,
+  // новая приходит снизу. Реальный отклик на КЛЮЧЕВОЕ редкое действие
+  // (не команда с клавиатуры сотни раз в день — Эмиль здесь не запрещает).
+  const [sendCount, setSendCount] = useState(0)
+
+  // Растущее поле ввода вместо однострочного input: длинная мысль не
+  // обрезается и не скроллится внутри крошечной строки — само поле
+  // раскрывается вверх, как в любом настоящем мессенджере.
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`
+  }, [input])
 
   useEffect(() => {
     buildMemoryContext().then((m) => {
@@ -270,6 +310,7 @@ export function CompanionChat({
     hapticStart()
     sendMessage({ text: input })
     setInput('')
+    setSendCount((c) => c + 1)
   }
 
   return (
@@ -285,6 +326,19 @@ export function CompanionChat({
       {/* U3: сообщения растут сверху, инпут прижат к таб-бару (sticky) —
           прежний justify-end на мобиле прижимал одинокий гритинг к низу и
           оставлял мёртвую дыру посреди экрана */}
+      {/* Локальный очаг переписки: эхо AppBackdrop гаснет к тому месту, где
+          реально идёт разговор — здесь он читается собственным тёплым
+          пятном. Статично (Operate-поверхность, без анимации), в DOM ДО
+          скролл-контейнера — оба слоя static/auto, порядок в разметке сам
+          кладёт пятно позади содержимого без единого z-index. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 -translate-y-1/4 rounded-full opacity-80 blur-3xl sm:h-80 sm:w-80"
+        style={{
+          background:
+            'radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.13) 0%, transparent 70%)',
+        }}
+      />
       <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
@@ -297,7 +351,8 @@ export function CompanionChat({
             {/* Тот же материал, что у реплик ниже (.glass): приветствие и
                 сообщения произносит один и тот же персонаж, а выглядели они
                 как два разных источника — сплошная заливка против стекла. */}
-            <div className="glass max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground">
+            <div className="glass relative max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]">
+              <MessageTail side="left" />
               {greeting}
             </div>
           </motion.div>
@@ -391,12 +446,13 @@ export function CompanionChat({
                           <div className="size-9 shrink-0" aria-hidden="true" />
                         ))}
                       <div
-                        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
+                        className={`relative max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           isUser
-                            ? `ml-auto bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
-                            : `glass px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
+                            ? `ml-auto bg-gradient-to-br from-primary to-primary/85 px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-[0_4px_14px_-6px_oklch(0.72_0.17_55/0.45)] ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
+                            : `glass px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)] ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
                         }`}
                       >
+                        {isFirstOfGroup && <MessageTail side={isUser ? 'right' : 'left'} />}
                         {part.text}
                       </div>
                     </motion.div>
@@ -520,22 +576,28 @@ export function CompanionChat({
             // пропускало текст сообщения насквозь и читалось как дефект.
             // Край вместо центра — тот же выбор, что в мессенджерах: не
             // закрывает середину реплики, куда смотрят при чтении.
-            className="press pointer-events-auto absolute bottom-20 right-4 z-20 flex size-11 items-center justify-center rounded-full border border-white/12 bg-secondary shadow-[0_6px_18px_-6px_oklch(0_0_0/0.7)]"
+            className="press pointer-events-auto absolute bottom-28 right-4 z-20 flex size-11 items-center justify-center rounded-full border border-white/12 bg-secondary shadow-[0_6px_18px_-6px_oklch(0_0_0/0.7)]"
           >
             <ArrowDown className="size-4 text-foreground" aria-hidden="true" />
           </motion.button>
         )}
       </AnimatePresence>
 
+      {/* Плавающая "капсула" вместо сплошной панели во весь экран: градиент
+          растворяет уходящие вверх реплики в фон ДО композера — та же
+          маска-затухание, что у премиальных чатов (Linear, iMessage), а
+          не жёсткий обрез бордером. items-end: поле растёт вверх, кнопка
+          остаётся прижатой к низу строки, как у любого настоящего мессенджера. */}
       <form
         onSubmit={(e) => {
           e.preventDefault()
           submit()
         }}
-        className="sticky bottom-16 z-10 border-t border-border bg-background/92 px-4 py-3 backdrop-blur-md"
+        className="sticky bottom-16 z-10 bg-gradient-to-t from-background via-background/85 to-transparent px-4 pt-6 pb-3"
       >
-        <div className="mx-auto flex max-w-md items-center gap-2">
-          <input
+        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:ring-2 focus-within:ring-primary/40">
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -549,18 +611,36 @@ export function CompanionChat({
                 submit()
               }
             }}
+            rows={1}
             placeholder={placeholder ?? 'Напиши напарнику…'}
             aria-label="Сообщение напарнику"
-            className="glass h-11 flex-1 rounded-xl px-4 text-sm"
+            className="max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
           <Button
             type="submit"
             size="icon"
             disabled={!canSend || !input.trim()}
             aria-label="Отправить"
-            className="size-11 rounded-xl"
+            className="size-10 shrink-0 rounded-xl"
           >
-            <ArrowUp className="size-5" />
+            <span className="relative flex size-5 items-center justify-center overflow-hidden">
+              {reduceMotion ? (
+                <ArrowUp className="size-5" />
+              ) : (
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={sendCount}
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -14, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <ArrowUp className="size-5" />
+                  </motion.span>
+                </AnimatePresence>
+              )}
+            </span>
           </Button>
         </div>
       </form>
