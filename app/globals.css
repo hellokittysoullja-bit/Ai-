@@ -186,32 +186,43 @@
   animation: island-new-bloom 1.8s ease-out 1;
 }
 
-/* Прорастание элемента острова: пружинный вход снизу с overshoot */
+/* Прорастание элемента острова: пружинный вход снизу с overshoot.
+   Стартовый масштаб 0.4, а НЕ 0: в реальном мире ничто не появляется из
+   ничего, и рост из точки читается как дешёвый эффект — а это главная
+   наградная анимация продукта, ей быть дешёвой нельзя. Плюс opacity,
+   чтобы малый стартовый масштаб не мелькал сплошным пятном.
+   Overshoot живёт ТОЛЬКО в кейфреймах: прежняя кривая (0.34, 1.2, ...)
+   сама выбрасывала за единицу, накладываясь на выброс 1.12 в кадрах —
+   два источника упругости дают дрожание, а не пружину. Кривая заменена
+   на ease-out без выброса, origin остаётся у основания (растёт из земли). */
 @keyframes island-grow {
   0% {
-    transform: scale(0);
+    transform: scale(0.4);
+    opacity: 0;
   }
-  62% {
-    transform: scale(1.12);
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
   }
   82% {
-    transform: scale(0.96);
+    transform: scale(0.97);
   }
   100% {
     transform: scale(1);
+    opacity: 1;
   }
 }
 
 .island-grow {
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards;
+  animation: island-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
 /* Новый элемент: и прорастает, и вспыхивает (оба класса задают animation) */
 .island-grow.island-new-element {
   animation:
-    island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards,
+    island-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards,
     island-new-bloom 1.8s ease-out 0.7s 1;
 }
 
@@ -225,14 +236,18 @@
 
 /* Первый кадр «статика прежде скрипта»: весь контент уже в серверном HTML,
    появление хореографирует чистый CSS — работает даже с выключенным JS */
+/* Только opacity и transform: filter — это paint на каждый кадр, а этот
+   класс висит одновременно на каждом слове фразы (14+ элементов) ровно
+   в момент замера LCP. Подъём на 0.14em заменяет расфокус тем же
+   ощущением «проявилось», не трогая paint. */
 @keyframes hero-word-in {
   from {
     opacity: 0;
-    filter: blur(2px);
+    transform: translateY(0.14em);
   }
   to {
     opacity: 1;
-    filter: blur(0);
+    transform: translateY(0);
   }
 }
 
@@ -381,7 +396,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    нужен ещё один анимируемый property помимо transform. */
 @layer utilities {
   .press {
-    transition: transform 120ms ease;
+    transition: transform 160ms ease-out;
   }
   .press:active {
     transform: scale(0.97);
@@ -398,13 +413,13 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    раздельно. */
 @layer utilities {
   .press-warm {
-    transition: transform 120ms ease, box-shadow 700ms ease;
+    transition: transform 160ms ease-out, box-shadow 700ms ease-out;
   }
   .press-warm:active {
     transform: scale(0.97);
   }
   .press-fade {
-    transition: transform 120ms ease, opacity 300ms ease;
+    transition: transform 160ms ease-out, opacity 300ms ease-out;
   }
   .press-fade:active {
     transform: scale(0.97);
