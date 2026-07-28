@@ -92,8 +92,12 @@ export function AppBackdrop() {
           Два холма-силуэта (чуть светлее неба — читаются как масса при любой
           автояркости OLED) дают сцене пол, а разговору — место действия:
           ночной остров, не void. Статичный SVG, ноль анимации. */}
+      {/* h-[38vh]: док ввода + таб-бар перекрывают нижние ~130px экрана —
+          при 22vh от холмов оставалась полоска в 18px, сцена не читалась
+          вовсе (проверено скриншотом). Теперь холмы поднимаются над
+          панелями и видны за лентой чата. */}
       <svg
-        className="absolute inset-x-0 bottom-0 h-[22vh] w-full"
+        className="absolute inset-x-0 bottom-0 h-[38vh] w-full"
         viewBox="0 0 100 30"
         preserveAspectRatio="none"
       >
@@ -106,17 +110,18 @@ export function AppBackdrop() {
           fill="oklch(0.185 0.02 138)"
         />
       </svg>
-      {/* ОЧАГ у нижней кромки — там, где руки и док ввода. Тёплый свет
-          снизу = «сидим рядом у огня»: разговор происходит в тепле, кот
-          «сидит» по ту сторону костра. Это же свечение объясняет тёплую
-          подсветку его пузырей (.chat-bubble-cat) — свет в сцене един. */}
+      {/* ОЧАГ. Центр поднят на 150px от низа — над перекрывающими панелями:
+          тёплый свет реально виден за нижними пузырями ленты, а не срезан
+          доком ввода (прежний bottom-0 translate-y-1/2 был почти целиком
+          спрятан). «Сидим рядом у огня»: это же свечение объясняет тёплую
+          подсветку пузырей кота (.chat-bubble-cat) — свет в сцене един. */}
       <div
-        className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full blur-3xl"
+        className="absolute bottom-[150px] left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full blur-3xl"
         style={{
           width: "clamp(20rem, 60vw, 36rem)",
-          height: "clamp(11rem, 30vw, 18rem)",
+          height: "clamp(12rem, 32vw, 19rem)",
           background:
-            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.17) 0%, oklch(0.72 0.17 55 / 0.06) 45%, transparent 70%)",
+            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.2) 0%, oklch(0.72 0.17 55 / 0.07) 45%, transparent 70%)",
         }}
       />
     </div>

@@ -347,12 +347,16 @@ export function CompanionChat({
             короткий чат обжит и примыкает к рукам, а не висит наверху,
             оставляя мёртвую чёрную дыру между собой и инпутом */}
         <div className="mx-auto mt-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
-          {/* Разделитель дня — якорь времени, как в настоящих мессенджерах */}
-          <div className="flex justify-center pb-1">
-            <span className="rounded-full bg-white/[0.06] px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-              сегодня
-            </span>
-          </div>
+          {/* Разделитель дня — якорь времени, как в настоящих мессенджерах.
+              Только при живой истории: над одиноким приветствием «СЕГОДНЯ» —
+              шум, а не якорь */}
+          {messages.length > 0 && (
+            <div className="flex justify-center pb-1">
+              <span className="rounded-full bg-white/[0.06] px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                сегодня
+              </span>
+            </div>
+          )}
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
