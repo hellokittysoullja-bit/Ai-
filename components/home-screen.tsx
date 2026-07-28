@@ -607,22 +607,23 @@ export function HomeScreen() {
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  {/* Аура за силуэтом: холодное лунное свечение из угла
-                      карты. Награда-обещание должна МАНИТЬ (reward
-                      anticipation, Schultz: дофамин выделяется на сигнал
-                      награды, но сигнал обязан быть заметным) — прежний
-                      серый силуэт был погасшим и не работал стимулом */}
+                  {/* Аура за силуэтом: едва заметное холодное пятно —
+                      нейтральный лунный свет, дозированный так, чтобы не
+                      вводить третий цветовой голос в сцену из двух светов
+                      (костёр + неон). Награда-обещание должна манить
+                      (reward anticipation, Schultz), но чистым силуэтом,
+                      а не ореолом — глоу-перегруз v3 читался «затмением» */}
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none absolute -left-6 -top-8 size-32 rounded-full bg-[radial-gradient(circle,oklch(0.88_0.06_240/0.22)_0%,transparent_65%)]"
+                    className="pointer-events-none absolute -left-7 -top-9 size-28 rounded-full bg-[radial-gradient(circle,oklch(0.94_0.02_240/0.1)_0%,transparent_62%)]"
                   />
                   <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // Полная непрозрачность + свечение: силуэт — витрина
-                      // награды, а не водяной знак. drop-shadow дублирует
-                      // ауру прямо по контуру фигуры
-                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_10px_oklch(0.88_0.08_240/0.55)] saturate-[0.75]"
+                      // Масса из v3 (крупный, непрозрачный — витрина награды),
+                      // сдержанность из v2: лёгкая тень-подсветка вместо
+                      // мутного ореола 10px/0.55
+                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_4px_oklch(0.94_0.03_240/0.3)] saturate-[0.75]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
