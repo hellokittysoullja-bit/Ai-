@@ -471,63 +471,147 @@ export function HomeScreen() {
             </p>
           )}
 
-          {firstWord?.actionStep && (
-            <Button
-              size="lg"
-              className="w-full gap-2 font-semibold"
-              onClick={() => startNow(firstWord.actionStep as string)}
-            >
-              <Play className="size-4" aria-hidden="true" />
-              Начинаю
-            </Button>
-          )}
 
           {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
               опытный пользователь получал больше трения, чем новичок
               (3 тапа против 1). Очередь дробления приоритетнее повтора:
               «следующий шаг» продолжает начатую задачу; без очереди —
               повтор последнего шага; «Другое дело» — сетап для нового */}
+          {/* Единый блок «действие + его награда».
+              Раньше это были два соседних объекта: кнопка сверху, карточка
+              прогресса ниже. Ассоциация «нажал → выросло» тем слабее, чем
+              дальше действие и его результат разнесены в кадре — поэтому
+              награда теперь физически обрамляет кнопку, а не соседствует
+              с ней. Второе: продукт сознательно отказался от стриков, то
+              есть отдал loss aversion; законная White Hat-замена — видимое
+              накопление и предвкушение именованного будущего состояния
+              (goal gradient усиливается только когда близость к цели
+              перцептивно очевидна). Раньше это состояние было отрендерено
+              строкой text-muted-foreground с почти чёрной иконкой —
+              сильнейшая точка жизненного цикла подавалась тише кнопки
+              «Другое дело». Это единственный .glass-highlight на экране:
+              третий материальный ярус обязан оставаться редким. */}
+          {/* Условие включает actionStep, а не только totalStarts > 0:
+              план на сегодня может существовать при нуле стартов (LLM
+              сохраняет план из чата, не требуя ни одной сессии). Без этой
+              ветки такой человек остался бы на экране вообще без кнопки —
+              текст «жми кнопку» есть, кнопки нет. */}
           {stats &&
-            stats.totalStarts > 0 &&
-            !firstWord?.actionStep &&
+            (stats.totalStarts > 0 || !!firstWord?.actionStep) &&
             !firstWord?.showStarterChips && (
-              <div className="flex flex-col gap-2">
-                <Button
-                  size="lg"
-                  className="w-full gap-2 font-semibold"
-                  onClick={() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    return quick
-                      ? router.push(
-                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                        )
-                      : router.push("/app/session");
-                  }}
-                >
-                  <Play className="size-4" aria-hidden="true" />
-                  {(() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    if (!quick) return "Начать сессию";
-                    // Обрезка по границе слова: рваное «созда…» на
-                    // кнопке-герое читается как брак
-                    const short = trimLabel(quick, 22);
-                    return queuedStep
-                      ? `Следующий шаг: «${short}»`
-                      : `Повторить: «${short}»`;
-                  })()}
-                </Button>
-                {lastStepLabel && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-10 self-center text-muted-foreground"
+            <div className="glass-highlight flex flex-col gap-3 rounded-2xl p-4">
+              {stats.totalStarts < LANDMARK_COUNT ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    {/* Призрак следующего ориентира — крупно: он и есть
+                        обещание, ради которого нажимают кнопку ниже */}
+                    <svg
+                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 26} ${landmarkAnchors[stats.totalStarts].y - 40} 52 52`}
+                      className="h-14 w-14 shrink-0 opacity-45 saturate-[0.25]"
+                      aria-hidden="true"
+                    >
+                      {landmarkNodes[stats.totalStarts]}
+                    </svg>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm leading-snug text-muted-foreground">
+                        Следующий старт вырастит
+                      </span>
+                      <span className="text-balance text-lg font-bold leading-tight">
+                        «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                      </span>
+                    </div>
+                  </div>
+                  {/* Незавершённость видима, иначе Зейгарник не работает:
+                      десять делений, последнее пустое — видно, сколько
+                      осталось, без единой цифры-упрёка */}
+                  <div
+                    className="flex gap-1"
+                    role="img"
+                    aria-label={`Открыто ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
+                  >
+                    {Array.from({ length: LANDMARK_COUNT }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1 flex-1 rounded-full ${
+                          i < stats.totalStarts ? "bg-primary" : "bg-white/12"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {stats.totalStarts} из {LANDMARK_COUNT} ·{" "}
+                    {LANDMARK_COUNT - stats.totalStarts === 1
+                      ? "остался последний"
+                      : `осталось ${LANDMARK_COUNT - stats.totalStarts}`}
+                  </span>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className="text-lg font-bold leading-tight">
+                    {pityRipe
+                      ? "Следующая находка будет необычной — или лучше"
+                      : `Редких находок: ${rareFound} из ${ISLAND_POOL.filter((e) => e.rarity === "rare").length}`}
+                  </span>
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    {pityRipe
+                      ? "Она уже ждёт твоего старта."
+                      : "Полная сессия повышает шанс редкой."}
+                  </span>
+                </div>
+              )}
+
+              {/* Действие — внутри той же рамки, что и его награда */}
+              <Button
+                size="lg"
+                className="w-full gap-2 font-semibold"
+                onClick={() => {
+                  if (firstWord?.actionStep) {
+                    startNow(firstWord.actionStep);
+                    return;
+                  }
+                  const quick = queuedStep ?? lastStepLabel;
+                  return quick
+                    ? router.push(
+                        `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                      )
+                    : router.push("/app/session");
+                }}
+              >
+                <Play className="size-4" aria-hidden="true" />
+                {(() => {
+                  if (firstWord?.actionStep) return "Начинаю";
+                  const quick = queuedStep ?? lastStepLabel;
+                  if (!quick) return "Начать сессию";
+                  // Обрезка по границе слова: рваное «созда…» на
+                  // кнопке-герое читается как брак
+                  const short = trimLabel(quick, 22);
+                  return queuedStep
+                    ? `Следующий шаг: «${short}»`
+                    : `Повторить: «${short}»`;
+                })()}
+              </Button>
+
+              <div className="flex items-center justify-between gap-2">
+                {lastStepLabel || firstWord?.actionStep ? (
+                  <button
+                    type="button"
                     onClick={() => router.push("/app/session")}
+                    className="min-h-11 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
                     Другое дело
-                  </Button>
+                  </button>
+                ) : (
+                  <span />
                 )}
+                <Link
+                  href="/app/world"
+                  className="min-h-11 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Весь остров →
+                </Link>
               </div>
-            )}
+            </div>
+          )}
 
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">
@@ -551,53 +635,6 @@ export function HomeScreen() {
             </div>
           )}
 
-          {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
-              Дома (раньше — только в Мире). До 10-го старта — следующий
-              ориентир с призрачным силуэтом; дальше — счёт редких находок */}
-          {stats && stats.totalStarts > 0 && (
-            <Link
-              href="/app/world"
-              className="glass press flex items-center gap-3 rounded-2xl px-4 py-2.5"
-            >
-              {stats.totalStarts < LANDMARK_COUNT ? (
-                <>
-                  <svg
-                    viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                    className="h-9 w-9 shrink-0 opacity-60 saturate-[0.35]"
-                    aria-hidden="true"
-                  >
-                    {landmarkNodes[stats.totalStarts]}
-                  </svg>
-                  <span className="min-w-0 text-sm leading-snug text-muted-foreground">
-                    Следующий старт вырастит{" "}
-                    <span className="font-semibold text-foreground">
-                      «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
-                    </span>
-                    {stats.lastStartDate === todayKey(new Date())
-                      ? " — остров уже вырос сегодня, смотри →"
-                      : " →"}
-                  </span>
-                </>
-              ) : pityRipe ? (
-                <span className="text-sm leading-snug text-muted-foreground">
-                  Следующая находка будет{" "}
-                  <span className="font-semibold text-reward">
-                    необычной — или лучше
-                  </span>
-                  . Она уже ждёт →
-                </span>
-              ) : (
-                <span className="text-sm leading-snug text-muted-foreground">
-                  Редких находок:{" "}
-                  <span className="font-semibold text-reward">
-                    {rareFound} из{" "}
-                    {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
-                  </span>{" "}
-                  — полная сессия повышает шанс →
-                </span>
-              )}
-            </Link>
-          )}
         </div>
       </section>
 
