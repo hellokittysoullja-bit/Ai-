@@ -406,88 +406,6 @@ export function HomeScreen() {
             </AnimatePresence>
           </div>
 
-          {/* Момент дарения имени: один раз, после первого старта.
-              Названное существо — уже не приложение, а «мой». */}
-          {nameLoaded &&
-            !companionName &&
-            stats !== null &&
-            stats.totalStarts >= 1 && (
-              <form
-                className="glass flex flex-col gap-2 rounded-2xl p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  giveName(nameDraft);
-                }}
-              >
-                <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    placeholder="Как меня зовут?"
-                    maxLength={24}
-                    aria-label="Имя для напарника"
-                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="h-10"
-                    disabled={!nameDraft.trim()}
-                  >
-                    Так и зовут
-                  </Button>
-                </div>
-              </form>
-            )}
-
-          {/* Весточки от напарника: предлагаем один раз, после того как
-              человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». */}
-          {checkinState === "available" && !!companionName && (
-            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
-              <div className="flex items-start gap-2">
-                <Bell
-                  className="mt-0.5 size-4 shrink-0 text-primary"
-                  aria-hidden="true"
-                />
-                <p className="font-hand text-lg leading-snug">
-                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
-                  раз, без спама — и никаких «ты пропал».
-                </p>
-              </div>
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-10 self-start"
-                onClick={turnOnCheckins}
-                disabled={checkinBusy}
-              >
-                {checkinBusy ? "Секунду…" : "Да, махай мне"}
-              </Button>
-              {checkinHint && (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Почти получилось: чтобы я мог писать первым, добавь меня на
-                  экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
-                  раз.
-                </p>
-              )}
-            </div>
-          )}
-
-          {checkinState === "enabled" && !!companionName && (
-            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
-              <Bell
-                className="size-3.5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              {companionName} будет тихо махать тебе с острова раз в день.
-            </p>
-          )}
-
           {firstWord?.actionStep && (
             <Button
               size="lg"
@@ -570,6 +488,93 @@ export function HomeScreen() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Карточки отношений — ПОСЛЕ главного действия (serial position:
+              единственное целевое действие дня не должно иметь конкурентов
+              выше себя). Кот сначала помогает начать, потом просит имя —
+              так честнее и по характеру персонажа. */}
+
+          {/* Момент дарения имени: один раз, после первого старта.
+              Названное существо — уже не приложение, а «мой». */}
+          {nameLoaded &&
+            !companionName &&
+            stats !== null &&
+            stats.totalStarts >= 1 && (
+              <form
+                className="glass flex flex-col gap-2 rounded-2xl p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  giveName(nameDraft);
+                }}
+              >
+                <p className="font-hand text-lg leading-snug">
+                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+                  откликаться.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Как меня зовут?"
+                    maxLength={24}
+                    aria-label="Имя для напарника"
+                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-10"
+                    disabled={!nameDraft.trim()}
+                  >
+                    Так и зовут
+                  </Button>
+                </div>
+              </form>
+            )}
+
+          {/* Весточки от напарника: предлагаем один раз, после того как
+              человек уже назвал существо. Только там, где браузер их умеет.
+              Ни спама, ни давления — «один тихий раз в день». */}
+          {checkinState === "available" && !!companionName && (
+            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
+              <div className="flex items-start gap-2">
+                <Bell
+                  className="mt-0.5 size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <p className="font-hand text-lg leading-snug">
+                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
+                  раз, без спама — и никаких «ты пропал».
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-10 self-start"
+                onClick={turnOnCheckins}
+                disabled={checkinBusy}
+              >
+                {checkinBusy ? "Секунду…" : "Да, махай мне"}
+              </Button>
+              {checkinHint && (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Почти получилось: чтобы я мог писать первым, добавь меня на
+                  экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
+                  раз.
+                </p>
+              )}
+            </div>
+          )}
+
+          {checkinState === "enabled" && !!companionName && (
+            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
+              <Bell
+                className="size-3.5 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              {companionName} будет тихо махать тебе с острова раз в день.
+            </p>
           )}
 
           {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
