@@ -525,9 +525,13 @@ export function HomeScreen() {
                   <div className="flex items-center gap-3">
                     {/* Призрак следующего ориентира — крупно: он и есть
                         обещание, ради которого нажимают кнопку ниже */}
+                    {/* Призрак — объект предвкушения, он обязан читаться как
+                        конкретная вещь. На opacity-45 + saturate-.25 тёмный
+                        спрайт на тёмной карточке превращался в смазанное
+                        пятно: обещание есть, а разглядеть нечего. */}
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 26} ${landmarkAnchors[stats.totalStarts].y - 40} 52 52`}
-                      className="h-14 w-14 shrink-0 opacity-45 saturate-[0.25]"
+                      className="h-14 w-14 shrink-0 opacity-75 saturate-[0.6]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
@@ -611,12 +615,15 @@ export function HomeScreen() {
                 })()}
               </Button>
 
+              {/* inline-flex + items-center на ОБОИХ: у <a> min-h-11 сам по
+                  себе ничего не центрирует (инлайновый элемент), из-за чего
+                  «Весь остров» стоял выше «Другое дело» на одной строке */}
               <div className="flex items-center justify-between gap-2">
                 {lastStepLabel || firstWord?.actionStep ? (
                   <button
                     type="button"
                     onClick={() => router.push("/app/session")}
-                    className="min-h-11 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                   >
                     Другое дело
                   </button>
@@ -625,7 +632,7 @@ export function HomeScreen() {
                 )}
                 <Link
                   href="/app/world"
-                  className="min-h-11 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 >
                   Весь остров →
                 </Link>

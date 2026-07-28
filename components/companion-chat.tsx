@@ -146,6 +146,7 @@ export function CompanionChat({
   })
 
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   // «Он тебя помнит»: разговор переживает перезагрузку страницы.
   // Восстанавливаем последние сообщения при открытии чата.
@@ -168,9 +169,41 @@ export function CompanionChat({
   }, [messages, status])
 
   // U4: скроллим по факту нового сообщения, а не на каждый чанк стрима —
-  // scrollIntoView на каждом токене дёргал ленту
+  // scrollIntoView на каждом токене дёргал ленту.
+  //
+  // Скроллим сам контейнер, а не через scrollIntoView на маркере: при
+  // восстановлении переписки из памяти лента открывалась на scrollTop 0 —
+  // человек видел САМОЕ СТАРОЕ сообщение, а свежее было срезано нижней
+  // кромкой. Обещание «он тебя помнит» встречало старым контекстом.
+  // Первый скролл — мгновенный (это не анимация, это стартовая позиция),
+  // последующие — плавные. rAF: к моменту эффекта шрифты могли ещё не
+  // примениться, и высота ленты была занижена.
+  const didInitialScrollRef = useRef(false)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (messages.length === 0) return
+    const el = scrollRef.current
+    if (!el) return
+    const instant = !didInitialScrollRef.current
+    didInitialScrollRef.current = true
+    const run = () =>
+      el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'auto' : 'smooth' })
+    run()
+    if (!instant) return
+    // Первый заход требует нескольких точек синхронизации: на момент
+    // коммита рукописный Caveat ещё не применён, лента ниже вьюпорта не
+    // переполнена, и scrollTo молча схлопывается в ноль. Повторяем после
+    // кадра, после готовности шрифтов и с запасом по таймеру.
+    requestAnimationFrame(run)
+    let cancelled = false
+    const guarded = () => {
+      if (!cancelled) run()
+    }
+    document.fonts?.ready.then(guarded).catch(() => {})
+    const t = window.setTimeout(guarded, 300)
+    return () => {
+      cancelled = true
+      window.clearTimeout(t)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
@@ -196,7 +229,7 @@ export function CompanionChat({
       {/* U3: сообщения растут сверху, инпут прижат к таб-бару (sticky) —
           прежний justify-end на мобиле прижимал одинокий гритинг к низу и
           оставлял мёртвую дыру посреди экрана */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
+      <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto">
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
             className="flex items-start gap-2"
@@ -205,7 +238,10 @@ export function CompanionChat({
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
           >
             <CompanionAvatar />
-            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
+            {/* Тот же материал, что у реплик ниже (.glass): приветствие и
+                сообщения произносит один и тот же персонаж, а выглядели они
+                как два разных источника — сплошная заливка против стекла. */}
+            <div className="glass max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground">
               {greeting}
             </div>
           </motion.div>
@@ -236,9 +272,12 @@ export function CompanionChat({
                   </button>
                 ))}
               </div>
+              {/* min-h-11: цель была 143×17px — ниже минимума 24px по
+                  WCAG 2.5.8, при том что это единственный быстрый выход
+                  из чата прямо к сессии */}
               <Link
                 href="/app/session"
-                className="mt-1 inline-flex w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
+                className="mt-1 inline-flex min-h-11 w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
               >
                 или сразу к делу
                 <ArrowRight className="size-3.5" aria-hidden="true" />
