@@ -164,19 +164,26 @@
   }
 }
 
-/* Новый элемент острова: мягкая пульсация, 3 цикла, затем покой */
-@keyframes island-new-pulse {
-  0%,
-  100% {
-    opacity: 1;
+/* Новый элемент острова: одна тёплая вспышка света, оседающая — не
+   мигание прозрачностью. Мигание — визуальный язык уведомлений/ошибок,
+   не награды (глаз читает «что-то не так» там, где смысл «ты молодец»).
+   Три цикла opacity 1→0.45→1 за 4.8с — источник отвлечения и сенсорной
+   перегрузки для СДВГ-аудитории. Один цикл drop-shadow: яркость приходит
+   и оседает, opacity элемента не трогается вообще — не мерцает. */
+@keyframes island-new-bloom {
+  0% {
+    filter: drop-shadow(0 0 0 transparent);
   }
-  50% {
-    opacity: 0.45;
+  35% {
+    filter: drop-shadow(0 0 10px oklch(0.86 0.22 130 / 0.55));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
   }
 }
 
 .island-new-element {
-  animation: island-new-pulse 1.6s ease-in-out 3;
+  animation: island-new-bloom 1.8s ease-out 1;
 }
 
 /* Прорастание элемента острова: пружинный вход снизу с overshoot */
@@ -201,11 +208,11 @@
   animation: island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards;
 }
 
-/* Новый элемент: и прорастает, и пульсирует (оба класса задают animation) */
+/* Новый элемент: и прорастает, и вспыхивает (оба класса задают animation) */
 .island-grow.island-new-element {
   animation:
     island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards,
-    island-new-pulse 1.6s ease-in-out 0.7s 3;
+    island-new-bloom 1.8s ease-out 0.7s 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -367,12 +374,41 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 /* Микро-отклик нажатия — OPT-IN класс .press.
    НАВЕШИВАЕТСЯ ТОЛЬКО на CTA без собственного active-transform
    («Попробовать», «Пойдём попробуем», «Начать» в шапке).
-   Не конфликтует с таб-баром, отправкой в чате, motion/react и т.д. */
-.press {
-  transition: transform 120ms ease;
+   Не конфликтует с таб-баром, отправкой в чате, motion/react и т.д.
+   В @layer utilities: .press не обязан побеждать Tailwind-утилиты
+   там, где он больше не единственный, кто трогает transition, — см.
+   .press-warm/.press-fade ниже для случаев, где на одном элементе
+   нужен ещё один анимируемый property помимо transform. */
+@layer utilities {
+  .press {
+    transition: transform 120ms ease;
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
 }
-.press:active {
-  transform: scale(0.97);
+
+/* .press-warm/.press-fade: transition-property не складывается из двух
+   классов на одном элементе — побеждает только один (unlayered/layered
+   тут ни при чём, это просто как работает свойство). Кнопка hero после
+   ответа в диалоге должна ОДНОВРЕМЕННО быстро проседать по тапу (120мс)
+   И медленно «нагреваться» тенью (700мс) — единственный способ дать
+   обоим свойствам собственную длительность в одном элементе — одно
+   составное transition-объявление, а не .press + transition-shadow
+   раздельно. */
+@layer utilities {
+  .press-warm {
+    transition: transform 120ms ease, box-shadow 700ms ease;
+  }
+  .press-warm:active {
+    transform: scale(0.97);
+  }
+  .press-fade {
+    transition: transform 120ms ease, opacity 300ms ease;
+  }
+  .press-fade:active {
+    transform: scale(0.97);
+  }
 }
 
 /* Плавный скролл к якорям («Как это работает») — только если motion разрешён.
@@ -384,10 +420,14 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .press {
+  .press,
+  .press-warm,
+  .press-fade {
     transition: none;
   }
-  .press:active {
+  .press:active,
+  .press-warm:active,
+  .press-fade:active {
     transform: none;
   }
 }
@@ -438,22 +478,29 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     border-color 220ms ease,
     background 220ms ease;
 }
-.glass-interactive:hover {
-  /* Закон света: UI не светится — светится мир. Подъём отыгрывается
-     светлотой поверхности и чёрной тенью; лайм остаётся только тонкой
-     кромкой бордера (свет, пойманный на грани, — материал, не glow). */
-  border-color: oklch(0.86 0.22 130 / 0.45);
-  background: linear-gradient(
-    155deg,
-    oklch(1 0 0 / 0.19) 0%,
-    oklch(1 0 0 / 0.08) 55%,
-    oklch(1 0 0 / 0.03) 100%
-  );
-  transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.28),
-    inset 0 0 24px oklch(1 0 0 / 0.03),
-    0 16px 32px -18px oklch(0 0 0 / 0.55);
+/* Гейт только на устройствах с настоящим hover (мышь/трекпад): на тач-
+   экранах WebKit/Chromium эмулируют :hover после тапа и НЕ снимают его
+   до следующего касания — приподнятая карточка со светящейся кромкой
+   залипает до тапа в другое место. Продукт целиком мобильный (max-w-md
+   везде), значит без гейта это происходит почти при каждом тапе. */
+@media (hover: hover) and (pointer: fine) {
+  .glass-interactive:hover {
+    /* Закон света: UI не светится — светится мир. Подъём отыгрывается
+       светлотой поверхности и чёрной тенью; лайм остаётся только тонкой
+       кромкой бордера (свет, пойманный на грани, — материал, не glow). */
+    border-color: oklch(0.86 0.22 130 / 0.45);
+    background: linear-gradient(
+      155deg,
+      oklch(1 0 0 / 0.19) 0%,
+      oklch(1 0 0 / 0.08) 55%,
+      oklch(1 0 0 / 0.03) 100%
+    );
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.28),
+      inset 0 0 24px oklch(1 0 0 / 0.03),
+      0 16px 32px -18px oklch(0 0 0 / 0.55);
+  }
 }
 .glass-interactive:active {
   transform: translateY(0) scale(0.97);
