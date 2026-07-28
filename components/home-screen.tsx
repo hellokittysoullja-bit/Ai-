@@ -334,7 +334,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, доступны ли весточки
+    // Тихо ставим service worker и узнаём, д��ступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -505,49 +505,6 @@ export function HomeScreen() {
             </div>
           )}
 
-          {/* Карточки отношений — ПОСЛЕ главного действия (serial position:
-              единственное целевое действие дня не должно иметь конкурентов
-              выше себя). Кот сначала помогает начать, потом просит имя —
-              так честнее и по характеру персонажа. */}
-
-          {/* Момент дарения имени: один раз, после первого старта.
-              Названное существо — уже не приложение, а «мой». */}
-          {nameLoaded &&
-            !companionName &&
-            stats !== null &&
-            stats.totalStarts >= 1 && (
-              <form
-                className="glass flex flex-col gap-2 rounded-2xl p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  giveName(nameDraft);
-                }}
-              >
-                <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    placeholder="Как меня зовут?"
-                    maxLength={24}
-                    aria-label="Имя для напарника"
-                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="h-10"
-                    disabled={!nameDraft.trim()}
-                  >
-                    Так и зовут
-                  </Button>
-                </div>
-              </form>
-            )}
-
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
@@ -652,13 +609,17 @@ export function HomeScreen() {
                       {/* Сегменты-фишки (unit bias): каждый тик = один
                           реальный старт. h-1.5 + gap-1 — деления читаются
                           раздельно, не сливаются в полоску */}
+                      {/* Иерархия яркости: сегменты — приглушённый зелёный
+                          БЕЗ глоу. Девять светящихся полос перекрикивали
+                          CTA — самой яркой зелёной массой экрана обязана
+                          остаться кнопка действия, прогресс — второй голос */}
                       <span className="flex gap-1">
                         {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
                           <span
                             key={i}
                             className={`h-1.5 flex-1 rounded-full ${
                               i < stats.totalStarts
-                                ? 'bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]'
+                                ? 'bg-primary/65'
                                 : 'bg-white/[0.08]'
                             }`}
                           />
@@ -708,6 +669,47 @@ export function HomeScreen() {
               )}
             </Link>
           )}
+
+          {/* Порядок сверху вниз = приоритет: действие (CTA) → награда
+              (goal-карта) → отношения (имя). Карточка имени, стоявшая
+              МЕЖДУ действием и наградой, разрывала связку «сделай — и
+              вырастет» лишним социальным решением (serial position +
+              минимизация числа решений до действия) */}
+          {nameLoaded &&
+            !companionName &&
+            stats !== null &&
+            stats.totalStarts >= 1 && (
+              <form
+                className="glass flex flex-col gap-2 rounded-2xl p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  giveName(nameDraft);
+                }}
+              >
+                <p className="font-hand text-lg leading-snug">
+                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+                  откликаться.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Как меня зовут?"
+                    maxLength={24}
+                    aria-label="Имя для напарника"
+                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-10"
+                    disabled={!nameDraft.trim()}
+                  >
+                    Так и зовут
+                  </Button>
+                </div>
+              </form>
+            )}
         </div>
       </section>
 
