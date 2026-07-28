@@ -346,7 +346,9 @@ export function HomeScreen() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
-        <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
+        {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
+            блоками — визуальная теснота = когнитивная теснота для СДВГ */}
+        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
           <div className="flex items-start gap-3">
             {/*
               Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
@@ -407,21 +409,34 @@ export function HomeScreen() {
           </div>
 
           {firstWord?.actionStep && (
-            <Button
-              size="lg"
-              className="w-full gap-2 font-semibold"
-              onClick={() => startNow(firstWord.actionStep as string)}
-            >
-              <Play className="size-4 shrink-0" aria-hidden="true" />
-              {/* Задача — в лейбле (как в проде было «Повторить: …»):
-                  кнопка с конкретикой снимает последнюю микро-неопределённость
-                  «а что именно начнётся?» — labeled CTA конвертит лучше
-                  generic (исследования NN/g по link labels). trimLabel
-                  защищает от длинных задач. */}
-              <span className="truncate">
-                Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
-              </span>
-            </Button>
+            <div className="flex flex-col gap-1">
+              <Button
+                size="lg"
+                className="w-full gap-2 font-semibold"
+                onClick={() => startNow(firstWord.actionStep as string)}
+              >
+                <Play className="size-4 shrink-0" aria-hidden="true" />
+                {/* Задача — в лейбле (как в проде было «Повторить: …»):
+                    кнопка с конкретикой снимает последнюю микро-неопределённость
+                    «а что именно начнётся?» — labeled CTA конвертит лучше
+                    generic (исследования NN/g по link labels). trimLabel
+                    защищает от длинных задач. */}
+                <span className="truncate">
+                  Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
+                </span>
+              </Button>
+              {/* Выход «Другое дело» (пакет Клода): явный второй путь —
+                  для СДВГ отсутствие альтернативы у единственного CTA
+                  читается как ловушка и подталкивает к избеганию */}
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-10 self-center text-muted-foreground"
+                onClick={() => router.push("/app/session")}
+              >
+                Другое дело
+              </Button>
+            </div>
           )}
 
           {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
@@ -586,65 +601,85 @@ export function HomeScreen() {
           {stats && (
             <Link
               href="/app/world"
-              className="glass press flex items-center gap-3 rounded-2xl px-4 py-2.5"
+              className="glass press flex flex-col gap-3 rounded-2xl p-4"
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  <svg
-                    viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                    // opacity-85/saturate-0.55: «призрачность» силуэта должна
-                    // читаться как обещание, а не как дырка — на OLED с
-                    // автояркостью прежние 0.6/0.35 давали чёрный блин
-                    className="h-9 w-9 shrink-0 opacity-85 saturate-[0.55]"
-                    aria-hidden="true"
-                  >
-                    {landmarkNodes[stats.totalStarts]}
-                  </svg>
-                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="text-sm leading-snug text-muted-foreground">
-                      Следующий старт вырастит{" "}
-                      <span className="font-semibold text-foreground">
+                  {/* Пакет Клода: карта — «алтарь цели». Двухуровневая
+                      типографика (моно-eyebrow + крупное имя находки
+                      отдельной строкой), крупный силуэт, толстые сегменты,
+                      вербальный goal-gradient и явный выход «весь остров» —
+                      вместо прежней однострочной скороговорки с сиротской
+                      стрелкой */}
+                  <span className="flex items-center gap-3">
+                    <svg
+                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
+                      // opacity-90/saturate-0.6: силуэт-обещание заметнее —
+                      // на OLED прежние значения давали чёрный блин
+                      className="h-12 w-12 shrink-0 opacity-90 saturate-[0.6]"
+                      aria-hidden="true"
+                    >
+                      {landmarkNodes[stats.totalStarts]}
+                    </svg>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Следующий старт вырастит
+                      </span>
+                      <span className="text-base font-semibold leading-snug text-foreground text-balance">
                         «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
                       </span>
-                      {stats.lastStartDate === todayKey(new Date())
-                        ? " — остров уже вырос сегодня, смотри →"
-                        : " →"}
                     </span>
-                    {/* Endowed progress (Nunes & Drèze, 2006): видимая
-                        заполненная часть пути к находке. Только при
-                        totalStarts > 0 — пустой бар у новичка демотивирует
-                        (нулевой прогресс хуже отсутствия бара) */}
-                    {stats.totalStarts > 0 && (
-                      <span
-                        className="flex items-center gap-1"
-                        role="progressbar"
-                        aria-valuenow={stats.totalStarts}
-                        aria-valuemin={0}
-                        aria-valuemax={LANDMARK_COUNT}
-                        aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
-                      >
-                        {/* Сегменты вместо сплошной заливки: 10 стартов —
-                            дискретные единицы, каждый тик = один реальный
-                            старт (unit bias: считаемые деления читаются
-                            как «мои» лучше, чем безликий процент) */}
-                        <span className="flex flex-1 gap-0.5">
-                          {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
-                            <span
-                              key={i}
-                              className={`h-1 flex-1 rounded-full ${
-                                i < stats.totalStarts
-                                  ? 'bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]'
-                                  : 'bg-white/[0.08]'
-                              }`}
-                            />
-                          ))}
+                  </span>
+                  {/* Endowed progress (Nunes & Drèze, 2006): видимая
+                      заполненная часть пути к находке. Только при
+                      totalStarts > 0 — пустой бар у новичка демотивирует */}
+                  {stats.totalStarts > 0 && (
+                    <span
+                      className="flex flex-col gap-1.5"
+                      role="progressbar"
+                      aria-valuenow={stats.totalStarts}
+                      aria-valuemin={0}
+                      aria-valuemax={LANDMARK_COUNT}
+                      aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
+                    >
+                      {/* Сегменты-фишки (unit bias): каждый тик = один
+                          реальный старт. h-1.5 + gap-1 — деления читаются
+                          раздельно, не сливаются в полоску */}
+                      <span className="flex gap-1">
+                        {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
+                          <span
+                            key={i}
+                            className={`h-1.5 flex-1 rounded-full ${
+                              i < stats.totalStarts
+                                ? 'bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]'
+                                : 'bg-white/[0.08]'
+                            }`}
+                          />
+                        ))}
+                      </span>
+                      <span className="flex items-baseline justify-between gap-2">
+                        {/* Вербальный фрейминг близости (goal-gradient,
+                            Kivetz 2006): «остался последний» сильнее голого
+                            счёта */}
+                        <span className="font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                          {stats.totalStarts} из {LANDMARK_COUNT}
+                          {LANDMARK_COUNT - stats.totalStarts === 1
+                            ? ' · остался последний'
+                            : stats.lastStartDate === todayKey(new Date())
+                              ? ' · вырос сегодня'
+                              : ''}
                         </span>
-                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
-                          {stats.totalStarts}/{LANDMARK_COUNT}
+                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                          весь остров →
                         </span>
                       </span>
-                    )}
-                  </span>
+                    </span>
+                  )}
+                  {stats.totalStarts === 0 && (
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+                      весь остров →
+                    </span>
+                  )}
                 </>
               ) : pityRipe ? (
                 <span className="text-sm leading-snug text-muted-foreground">
