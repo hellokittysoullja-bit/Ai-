@@ -171,6 +171,13 @@ function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
 export function Hero() {
   const [steps, setSteps] = useState<SceneStep[]>([]);
   const [answered, setAnswered] = useState(false);
+  // D3 · Раньше 550мс между отправленной репликой и ответом кота были
+  // тишиной без единого сигнала — не ноль (мгновенный честный ответ) и не
+  // настоящее предвкушение (сигнал «печатает»), а худшее из двух: пауза,
+  // которую мозг читает как «сайт завис», а не как «он думает». Тот же
+  // паттерн точек, что уже есть в companion-chat.tsx — переиспользован,
+  // не изобретён заново.
+  const [typing, setTyping] = useState(false);
   const [expression, setExpression] = useState<MascotExpression>("calm");
   // CTA виден с первой секунды (не заперт за диалогом), но ответ существа
   // всё равно должен закрывать дофаминовую петлю действием, а не повисать
@@ -233,7 +240,9 @@ export function Hero() {
       // приватный режим — не критично
     }
     setSteps([{ kind: "visitor", text: REPLIES[key].visitor, replyKey: key }]);
+    setTyping(true);
     setTimeout(() => {
+      setTyping(false);
       setSteps((prev) => [
         ...prev,
         { kind: "companion", text: REPLIES[key].companion },
@@ -560,6 +569,27 @@ export function Hero() {
                     </p>
                   </motion.div>
                 ),
+              )}
+              {typing && (
+                <motion.div
+                  key="typing"
+                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={SPRING_SNAPPY}
+                  className="flex items-center gap-1 self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-4 py-3 shadow-xl backdrop-blur-md"
+                  aria-label="Напарник печатает"
+                >
+                  <span
+                    className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                    style={{ animationDelay: "-0.3s" }}
+                  />
+                  <span
+                    className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                    style={{ animationDelay: "-0.15s" }}
+                  />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                </motion.div>
               )}
             </AnimatePresence>
 
