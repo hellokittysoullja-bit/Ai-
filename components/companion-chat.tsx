@@ -32,12 +32,27 @@ type CompanionChatProps = {
 }
 
 function CompanionAvatar() {
-  // Кружок-подложка: тёмный кот на тёмном фоне читался пятнышком
+  // Тот же тёплый очаг, что у героя лендинга и в шапке Дома: существо
+  // ВЕЗДЕ живёт в своём свете. Без него чёрный кот в тёмном кружке
+  // читался кляксой (скриншоты с реального iPhone).
   return (
-    <div className="flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80">
-      <MascotSvg expression="calm" size={30} />
+    <div className="relative flex size-9 shrink-0 items-center justify-center">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-1.5 rounded-full bg-[radial-gradient(circle_at_center,oklch(0.72_0.17_55/0.2)_0%,transparent_70%)]"
+      />
+      <div className="relative flex size-9 items-center justify-center rounded-full border border-white/10 bg-secondary/80">
+        <MascotSvg expression="calm" size={30} />
+      </div>
     </div>
   )
+}
+
+/** Держит выравнивание пузыря в сгруппированной серии сообщений кота —
+    аватар показываем только на первой реплике серии (паттерн iMessage/
+    Telegram: повторяющийся столбик одинаковых котов — шум, не сигнал) */
+function AvatarSpacer() {
+  return <div aria-hidden="true" className="w-9 shrink-0" />
 }
 
 export function CompanionChat({
@@ -167,10 +182,17 @@ export function CompanionChat({
     saveChatMessages(messages)
   }, [messages, status])
 
-  // U4: скроллим по факту нового сообщения, а не на каждый чанк стрима —
-  // scrollIntoView на каждом токене дёргал ленту
+  // U4 + «не дёргай читающего»: автоскролл только если человек и так у низа
+  // ленты ЛИБО он сам только что отправил сообщение. Если он ускроллил вверх
+  // перечитать — новое сообщение не вырывает ленту из рук (стандарт
+  // Telegram/iMessage; вырывание = потеря контроля = злость).
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const nearBottomRef = useRef(true)
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const lastRole = messages[messages.length - 1]?.role
+    if (nearBottomRef.current || lastRole === 'user') {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
@@ -191,12 +213,23 @@ export function CompanionChat({
           реплика улетала к низу, а между ней и приветствием-шапкой зияла
           пропасть, читавшаяся как «не прогрузилось». Сверху вниз реплики
           примыкают к шапке, а свободное место уходит вниз к полю ввода — это
-          нормальный «пустой чат в ожидании», а не разрыв. Overflow и autoscroll
+          нормальный «пустой чат в ожидании», а не раз��ыв. Overflow и autoscroll
           на bottomRef не затронуты. */}
       {/* U3: сообщения растут сверху, инпут прижат к таб-бару (sticky) —
           прежний justify-end на мобиле прижимал одинокий гритинг к низу и
           оставлял мёртвую дыру посреди экрана */}
-      <div className="flex flex-1 flex-col overflow-y-auto">
+      <div
+        ref={scrollRef}
+        onScroll={() => {
+          const el = scrollRef.current
+          if (!el) return
+          nearBottomRef.current =
+            el.scrollHeight - el.scrollTop - el.clientHeight < 120
+        }}
+        // overscroll-contain: резиновый отскок ленты не тянет за собой
+        // всю страницу (iOS scroll chaining)
+        className="flex flex-1 flex-col overflow-y-auto overscroll-contain"
+      >
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
           <motion.div
             className="flex items-start gap-2"
@@ -205,7 +238,9 @@ export function CompanionChat({
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
           >
             <CompanionAvatar />
-            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3 py-1.5 font-hand text-lg leading-snug">
+            {/* px-3.5 py-2: у Caveat высокие выносные — при py-1.5 буквы
+                упирались в кромку пузыря */}
+            <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-secondary px-3.5 py-2 font-hand text-lg leading-snug">
               {greeting}
             </div>
           </motion.div>
@@ -230,7 +265,7 @@ export function CompanionChat({
                     key={chip}
                     type="button"
                     onClick={() => sendMessage({ text: chip })}
-                    className="glass glass-interactive press rounded-full px-3.5 py-2 text-sm text-foreground hover:text-primary"
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm text-foreground hover:text-primary"
                   >
                     {chip}
                   </button>
@@ -246,15 +281,26 @@ export function CompanionChat({
             </motion.div>
           )}
 
-          {messages.map((message) => (
+          {messages.map((message, mi) => {
+            // Группировка серий (паттерн iMessage/Telegram): аватар — только
+            // на первой реплике подряд идущих сообщений кота, дальше серия
+            // визуально сцеплена меньшим отступом. Столбик одинаковых котов
+            // (скриншот IMG_1847) — шум, который дешевит интерфейс.
+            const groupedWithPrev =
+              message.role === 'assistant' &&
+              mi > 0 &&
+              messages[mi - 1].role === 'assistant'
+            const firstTextIdx = message.parts.findIndex((p) => p.type === 'text')
+            return (
             <div
               key={message.id}
               className={`flex flex-col gap-2 ${
                 message.role === 'user' ? 'items-end' : 'items-start'
-              }`}
+              } ${groupedWithPrev ? '-mt-1.5' : ''}`}
             >
               {message.parts.map((part, i) => {
                 if (part.type === 'text') {
+                  const showAvatar = i === firstTextIdx && !groupedWithPrev
                   return (
                     <motion.div
                       key={i}
@@ -263,12 +309,15 @@ export function CompanionChat({
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ type: 'spring', stiffness: 300, damping: 24 }}
                     >
-                      {message.role !== 'user' && <CompanionAvatar />}
+                      {message.role !== 'user' &&
+                        (showAvatar ? <CompanionAvatar /> : <AvatarSpacer />)}
                       <div
                         className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           message.role === 'user'
-                            ? 'ml-auto rounded-tr-sm bg-primary px-3 py-2 text-sm leading-relaxed text-primary-foreground'
-                            : 'glass rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
+                            ? 'ml-auto rounded-tr-sm bg-primary px-3.5 py-2 text-sm leading-relaxed text-primary-foreground'
+                            : `glass px-3.5 py-2 font-hand text-lg leading-snug text-secondary-foreground ${
+                                showAvatar ? 'rounded-tl-sm' : ''
+                              }`
                         }`}
                       >
                         {part.text}
@@ -308,24 +357,33 @@ export function CompanionChat({
                   }
                   const d = minutes && [15, 25, 45].includes(minutes) ? minutes : 15
                   return (
+                    // Единственный настоящий CTA в ленте — обязан отличаться
+                    // от обычных пузырей: primary-кромка стекла (через
+                    // --glass-border, каскад-безопасно) + полноразмерная
+                    // кнопка 44px. Раньше карточка сливалась с репликами.
                     <div
                       key={i}
-                      className="glass ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3"
+                      className="glass ml-11 flex w-full max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3"
+                      style={
+                        {
+                          '--glass-border':
+                            'color-mix(in oklab, var(--primary) 40%, transparent)',
+                        } as React.CSSProperties
+                      }
                     >
                       <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
                         готов к старту · {d} мин
                       </span>
                       <span className="text-sm font-semibold">{firstStep}</span>
                       <Button
-                        size="sm"
-                        className="gap-1.5 font-semibold"
+                        className="press h-11 w-full gap-1.5 font-semibold"
                         onClick={() =>
                           router.push(
                             `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,
                           )
                         }
                       >
-                        <Play className="size-3.5" aria-hidden="true" />
+                        <Play className="size-4" aria-hidden="true" />
                         Начинаю
                       </Button>
                     </div>
@@ -348,7 +406,8 @@ export function CompanionChat({
                 return null
               })}
             </div>
-          ))}
+            )
+          })}
 
           {status === 'submitted' && (
             <div className="flex items-center gap-2">
@@ -397,14 +456,20 @@ export function CompanionChat({
             }}
             placeholder={placeholder ?? 'Напиши напарнику…'}
             aria-label="Сообщение напарнику"
-            className="glass h-11 flex-1 rounded-xl px-4 text-sm"
+            // text-base (16px) обязателен: при font-size < 16px iOS Safari
+            // принудительно зумит страницу на фокусе — главный «дешёвый» тик
+            // мобильных сайтов
+            className="glass h-11 min-w-0 flex-1 rounded-xl px-4 text-base"
           />
           <Button
             type="submit"
             size="icon"
             disabled={!canSend || !input.trim()}
             aria-label="Отправить"
-            className="size-11 rounded-xl"
+            // press: нажимаемое отвечает телом (scale 0.97, 120ms ease-out);
+            // transition на opacity — кнопка «оживает» плавно, когда появился
+            // текст, а не переключается ступенькой
+            className="press size-11 rounded-xl transition-opacity duration-200"
           >
             <ArrowUp className="size-5" />
           </Button>

@@ -203,6 +203,35 @@ export async function clearActiveSession(): Promise<void> {
   write(KEYS.activeSession, null)
 }
 
+// ---------- Очередь дробления (продукт помнит невыполненные шаги) ----------
+
+export type StepQueue = {
+  /** Задача, которую дробили */
+  task: string
+  /** Оставшиеся шаги в исходном порядке */
+  steps: string[]
+}
+
+const STEP_QUEUE_KEY = 'naparnik:stepQueue'
+
+export async function getStepQueue(): Promise<StepQueue | null> {
+  const q = read<StepQueue | null>(STEP_QUEUE_KEY, null)
+  return q && q.steps.length > 0 ? q : null
+}
+
+export async function saveStepQueue(task: string, steps: string[]): Promise<void> {
+  const clean = steps.map((s) => s.trim()).filter(Boolean)
+  write(STEP_QUEUE_KEY, clean.length > 0 ? { task, steps: clean } : null)
+}
+
+/** Шаг исполнен — очередь короче; пустая очередь очищается целиком */
+export async function consumeQueueStep(step: string): Promise<void> {
+  const q = await getStepQueue()
+  if (!q) return
+  const rest = q.steps.filter((s) => s !== step)
+  write(STEP_QUEUE_KEY, rest.length > 0 ? { task: q.task, steps: rest } : null)
+}
+
 // ---------- Имя существа (endowment: названное — становится своим) ----------
 
 export async function getCompanionName(): Promise<string | null> {

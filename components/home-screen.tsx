@@ -539,7 +539,7 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="glass glass-interactive press rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {chip}
                   </Link>
@@ -563,7 +563,10 @@ export function HomeScreen() {
                 <>
                   <svg
                     viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                    className="h-9 w-9 shrink-0 opacity-60 saturate-[0.35]"
+                    // opacity-85/saturate-0.55: «призрачность» силуэта должна
+                    // читаться как обещание, а не как дырка — на OLED с
+                    // автояркостью прежние 0.6/0.35 давали чёрный блин
+                    className="h-9 w-9 shrink-0 opacity-85 saturate-[0.55]"
                     aria-hidden="true"
                   >
                     {landmarkNodes[stats.totalStarts]}
