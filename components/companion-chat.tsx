@@ -510,7 +510,7 @@ export function CompanionChat({
                       <span className="text-sm font-semibold">{plan.task}</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         Первый шаг: {plan.firstStep}
-                        {plan.startTime ? ` — ${plan.startTime}` : ''}
+                        {plan.startTime ? ` ��� ${plan.startTime}` : ''}
                       </span>
                     </div>
                   )
@@ -653,12 +653,30 @@ export function CompanionChat({
             e.preventDefault()
             submit()
           }}
-          className="border-t border-border bg-background/92 px-4 py-3 backdrop-blur-md"
+          // Жёсткая линия border-t заменена растворением: лента тает в док
+          // градиентом (закон непрерывности — сцена не «обрывается» на
+          // границе панели, свет и фон едины, как у очага)
+          className="relative bg-background/92 px-4 py-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8 before:bg-gradient-to-t before:from-background/80 before:to-transparent"
         >
-          <div className="mx-auto flex max-w-md items-center gap-2">
-            <input
+          <div className="mx-auto flex max-w-md items-end gap-2">
+            {/* textarea вместо input: длинная мысль не прячется за одной
+                строкой (стандарт Telegram/iMessage). Растёт до ~4 строк
+                через field-sizing / авто-высоту; Enter — отправить,
+                Shift+Enter — новая строка */}
+            <textarea
+              ref={(el) => {
+                // Схлопываем высоту после отправки (submit чистит input в
+                // обход onChange — без этого поле остаётся растянутым)
+                if (el && input === '') el.style.height = 'auto'
+              }}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              rows={1}
+              onChange={(e) => {
+                setInput(e.target.value)
+                const el = e.currentTarget
+                el.style.height = 'auto'
+                el.style.height = `${Math.min(el.scrollHeight, 108)}px`
+              }}
               onKeyDown={(e) => {
                 if (
                   e.key === 'Enter' &&
@@ -667,6 +685,7 @@ export function CompanionChat({
                   e.keyCode !== 229
                 ) {
                   e.preventDefault()
+                  e.currentTarget.style.height = 'auto'
                   submit()
                 }
               }}
@@ -676,14 +695,14 @@ export function CompanionChat({
               // принудительно зумит страницу на фокусе — главный «дешёвый»
               // тик мобильных сайтов. .chat-input-dock — тёплое свечение
               // кромки на фокусе: «напарник заметил, что ты пишешь»
-              className="glass chat-input-dock h-11 min-w-0 flex-1 rounded-xl px-4 text-base transition-shadow duration-300"
+              className="glass chat-input-dock max-h-27 min-h-11 min-w-0 flex-1 resize-none rounded-xl px-4 py-2.5 text-base leading-relaxed transition-shadow duration-300"
             />
             <Button
               type="submit"
               size="icon"
               disabled={!canSend || !input.trim()}
               aria-label="Отправить"
-              className="press size-11 rounded-xl transition-opacity duration-200"
+              className="press size-11 shrink-0 rounded-xl transition-opacity duration-200"
             >
               {/* Стрелка «выстреливает» вверх при каждой отправке — жест
                   подтверждён телом, сообщение реально улетело */}

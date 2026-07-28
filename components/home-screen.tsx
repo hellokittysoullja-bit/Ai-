@@ -623,13 +623,21 @@ export function HomeScreen() {
                         aria-valuemax={LANDMARK_COUNT}
                         aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
                       >
-                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
-                          <span
-                            className="block h-full rounded-full bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]"
-                            style={{
-                              width: `${(stats.totalStarts / LANDMARK_COUNT) * 100}%`,
-                            }}
-                          />
+                        {/* Сегменты вместо сплошной заливки: 10 стартов —
+                            дискретные единицы, каждый тик = один реальный
+                            старт (unit bias: считаемые деления читаются
+                            как «мои» лучше, чем безликий процент) */}
+                        <span className="flex flex-1 gap-0.5">
+                          {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
+                            <span
+                              key={i}
+                              className={`h-1 flex-1 rounded-full ${
+                                i < stats.totalStarts
+                                  ? 'bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]'
+                                  : 'bg-white/[0.08]'
+                              }`}
+                            />
+                          ))}
                         </span>
                         <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
                           {stats.totalStarts}/{LANDMARK_COUNT}
