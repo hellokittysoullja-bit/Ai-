@@ -83,11 +83,14 @@ export function Problem() {
               >
                 <span
                   aria-hidden="true"
-                  className="font-mono text-destructive/60"
+                  className="font-mono text-destructive/80"
                 >
                   ✗
                 </span>
-                <span className="text-foreground/45 line-through decoration-destructive/45 decoration-[1.5px]">
+                {/* /62 вместо /45: зачёркнутое ДОЛЖНО читаться — это аргумент
+                    «ты это уже пробовал», а не декорация. На OLED с автояркостью
+                    /45 сливалось в серую кашу (скриншот IMG_1844) */}
+                <span className="text-foreground/62 line-through decoration-destructive/55 decoration-[1.5px]">
                   {tool}
                 </span>
               </motion.li>

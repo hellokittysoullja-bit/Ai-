@@ -5,32 +5,31 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 /**
- * «Начать» в шапке появляется только после скролла за hero — один
- * primary-CTA на вьюпорт («Попробовать» живёт в hero).
+ * Инвариант: в кадре всегда ровно одно primary-действие.
+ * Шапочный «Начать» виден тогда и только тогда, когда CTA героя (#hero-cta)
+ * не виден. Прежняя логика (scrollY > 0.6·vh) оставляла ПЕРВЫЙ кадр на
+ * мобильном вообще без действия: hero-CTA за сгибом, шапочный ещё скрыт —
+ * подтверждено скриншотом с реального iPhone.
  *
- * Защита от регрессии: если страница короткая (скроллить почти нечего),
- * CTA показывается сразу — чтобы кнопка НИКОГДА не исчезала навсегда.
+ * Защита от регрессии: если #hero-cta не найден (страница без hero),
+ * CTA показывается сразу — кнопка никогда не исчезает навсегда.
  */
 export function HeaderCta() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const compute = () => {
-      const scrollable = document.body.scrollHeight - window.innerHeight;
-      // Скроллить почти нечего → CTA нужна сразу (короткие страницы).
-      if (scrollable < window.innerHeight * 0.4) {
-        setVisible(true);
-        return;
-      }
-      setVisible(window.scrollY > window.innerHeight * 0.6);
-    };
-    compute();
-    window.addEventListener("scroll", compute, { passive: true });
-    window.addEventListener("resize", compute);
-    return () => {
-      window.removeEventListener("scroll", compute);
-      window.removeEventListener("resize", compute);
-    };
+    const target = document.getElementById("hero-cta");
+    if (!target) {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => setVisible(!entry.isIntersecting),
+      // rootMargin -56px сверху: зона за sticky-шапкой не считается «видимой»
+      { threshold: 0.4, rootMargin: "-56px 0px 0px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
   }, []);
 
   return (

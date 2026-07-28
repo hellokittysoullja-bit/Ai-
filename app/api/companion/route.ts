@@ -24,7 +24,10 @@ function pickModel() {
   if (process.env.GOOGLE_GENERATIVE_AI_API_KEY) {
     return google('gemini-2.5-flash')
   }
-  return 'openai/gpt-5.5'
+  // ВАЖНО: id должен существовать в AI Gateway. Прежний 'openai/gpt-5.5'
+  // не существовал — каждый вызов падал, и ВСЕ ответы в проде шли через
+  // скриптовый фолбэк (regex-мозг), что читалось как тупой бот.
+  return 'google/gemini-3.6-flash'
 }
 
 export async function POST(req: Request) {
