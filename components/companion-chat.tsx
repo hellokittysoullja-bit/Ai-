@@ -53,30 +53,6 @@ function CompanionAvatar({ reacting = false }: { reacting?: boolean }) {
   )
 }
 
-// Тот же рукотворный хвостик, что уже держит атрибуцию реплики на лендинге
-// (viewBox 0 0 14 10, один росчерк пера) — здесь он сидит ровно в срезанном
-// углу первой реплики группы (rounded-tl-sm/tr-sm), связывая геометрию
-// с тем же почерком, а не изобретая новый декоративный элемент.
-function MessageTail({ side }: { side: 'left' | 'right' }) {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 14 10"
-      className={`pointer-events-none absolute -top-[7px] h-[10px] w-[14px] ${
-        side === 'left' ? 'left-[10px] text-white/25' : 'right-[10px] scale-x-[-1] text-primary'
-      }`}
-    >
-      <path
-        d="M2 10 Q 5 4 12 1"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-      />
-    </svg>
-  )
-}
-
 export function CompanionChat({
   mode,
   greeting,
@@ -336,7 +312,7 @@ export function CompanionChat({
         className="pointer-events-none absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 -translate-y-1/4 rounded-full opacity-80 blur-3xl sm:h-80 sm:w-80"
         style={{
           background:
-            'radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.13) 0%, transparent 70%)',
+            'radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.2) 0%, transparent 70%)',
         }}
       />
       <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto">
@@ -351,8 +327,7 @@ export function CompanionChat({
             {/* Тот же материал, что у реплик ниже (.glass): приветствие и
                 сообщения произносит один и тот же персонаж, а выглядели они
                 как два разных источника — сплошная заливка против стекла. */}
-            <div className="glass relative max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]">
-              <MessageTail side="left" />
+            <div className="glass max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]">
               {greeting}
             </div>
           </motion.div>
@@ -392,7 +367,7 @@ export function CompanionChat({
                       stiffness: 300,
                       damping: 24,
                     }}
-                    className="glass glass-interactive press rounded-full px-3.5 py-2 text-sm text-foreground hover:text-primary"
+                    className="glass glass-interactive press rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
                   >
                     {chip}
                   </motion.button>
@@ -446,13 +421,12 @@ export function CompanionChat({
                           <div className="size-9 shrink-0" aria-hidden="true" />
                         ))}
                       <div
-                        className={`relative max-w-[85%] whitespace-pre-wrap rounded-2xl ${
+                        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           isUser
                             ? `ml-auto bg-gradient-to-br from-primary to-primary/85 px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-[0_4px_14px_-6px_oklch(0.72_0.17_55/0.45)] ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
                             : `glass px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)] ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
                         }`}
                       >
-                        {isFirstOfGroup && <MessageTail side={isUser ? 'right' : 'left'} />}
                         {part.text}
                       </div>
                     </motion.div>
@@ -468,7 +442,7 @@ export function CompanionChat({
                   return (
                     <div
                       key={i}
-                      className="glass ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3"
+                      className="glass ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
                     >
                       <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
                         <CalendarCheck className="size-3.5" aria-hidden="true" />
@@ -492,7 +466,7 @@ export function CompanionChat({
                   return (
                     <div
                       key={i}
-                      className="glass ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3"
+                      className="glass ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
                     >
                       <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
                         готов к старту · {d} мин
@@ -534,10 +508,17 @@ export function CompanionChat({
           })}
 
           {status === 'submitted' && (
-            <div className="flex items-center gap-2">
+            <motion.div
+              className="flex items-center gap-2"
+              initial={{ opacity: 0, y: 6, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+            >
               <CompanionAvatar />
+              {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
+                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней. */}
               <span
-                className="flex items-center gap-1 px-1 py-2.5"
+                className="glass flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
                 aria-label="Напарник печатает"
               >
                 <span
@@ -550,7 +531,7 @@ export function CompanionChat({
                 />
                 <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
               </span>
-            </div>
+            </motion.div>
           )}
           <div ref={bottomRef} />
         </div>
@@ -595,7 +576,11 @@ export function CompanionChat({
         }}
         className="sticky bottom-16 z-10 bg-gradient-to-t from-background via-background/85 to-transparent px-4 pt-6 pb-3"
       >
-        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:ring-2 focus-within:ring-primary/40">
+        {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
+            рассеянный свет (тонкий контур + вынесенное свечение), а не
+            сплошная неоновая обводка — так фокус читается премиально, а
+            не как игровой хайлайт. */}
+        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1.5px_oklch(0.86_0.22_130/0.4),0_0_22px_-4px_oklch(0.86_0.22_130/0.4),0_10px_30px_-12px_oklch(0_0_0/0.55)]">
           <textarea
             ref={textareaRef}
             value={input}
