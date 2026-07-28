@@ -7,15 +7,27 @@ import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } fro
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
-import { ArrowDown, ArrowRight, ArrowUp, CalendarCheck, Play, Sparkles } from 'lucide-react'
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  CalendarCheck,
+  Check,
+  Play,
+  Sparkles,
+  Sprout,
+} from 'lucide-react'
 import { hapticStart } from '@/lib/haptics'
 import Link from 'next/link'
 import {
   addNote,
   buildMemoryContext,
   getChatMessages,
+  getChatTimestamps,
   saveChatMessages,
+  saveChatTimestamps,
   savePlan,
+  todayKey,
   type MemoryContext,
 } from '@/lib/memory'
 import { scriptedReply } from '@/lib/scripted-companion'
@@ -51,6 +63,24 @@ function CompanionAvatar({ reacting = false }: { reacting?: boolean }) {
       <MascotSvg expression={reacting ? 'happy' : 'calm'} size={30} />
     </div>
   )
+}
+
+function formatClock(iso: string): string {
+  return new Date(iso).toLocaleTimeString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+/** Ярлык дня для разделителя переписки: «Сегодня» / «Вчера» / дата */
+function formatDayLabel(iso: string): string {
+  const d = new Date(iso)
+  const key = todayKey(d)
+  if (key === todayKey()) return 'Сегодня'
+  const yesterday = new Date()
+  yesterday.setDate(yesterday.getDate() - 1)
+  if (key === todayKey(yesterday)) return 'Вчера'
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
 }
 
 export function CompanionChat({
@@ -180,10 +210,18 @@ export function CompanionChat({
   // «Он тебя помнит»: разговор переживает перезагрузку страницы.
   // Восстанавливаем последние сообщения при открытии чата.
   const chatRestoredRef = useRef(false)
+  // Момент первого появления каждой реплики — в state (не в ref), иначе
+  // свежий таймстемп новой реплики никогда не попадёт на экран: ref не
+  // вызывает перерендер сам по себе.
+  const [times, setTimes] = useState<Record<string, string>>({})
   useEffect(() => {
     if (chatRestoredRef.current) return
     chatRestoredRef.current = true
-    getChatMessages<(typeof messages)[number]>().then((saved) => {
+    Promise.all([
+      getChatMessages<(typeof messages)[number]>(),
+      getChatTimestamps(),
+    ]).then(([saved, loadedTimes]) => {
+      setTimes(loadedTimes)
       if (saved.length > 0) setMessages(saved)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -195,6 +233,21 @@ export function CompanionChat({
     if (status === 'streaming' || status === 'submitted') return
     if (messages.length === 0) return
     saveChatMessages(messages)
+    // Метка времени — на момент ПЕРВОГО появления реплики, а не на момент
+    // сохранения: иначе восстановленная история переписывала бы себе
+    // время каждым визитом.
+    setTimes((prev) => {
+      let changed = false
+      const next = { ...prev }
+      for (const m of messages) {
+        if (!next[m.id]) {
+          next[m.id] = new Date().toISOString()
+          changed = true
+        }
+      }
+      if (changed) saveChatTimestamps(next)
+      return changed ? next : prev
+    })
   }, [messages, status])
 
   // U4: скроллим по факту нового сообщения, а не на каждый чанк стрима —
@@ -393,15 +446,35 @@ export function CompanionChat({
             // сообщение: только оно получает хвост и аватар, остальные
             // прижимаются к нему и идут с ровными углами.
             const prev = messages[mi - 1]
+            const next = messages[mi + 1]
             const isFirstOfGroup = !prev || prev.role !== message.role
+            const isLastOfGroup = !next || next.role !== message.role
             const isUser = message.role === 'user'
+
+            // Разделитель дня: только когда дата реально СМЕНИЛАСЬ между
+            // соседними репликами — на свежем чате без истории делитель
+            // не нужен, «Сегодня» перед первой же репликой — просто шум.
+            const thisTime = times[message.id]
+            const prevTime = prev ? times[prev.id] : undefined
+            const showDayDivider =
+              !!thisTime &&
+              !!prevTime &&
+              todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
+
             return (
-            <div
-              key={message.id}
-              className={`flex flex-col gap-2 ${isFirstOfGroup ? '' : '-mt-2'} ${
-                isUser ? 'items-end' : 'items-start'
-              }`}
-            >
+            <div key={message.id} className="flex flex-col gap-2">
+              {showDayDivider && (
+                <div className="my-1 flex items-center justify-center">
+                  <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                    {formatDayLabel(thisTime)}
+                  </span>
+                </div>
+              )}
+              <div
+                className={`flex flex-col gap-2 ${isFirstOfGroup ? '' : '-mt-2'} ${
+                  isUser ? 'items-end' : 'items-start'
+                }`}
+              >
               {message.parts.map((part, i) => {
                 if (part.type === 'text') {
                   return (
@@ -484,6 +557,13 @@ export function CompanionChat({
                         <Play className="size-3.5" aria-hidden="true" />
                         Начинаю
                       </Button>
+                      {/* Связка «нажал → выросло» видна и внутри самого
+                          диалога, не только в карточке вехи наверху экрана —
+                          та же механика упомянута там, где реально жмут. */}
+                      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <Sprout className="size-3.5 shrink-0 text-primary/70" aria-hidden="true" />
+                        этот старт вырастит что-то на острове
+                      </span>
                     </div>
                   )
                 }
@@ -503,6 +583,23 @@ export function CompanionChat({
 
                 return null
               })}
+              {/* Таймстемп — раз на группу (у последней реплики), а не на
+                  каждую: как в реальных мессенджерах, не как лог событий.
+                  Галочка — только у своих и только когда реплика ушла
+                  (не во время стриминга: секунду назад это было бы ложью). */}
+              {isLastOfGroup && thisTime && (
+                <span
+                  className={`flex items-center gap-1 px-1 font-mono text-[10px] text-muted-foreground/70 ${
+                    isUser ? 'justify-end' : 'justify-start'
+                  }`}
+                >
+                  {formatClock(thisTime)}
+                  {isUser && status !== 'streaming' && status !== 'submitted' && (
+                    <Check className="size-3" aria-hidden="true" />
+                  )}
+                </span>
+              )}
+              </div>
             </div>
             )
           })}

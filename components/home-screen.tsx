@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { ArrowRight, Play } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -543,6 +543,19 @@ export function HomeScreen() {
                       <span className="text-balance text-lg font-bold leading-tight">
                         «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
                       </span>
+                      {/* Сегодняшний рост — отдельная строка-уведомление,
+                          не замена обещания выше: обещание смотрит вперёд
+                          («вырастит»), эта строка — назад, на то, что уже
+                          случилось сегодня, и зовёт посмотреть. */}
+                      {stats.lastStartDate === todayKey() && (
+                        <Link
+                          href="/app/world"
+                          className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          Остров уже вырос сегодня — смотри
+                          <ArrowRight className="size-3" aria-hidden="true" />
+                        </Link>
+                      )}
                     </div>
                   </div>
                   {/* Незавершённость видима, иначе Зейгарник не работает:
