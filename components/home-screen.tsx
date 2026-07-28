@@ -601,22 +601,28 @@ export function HomeScreen() {
           {stats && (
             <Link
               href="/app/world"
-              className="glass press flex flex-col gap-3 rounded-2xl p-4"
+              // relative + overflow-hidden: внутри живёт лунная аура.
+              // Тонкая тёплая кромка сверху — свет костра касается карты
+              className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  {/* Пакет Клода: карта — «алтарь цели». Двухуровневая
-                      типографика (моно-eyebrow + крупное имя находки
-                      отдельной строкой), крупный силуэт, толстые сегменты,
-                      вербальный goal-gradient и явный выход «весь остров» —
-                      вместо прежней однострочной скороговорки с сиротской
-                      стрелкой */}
-                  <span className="flex items-center gap-3">
+                  {/* Аура за силуэтом: холодное лунное свечение из угла
+                      карты. Награда-обещание должна МАНИТЬ (reward
+                      anticipation, Schultz: дофамин выделяется на сигнал
+                      награды, но сигнал обязан быть заметным) — прежний
+                      серый силуэт был погасшим и не работал стимулом */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-6 -top-8 size-32 rounded-full bg-[radial-gradient(circle,oklch(0.88_0.06_240/0.22)_0%,transparent_65%)]"
+                  />
+                  <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // opacity-90/saturate-0.6: силуэт-обещание заметнее —
-                      // на OLED прежние значения давали чёрный блин
-                      className="h-12 w-12 shrink-0 opacity-90 saturate-[0.6]"
+                      // Полная непрозрачность + свечение: силуэт — витрина
+                      // награды, а не водяной знак. drop-shadow дублирует
+                      // ауру прямо по контуру фигуры
+                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_10px_oklch(0.88_0.08_240/0.55)] saturate-[0.75]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
@@ -625,7 +631,7 @@ export function HomeScreen() {
                       <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                         Следующий старт вырастит
                       </span>
-                      <span className="text-base font-semibold leading-snug text-foreground text-balance">
+                      <span className="text-lg font-semibold leading-snug text-foreground text-balance">
                         «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
                       </span>
                     </span>

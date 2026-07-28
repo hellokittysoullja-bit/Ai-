@@ -52,18 +52,21 @@ function CompanionAvatar({
     <div className="relative flex size-9 shrink-0 items-center justify-center">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-1.5 rounded-full bg-[radial-gradient(circle_at_center,oklch(0.72_0.17_55/0.22)_0%,transparent_70%)]"
+        className="pointer-events-none absolute -inset-2 rounded-full bg-[radial-gradient(circle_at_center,oklch(0.72_0.17_55/0.32)_0%,transparent_70%)]"
       />
-      {/* Кольцо очага: conic с тёплым максимумом внизу */}
+      {/* Кольцо очага: conic с тёплым максимумом внизу. Непрозрачность
+          поднята (0.85 в пике) и кольцо утолщено до 2px — на скриншотах
+          прежнее кольцо при 0.55/1.5px растворялось в тёмной сцене,
+          персонаж терял связь с костром */}
       <div
         aria-hidden="true"
-        className="absolute -inset-px rounded-full"
+        className="absolute -inset-0.5 rounded-full"
         style={{
           background:
-            'conic-gradient(from 200deg, oklch(0.72 0.17 55 / 0.55), oklch(0.72 0.17 55 / 0.12) 40%, oklch(1 0 0 / 0.1) 65%, oklch(0.72 0.17 55 / 0.55))',
-          mask: 'radial-gradient(circle, transparent calc(50% - 1.5px), black calc(50% - 0.5px))',
+            'conic-gradient(from 200deg, oklch(0.75 0.17 55 / 0.85), oklch(0.72 0.17 55 / 0.25) 40%, oklch(1 0 0 / 0.12) 65%, oklch(0.75 0.17 55 / 0.85))',
+          mask: 'radial-gradient(circle, transparent calc(50% - 2.5px), black calc(50% - 0.5px))',
           WebkitMask:
-            'radial-gradient(circle, transparent calc(50% - 1.5px), black calc(50% - 0.5px))',
+            'radial-gradient(circle, transparent calc(50% - 2.5px), black calc(50% - 0.5px))',
         }}
       />
       <div className="relative flex size-9 items-center justify-center rounded-full bg-secondary/80">
@@ -346,7 +349,9 @@ export function CompanionChat({
         {/* mt-auto: лента растёт от дока ввода вверх (паттерн Telegram) —
             короткий чат обжит и примыкает к рукам, а не висит наверху,
             оставляя мёртвую чёрную дыру между собой и инпутом */}
-        <div className="mx-auto mt-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
+        {/* pb-10: нижний зазор под градиент растворения дока — прежний
+            py-4 позволял чипам заезжать под градиент и полусрезаться */}
+        <div className="mx-auto mt-auto flex w-full max-w-md flex-col gap-3 px-4 pb-10 pt-4">
           {/* Разделитель дня — якорь времени, как в настоящих мессенджерах.
               Только при живой истории: над одиноким приветствием «СЕГОДНЯ» —
               шум, а не якорь */}
@@ -662,7 +667,7 @@ export function CompanionChat({
             {/* textarea вместо input: длинная мысль не прячется за одной
                 строкой (стандарт Telegram/iMessage). Растёт до ~4 строк
                 через field-sizing / авто-высоту; Enter — отправить,
-                Shift+Enter — новая строка */}
+                Shift+Enter — новая ст��ока */}
             <textarea
               ref={(el) => {
                 // Схлопываем высоту после отправки (submit чистит input в
