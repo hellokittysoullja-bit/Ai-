@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
-import { AnimatePresence, motion } from 'motion/react'
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
-import { MascotSvg } from '@/components/mascot-svg'
+import { MascotSvg, type MascotExpression } from '@/components/mascot-svg'
 import {
   ArrowDown,
   ArrowRight,
@@ -39,7 +39,11 @@ type CompanionChatProps = {
   showSuggestions?: boolean
 }
 
-function CompanionAvatar() {
+function CompanionAvatar({
+  expression = 'calm',
+}: {
+  expression?: MascotExpression
+}) {
   // Существо ВЕЗДЕ живёт в свете своего очага. Кольцо — тонкий тёплый
   // градиент (сильнее снизу, откуда в сцене бьёт свет костра из
   // AppBackdrop): аватар перестаёт быть «иконкой в кружке» и становится
@@ -63,9 +67,80 @@ function CompanionAvatar() {
         }}
       />
       <div className="relative flex size-9 items-center justify-center rounded-full bg-secondary/80">
-        <MascotSvg expression="calm" size={30} />
+        <MascotSvg expression={expression} size={30} />
       </div>
     </div>
+  )
+}
+
+/** Выражение существа живёт вместе с тем, что оно говорит, — как у героя
+    лендинга. Вопрос — заинтересованный прищур (focused), приглашение к
+    старту / радость — happy, остальное — спокойствие. Считается по тексту
+    реплики: ноль лишнего состояния. */
+function inferExpression(
+  text: string,
+  hasStartCard: boolean,
+): MascotExpression {
+  if (hasStartCard) return 'excited'
+  if (/(!|отлично|получилось|горжусь|ура|красота|засчитан)/i.test(text))
+    return 'happy'
+  if (/\?\s*$/.test(text)) return 'focused'
+  return 'calm'
+}
+
+/** Реплика кота ПИШЕТСЯ рукой — то же ремесло, что OPENING_LINE в hero:
+    посимвольное проявление с чернильным курсором. Работает и для стрима
+    (текст догоняет растущий target), и для мгновенных скриптовых ответов.
+    Тап по пузырю — дописать сразу. Reduced-motion — сразу весь текст. */
+function HandwrittenInk({
+  text,
+  animate,
+  onInk,
+}: {
+  text: string
+  animate: boolean
+  /** Пинг на каждый тик пера — родитель подскролливает ленту */
+  onInk?: () => void
+}) {
+  const reduceMotion = useReducedMotion()
+  const [shown, setShown] = useState(animate && !reduceMotion ? 0 : text.length)
+  const doneRef = useRef(!animate || reduceMotion)
+
+  useEffect(() => {
+    if (doneRef.current) {
+      setShown(text.length)
+      return
+    }
+    if (shown >= text.length) return
+    const id = setInterval(() => {
+      setShown((s) => {
+        const next = Math.min(s + 2, text.length)
+        if (next >= text.length) doneRef.current = true
+        return next
+      })
+      onInk?.()
+    }, 24)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, shown])
+
+  return (
+    <span
+      onClick={() => {
+        doneRef.current = true
+        setShown(text.length)
+      }}
+    >
+      {text.slice(0, shown)}
+      {shown < text.length && (
+        <span
+          aria-hidden="true"
+          className="ml-0.5 inline-block h-[0.85em] w-0.5 animate-pulse rounded bg-primary align-middle"
+        />
+      )}
+      {/* Полный текст сразу — скринридеру, не глазам */}
+      <span className="sr-only">{text.slice(shown)}</span>
+    </span>
   )
 }
 
@@ -221,11 +296,19 @@ export function CompanionChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
-  // После скриптового ответа статус может быть 'error' — чат должен жить дальше
+  // После скриптового ответа ста��ус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
   // Счётчик отправок — ключ для анимации «стрелка выстреливает вверх»
   const [sendCount, setSendCount] = useState(0)
+
+  // Рукописная анимация — только для реплик, родившихся в ЭТОЙ сессии.
+  // Восстановленная история пишется мгновенно: перечитывать вчерашний
+  // разговор через посимвольное проявление — пытка, не ремесло.
+  const bornBeforeRef = useRef<Set<string> | null>(null)
+  if (bornBeforeRef.current === null && messages.length > 0) {
+    bornBeforeRef.current = new Set(messages.map((m) => m.id))
+  }
 
   function submit() {
     if (!input.trim() || !canSend) return
@@ -278,9 +361,10 @@ export function CompanionChat({
           >
             <CompanionAvatar />
             {/* px-3.5 py-2: у Caveat высокие выносные — при py-1.5 буквы
-                упирались в кромку пузыря */}
+                упирались в кромку пузыря. Приветствие пишется рукой —
+                первый контакт с существом, то же ремесло, что в hero. */}
             <div className="chat-bubble-cat max-w-[85%] rounded-2xl rounded-tl-sm px-3.5 py-2 font-hand text-lg leading-snug">
-              {greeting}
+              <HandwrittenInk text={greeting} animate={messages.length === 0} />
             </div>
           </motion.div>
 
@@ -335,6 +419,19 @@ export function CompanionChat({
               mi > 0 &&
               messages[mi - 1].role === 'assistant'
             const firstTextIdx = message.parts.findIndex((p) => p.type === 'text')
+            // Живое выражение существа: считается из содержимого реплики
+            const fullText = message.parts
+              .filter((p) => p.type === 'text')
+              .map((p) => (p.type === 'text' ? p.text : ''))
+              .join(' ')
+            const hasStartCard = message.parts.some(
+              (p) => p.type === 'tool-startFocus',
+            )
+            const expression =
+              message.role === 'assistant'
+                ? inferExpression(fullText, hasStartCard)
+                : 'calm'
+            const bornNow = !(bornBeforeRef.current?.has(message.id) ?? false)
             return (
             <div
               key={message.id}
@@ -360,7 +457,11 @@ export function CompanionChat({
                       }}
                     >
                       {!isUser &&
-                        (showAvatar ? <CompanionAvatar /> : <AvatarSpacer />)}
+                        (showAvatar ? (
+                          <CompanionAvatar expression={expression} />
+                        ) : (
+                          <AvatarSpacer />
+                        ))}
                       <div
                         className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           isUser
@@ -370,7 +471,18 @@ export function CompanionChat({
                               }`
                         }`}
                       >
-                        {part.text}
+                        {isUser ? (
+                          part.text
+                        ) : (
+                          <HandwrittenInk
+                            text={part.text}
+                            animate={bornNow}
+                            onInk={() => {
+                              if (nearBottomRef.current)
+                                bottomRef.current?.scrollIntoView()
+                            }}
+                          />
+                        )}
                       </div>
                     </motion.div>
                   )
