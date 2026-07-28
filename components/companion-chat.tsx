@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ArrowUp,
   CalendarCheck,
+  Check,
   Play,
   Sparkles,
   Sprout,
@@ -313,6 +314,11 @@ export function CompanionChat({
     bornBeforeRef.current = new Set(messages.map((m) => m.id))
   }
 
+  // Временные метки: фиксируем момент рождения реплики в этой сессии.
+  // Только для живых сообщений — приписывать восстановленной истории
+  // сегодняшнее время было бы враньём (честность > декорация)
+  const bornAtRef = useRef(new Map<string, string>())
+
   function submit() {
     if (!input.trim() || !canSend) return
     sendMessage({ text: input })
@@ -441,6 +447,22 @@ export function CompanionChat({
                 ? inferExpression(fullText, hasStartCard)
                 : 'calm'
             const bornNow = !(bornBeforeRef.current?.has(message.id) ?? false)
+            if (bornNow && !bornAtRef.current.has(message.id)) {
+              bornAtRef.current.set(
+                message.id,
+                new Date().toLocaleTimeString('ru-RU', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }),
+              )
+            }
+            const bornAt = bornAtRef.current.get(message.id)
+            // Метка времени — на последней реплике серии (паттерн
+            // iMessage/Telegram): под каждым пузырём — шум, в конце серии —
+            // якорь. Для пользователя — галочка доставки: микро-отклик
+            // «сообщение дошло», закрывающий петлю действия
+            const lastOfSeries =
+              mi === messages.length - 1 || messages[mi + 1].role !== message.role
             return (
             <div
               key={message.id}
@@ -558,7 +580,7 @@ export function CompanionChat({
                         {firstStep}
                       </span>
                       <Button
-                        className="press h-12 w-full gap-2 text-base font-semibold"
+                        className="press cta-sheen h-12 w-full gap-2 text-base font-semibold"
                         onClick={() =>
                           router.push(
                             `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,
@@ -596,6 +618,24 @@ export function CompanionChat({
 
                 return null
               })}
+              {bornAt && lastOfSeries && (
+                <motion.span
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
+                  className={`flex items-center gap-1 font-mono text-[10px] tabular-nums text-muted-foreground/80 ${
+                    message.role === 'user' ? 'mr-1' : 'ml-12'
+                  }`}
+                >
+                  {bornAt}
+                  {message.role === 'user' && (
+                    <Check
+                      className="size-3 text-primary"
+                      aria-label="Доставлено"
+                    />
+                  )}
+                </motion.span>
+              )}
             </div>
             )
           })}

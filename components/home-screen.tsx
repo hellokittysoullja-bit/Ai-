@@ -412,7 +412,7 @@ export function HomeScreen() {
             <div className="flex flex-col gap-1">
               <Button
                 size="lg"
-                className="w-full gap-2 font-semibold"
+                className="cta-sheen w-full gap-2 font-semibold"
                 onClick={() => startNow(firstWord.actionStep as string)}
               >
                 <Play className="size-4 shrink-0" aria-hidden="true" />
@@ -577,10 +577,12 @@ export function HomeScreen() {
                   <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // Крупный непрозрачный силуэт (витрина награды) +
-                      // умеренное свечение по контуру: 7px/0.4 — между
-                      // мутным ореолом v3 (10px/0.55) и погасшим 4px/0.3
-                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
+                      // brightness-150: SVG-ассеты ориентиров нарисованы
+                      // под тёмную сцену Мира — в карточке без осветления
+                      // тёмный диск читался «чёрным блином-затмением», а
+                      // не наградой. Осветляем именно пиксели силуэта +
+                      // умеренное контурное свечение 7px/0.4
+                      className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}

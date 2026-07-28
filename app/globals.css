@@ -440,6 +440,49 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     0 4px 18px -6px oklch(0.86 0.22 130 / 0.4);
 }
 
+/* Проблеск по CTA: раз в 5s по кнопке пробегает быстрый диагональный блик —
+   приём премиальных кнопок (Apple Pay, AAA-геймдев). Свет ЛОВИТСЯ на
+   поверхности, а не излучается ею — консистентно закону «светится мир».
+   Один короткий проход + долгая пауза: выше порога заметности, ниже
+   порога раздражения. */
+@keyframes cta-sheen-sweep {
+  0% {
+    transform: translateX(-140%) skewX(-18deg);
+  }
+  18% {
+    transform: translateX(300%) skewX(-18deg);
+  }
+  100% {
+    transform: translateX(300%) skewX(-18deg);
+  }
+}
+.cta-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.cta-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.38) 50%,
+    transparent 100%
+  );
+  transform: translateX(-140%) skewX(-18deg);
+  animation: cta-sheen-sweep 5s ease-in-out infinite;
+  animation-delay: 1.2s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta-sheen::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
 /* Дыхание карточки «готов к старту» — единственный CTA ленты зовёт телом,
    а не миганием: медленный (3.2s) пульс primary-света, ниже порога
    раздражения, выше порога заметности */
@@ -609,7 +652,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    Все — с reduced-motion фолбэком; ни один не светится неоном (закон Р1).
    ========================================================================== */
 
-/* Э4 · Лунный блик по стеклу: ОДИН проход при появлении элемента (не hover).
+/* Э4 · Лунный блик по стеклу: ОДИН проход при появлении э��емента (не hover).
    Тёплая кость лунного света (hue 95), никогда не лайм. */
 @keyframes glass-shine {
   from { transform: translateX(-140%) skewX(-18deg); }
