@@ -88,6 +88,37 @@ export function AppBackdrop() {
           }}
         />
       ))}
+      {/* ЗЕМЛЯ. Без неё чат висел в чёрной пустоте — «сделано на коленке».
+          Два холма-силуэта (чуть светлее неба — читаются как масса при любой
+          автояркости OLED) дают сцене пол, а разговору — место действия:
+          ночной остров, не void. Статичный SVG, ноль анимации. */}
+      <svg
+        className="absolute inset-x-0 bottom-0 h-[22vh] w-full"
+        viewBox="0 0 100 30"
+        preserveAspectRatio="none"
+      >
+        <path
+          d="M0 16 Q 18 9 36 13 T 70 12 Q 86 10 100 14 L 100 30 L 0 30 Z"
+          fill="oklch(0.21 0.025 140)"
+        />
+        <path
+          d="M0 22 Q 25 16 50 19 T 100 18 L 100 30 L 0 30 Z"
+          fill="oklch(0.185 0.02 138)"
+        />
+      </svg>
+      {/* ОЧАГ у нижней кромки — там, где руки и док ввода. Тёплый свет
+          снизу = «сидим рядом у огня»: разговор происходит в тепле, кот
+          «сидит» по ту сторону костра. Это же свечение объясняет тёплую
+          подсветку его пузырей (.chat-bubble-cat) — свет в сцене един. */}
+      <div
+        className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rounded-full blur-3xl"
+        style={{
+          width: "clamp(20rem, 60vw, 36rem)",
+          height: "clamp(11rem, 30vw, 18rem)",
+          background:
+            "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.17) 0%, oklch(0.72 0.17 55 / 0.06) 45%, transparent 70%)",
+        }}
+      />
     </div>
   );
 }

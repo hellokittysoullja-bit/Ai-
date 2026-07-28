@@ -40,16 +40,29 @@ type CompanionChatProps = {
 }
 
 function CompanionAvatar() {
-  // Тот же тёплый очаг, что у героя лендинга и в шапке Дома: существо
-  // ВЕЗДЕ живёт в своём свете. Без него чёрный кот в тёмном кружке
-  // читался кляксой (скриншоты с реального iPhone).
+  // Существо ВЕЗДЕ живёт в свете своего очага. Кольцо — тонкий тёплый
+  // градиент (сильнее снизу, откуда в сцене бьёт свет костра из
+  // AppBackdrop): аватар перестаёт быть «иконкой в кружке» и становится
+  // персонажем, сидящим у огня. Свет в сцене един.
   return (
     <div className="relative flex size-9 shrink-0 items-center justify-center">
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -inset-1.5 rounded-full bg-[radial-gradient(circle_at_center,oklch(0.72_0.17_55/0.2)_0%,transparent_70%)]"
+        className="pointer-events-none absolute -inset-1.5 rounded-full bg-[radial-gradient(circle_at_center,oklch(0.72_0.17_55/0.22)_0%,transparent_70%)]"
       />
-      <div className="relative flex size-9 items-center justify-center rounded-full border border-white/10 bg-secondary/80">
+      {/* Кольцо очага: conic с тёплым максимумом внизу */}
+      <div
+        aria-hidden="true"
+        className="absolute -inset-px rounded-full"
+        style={{
+          background:
+            'conic-gradient(from 200deg, oklch(0.72 0.17 55 / 0.55), oklch(0.72 0.17 55 / 0.12) 40%, oklch(1 0 0 / 0.1) 65%, oklch(0.72 0.17 55 / 0.55))',
+          mask: 'radial-gradient(circle, transparent calc(50% - 1.5px), black calc(50% - 0.5px))',
+          WebkitMask:
+            'radial-gradient(circle, transparent calc(50% - 1.5px), black calc(50% - 0.5px))',
+        }}
+      />
+      <div className="relative flex size-9 items-center justify-center rounded-full bg-secondary/80">
         <MascotSvg expression="calm" size={30} />
       </div>
     </div>
@@ -223,7 +236,7 @@ export function CompanionChat({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* justify-end на мобильном: сообщения примыкают к полю ввода, короткий
+      {/* justify-end на мобильн��м: сообщения примыкают к полю ввода, короткий
           чат (1-2 реплики) выглядит обжитым, а не оборванным. На десктопе
           (md:justify-start) высота вьюпорта велика — при justify-end единственная
           реплика улетала к низу, а между ней и приветствием-шапкой зияла

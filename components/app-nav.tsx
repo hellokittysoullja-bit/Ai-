@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "motion/react";
 import { House, Timer, Sprout } from "lucide-react";
 import { getActiveSession, getUnseenWorldCount } from "@/lib/memory";
 
@@ -70,17 +71,37 @@ export function AppNav() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? "page" : undefined}
-              className={`flex flex-col items-center gap-1 rounded-xl px-6 py-1.5 text-xs font-medium transition-colors ${
+              className={`press relative flex flex-col items-center gap-1 rounded-2xl px-6 py-1.5 text-xs font-medium transition-colors ${
                 active
                   ? "text-primary"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
+              {/* Светящаяся пилюля активного таба перетекает между табами
+                  пружиной (shared layoutId — паттерн iOS 17 / Arc): экран
+                  ОТВЕЧАЕТ на навигацию телом, а не сменой цвета текста.
+                  Активное место подсвечено светом очага — единый свет сцены. */}
+              {active && (
+                <motion.span
+                  layoutId="nav-pill"
+                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  className="absolute inset-0 rounded-2xl bg-primary/10"
+                  style={{
+                    boxShadow:
+                      "inset 0 1px 0 oklch(1 0 0 / 0.08), 0 0 16px -4px oklch(0.86 0.22 130 / 0.25)",
+                  }}
+                  aria-hidden="true"
+                />
+              )}
               <span className="relative">
-                <Icon className="size-5" aria-hidden="true" />
+                <Icon
+                  className="size-5"
+                  strokeWidth={active ? 2.4 : 2}
+                  aria-hidden="true"
+                />
                 {showBadge && (
                   <span
-                    className="absolute -right-1 -top-1 size-2 rounded-full bg-primary"
+                    className="absolute -right-1 -top-1 size-2 animate-pulse rounded-full bg-reward shadow-[0_0_6px_oklch(0.8_0.16_85/0.8)] motion-reduce:animate-none"
                     aria-hidden="true"
                   />
                 )}
@@ -93,7 +114,7 @@ export function AppNav() {
                   </span>
                 )}
               </span>
-              {tab.label}
+              <span className="relative">{tab.label}</span>
               {showBadge && <span className="sr-only">— есть новое</span>}
               {showTimer && (
                 <span className="sr-only">
