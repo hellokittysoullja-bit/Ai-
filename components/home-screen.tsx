@@ -166,7 +166,7 @@ function buildFirstWord(
     }
     return {
       greeting:
-        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
+        "Привет. Я Напарник. Я не буду ��чить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
       actionStep: null,
       showStarterChips: true,
     };
@@ -477,8 +477,15 @@ export function HomeScreen() {
               className="w-full gap-2 font-semibold"
               onClick={() => startNow(firstWord.actionStep as string)}
             >
-              <Play className="size-4" aria-hidden="true" />
-              Начинаю
+              <Play className="size-4 shrink-0" aria-hidden="true" />
+              {/* Задача — в лейбле (как в проде было «Повторить: …»):
+                  кнопка с конкретикой снимает последнюю микро-неопределённость
+                  «а что именно начнётся?» — labeled CTA конвертит лучше
+                  generic (исследования NN/g по link labels). trimLabel
+                  защищает от длинных задач. */}
+              <span className="truncate">
+                Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
+              </span>
             </Button>
           )}
 
