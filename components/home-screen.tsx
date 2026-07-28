@@ -337,7 +337,14 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+      {/* max-h + overflow-y-auto: без потолка эта секция (приветствие +
+          разовая форма имени + карточка вехи) забирала себе всю высоту
+          main (h-dvh), а чату ниже оставались крохи — на измеренном
+          сценарии буквально 122px на весь чат, из них 53px видимых.
+          Живое сообщение "Дом" всегда должно оставлять чату честную долю
+          экрана, даже когда верхний блок временно длинный (имя ещё не
+          дано + есть карточка вехи одновременно). */}
+      <section className="max-h-[45svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
             {/*
