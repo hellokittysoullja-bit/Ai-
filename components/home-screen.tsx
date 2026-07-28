@@ -335,6 +335,14 @@ export function HomeScreen() {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
+  // Зеркалит точное условие рендера карточки вехи ниже — вычислено один
+  // раз, чтобы разовые формы (имя, весточки) знали, конкурирует ли с ними
+  // сейчас карточка за ту же ограниченную высоту секции.
+  const milestoneShowing =
+    !!stats &&
+    (stats.totalStarts > 0 || !!firstWord?.actionStep) &&
+    !firstWord?.showStarterChips;
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* max-h + overflow-y-auto: без потолка эта секция (приветствие +
@@ -344,7 +352,7 @@ export function HomeScreen() {
           Живое сообщение "Дом" всегда должно оставлять чату честную долю
           экрана, даже когда верхний блок временно длинный (имя ещё не
           дано + есть карточка вехи одновременно). */}
-      <section className="max-h-[45svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+      <section className="max-h-[60svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
         <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
             {/*
@@ -397,11 +405,15 @@ export function HomeScreen() {
           </div>
 
           {/* Момент дарения имени: один раз, после первого старта.
-              Названное существо — уже не приложение, а «мой». */}
+              Названное существо — уже не приложение, а «мой».
+              Не показываем одновременно с карточкой вехи ниже — оба
+              борются за одну и ту же ограниченную высоту секции, и
+              карточка вехи (Goal Gradient) важнее разовой формы. */}
           {nameLoaded &&
             !companionName &&
             stats !== null &&
-            stats.totalStarts >= 1 && (
+            stats.totalStarts >= 1 &&
+            !milestoneShowing && (
               <form
                 className="glass flex flex-col gap-2 rounded-2xl p-3"
                 onSubmit={(e) => {
@@ -436,8 +448,9 @@ export function HomeScreen() {
 
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». */}
-          {checkinState === "available" && !!companionName && (
+              Ни спама, ни давления — «один тихий раз в день». Тоже уступает
+              карточке вехи, той же логикой, что и форма имени выше. */}
+          {checkinState === "available" && !!companionName && !milestoneShowing && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
                 <Bell
