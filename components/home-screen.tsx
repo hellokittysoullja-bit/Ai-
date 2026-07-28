@@ -38,6 +38,11 @@ import { Bell } from "lucide-react";
 
 type FirstWord = {
   greeting: string;
+  /** Типографическое правило: рукописный шрифт — ТОЛЬКО голос существа.
+      Инструкция интерфейса («выбери шаг ниже») — системный шрифт, отдельным
+      полем: декоративные шрифты читаются медленнее (legibility-исследования),
+      а смешение голоса и UI-указаний в одном пузыре размывает персонажа */
+  hint?: string;
   /** Есть план на сегодня — показываем кнопку «Начинаю» */
   actionStep: string | null;
   /** Новичок без стартов — показываем чипы мгновенного первого старта */
@@ -151,7 +156,8 @@ function buildFirstWord(
     if (intro === "procrastinate") {
       return {
         greeting:
-          "Ты ��казал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Выбери шаг ниже, я рядом.",
+          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Я рядом.",
+        hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
         actionStep: null,
         showStarterChips: true,
       };
@@ -159,14 +165,16 @@ function buildFirstWord(
     if (intro === "curious") {
       return {
         greeting:
-          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов. Попробуй один крошечный шаг — увидишь, как это работает.",
+          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов.",
+        hint: "Попробуй один крошечный шаг ниже — увидишь, как это работает.",
         actionStep: null,
         showStarterChips: true,
       };
     }
     return {
       greeting:
-        "Привет. Я Напарник. Я не буду ��чить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
+        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать.",
+      hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
       actionStep: null,
       showStarterChips: true,
     };
@@ -376,15 +384,24 @@ export function HomeScreen() {
             */}
             <AnimatePresence>
               {firstWord ? (
-                <motion.p
+                <motion.div
                   key="greeting"
-                  className="pt-1 font-hand text-xl leading-snug"
+                  className="flex flex-col gap-1 pt-1"
                   initial={reduceMotion ? false : { opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 >
-                  {firstWord.greeting}
-                </motion.p>
+                  <p className="font-hand text-xl leading-snug">
+                    {firstWord.greeting}
+                  </p>
+                  {/* Инструкция — системным шрифтом: голос кота и указание
+                      интерфейса разделены типографически */}
+                  {firstWord.hint && (
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {firstWord.hint}
+                    </p>
+                  )}
+                </motion.div>
               ) : null}
             </AnimatePresence>
           </div>
@@ -578,14 +595,42 @@ export function HomeScreen() {
                   >
                     {landmarkNodes[stats.totalStarts]}
                   </svg>
-                  <span className="min-w-0 text-sm leading-snug text-muted-foreground">
-                    Следующий старт вырастит{" "}
-                    <span className="font-semibold text-foreground">
-                      «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                  <span className="flex min-w-0 flex-1 flex-col gap-1.5">
+                    <span className="text-sm leading-snug text-muted-foreground">
+                      Следующий старт вырастит{" "}
+                      <span className="font-semibold text-foreground">
+                        «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                      </span>
+                      {stats.lastStartDate === todayKey(new Date())
+                        ? " — остров уже вырос сегодня, смотри →"
+                        : " →"}
                     </span>
-                    {stats.lastStartDate === todayKey(new Date())
-                      ? " — остров уже вырос сегодня, смотри →"
-                      : " →"}
+                    {/* Endowed progress (Nunes & Drèze, 2006): видимая
+                        заполненная часть пути к находке. Только при
+                        totalStarts > 0 — пустой бар у новичка демотивирует
+                        (нулевой прогресс хуже отсутствия бара) */}
+                    {stats.totalStarts > 0 && (
+                      <span
+                        className="flex items-center gap-1"
+                        role="progressbar"
+                        aria-valuenow={stats.totalStarts}
+                        aria-valuemin={0}
+                        aria-valuemax={LANDMARK_COUNT}
+                        aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
+                      >
+                        <span className="h-1 flex-1 overflow-hidden rounded-full bg-white/[0.08]">
+                          <span
+                            className="block h-full rounded-full bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]"
+                            style={{
+                              width: `${(stats.totalStarts / LANDMARK_COUNT) * 100}%`,
+                            }}
+                          />
+                        </span>
+                        <span className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground">
+                          {stats.totalStarts}/{LANDMARK_COUNT}
+                        </span>
+                      </span>
+                    )}
                   </span>
                 </>
               ) : pityRipe ? (
