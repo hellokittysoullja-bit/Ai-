@@ -57,6 +57,7 @@ const KEYS = {
   activeSession: 'naparnik:activeSession',
   chat: 'naparnik:chat',
   companionName: 'naparnik:companionName',
+  stepQueue: 'naparnik:stepQueue',
 } as const
 
 function isBrowser() {
@@ -201,6 +202,31 @@ export async function saveActiveSession(session: ActiveSession): Promise<void> {
 
 export async function clearActiveSession(): Promise<void> {
   write(KEYS.activeSession, null)
+}
+
+// ---------- Очередь дробления (раздробил крупную задачу — остаток не теряется) ----------
+
+export type StepQueue = {
+  /** Исходная задача, из которой раздроблены шаги */
+  task: string
+  /** Оставшиеся шаги, следующий — steps[0] */
+  steps: string[]
+}
+
+export async function getStepQueue(): Promise<StepQueue | null> {
+  return read<StepQueue | null>(KEYS.stepQueue, null)
+}
+
+export async function saveStepQueue(task: string, steps: string[]): Promise<void> {
+  write(KEYS.stepQueue, steps.length > 0 ? { task, steps } : null)
+}
+
+/** Шаг исполнен (начат) — убираем его из очереди, если он там был */
+export async function consumeQueueStep(step: string): Promise<void> {
+  const queue = await getStepQueue()
+  if (!queue) return
+  const steps = queue.steps.filter((s) => s !== step)
+  write(KEYS.stepQueue, steps.length > 0 ? { task: queue.task, steps } : null)
 }
 
 // ---------- Имя существа (endowment: названное — становится своим) ----------
