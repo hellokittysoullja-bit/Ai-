@@ -564,23 +564,23 @@ export function HomeScreen() {
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  {/* Аура за силуэтом: едва заметное холодное пятно —
-                      нейтральный лунный свет, дозированный так, чтобы не
-                      вводить третий цветовой голос в сцену из двух светов
-                      (костёр + неон). Награда-обещание должна манить
-                      (reward anticipation, Schultz), но чистым силуэтом,
-                      а не ореолом — глоу-перегруз v3 читался «затмением» */}
+                  {/* Аура за силуэтом: холодный лунный свет из угла карты.
+                      Средняя дозировка (0.16): v3 с 0.22 читался
+                      «затмением», финальный откат до 0.1 гасил награду
+                      в чёрный блин — обещание обязано манить (reward
+                      anticipation, Schultz), холодный оттенок оправдан
+                      сюжетно: луна — единственный холодный свет сцены */}
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none absolute -left-7 -top-9 size-28 rounded-full bg-[radial-gradient(circle,oklch(0.94_0.02_240/0.1)_0%,transparent_62%)]"
+                    className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
                   />
                   <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // Масса из v3 (крупный, непрозрачный — витрина награды),
-                      // сдержанность из v2: лёгкая тень-подсветка вместо
-                      // мутного ореола 10px/0.55
-                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_4px_oklch(0.94_0.03_240/0.3)] saturate-[0.75]"
+                      // Крупный непрозрачный силуэт (витрина награды) +
+                      // умеренное свечение по контуру: 7px/0.4 — между
+                      // мутным ореолом v3 (10px/0.55) и погасшим 4px/0.3
+                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
@@ -594,7 +594,7 @@ export function HomeScreen() {
                       </span>
                     </span>
                   </span>
-                  {/* Endowed progress (Nunes & Drèze, 2006): видимая
+                  {/* Endowed progress (Nunes & Drèze, 2006): видим��я
                       заполненная часть пути к находке. Только при
                       totalStarts > 0 — пустой бар у новичка демотивирует */}
                   {stats.totalStarts > 0 && (
@@ -608,18 +608,18 @@ export function HomeScreen() {
                     >
                       {/* Сегменты-фишки (unit bias): каждый тик = один
                           реальный старт. h-1.5 + gap-1 — деления читаются
-                          раздельно, не сливаются в полоску */}
-                      {/* Иерархия яркости: сегменты — приглушённый зелёный
-                          БЕЗ глоу. Девять светящихся полос перекрикивали
-                          CTA — самой яркой зелёной массой экрана обязана
-                          остаться кнопка действия, прогресс — второй голос */}
+                          раздельно, не сливаются в полоску. Полный bg-primary
+                          с мягким глоу: приглушение до /65 давало грязный
+                          оливковый (полупрозрачный зелёный на тёмном стекле
+                          мутнеет) — заработанный прогресс обязан выглядеть
+                          живым; CTA сохраняет главенство размером массы */}
                       <span className="flex gap-1">
                         {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
                           <span
                             key={i}
                             className={`h-1.5 flex-1 rounded-full ${
                               i < stats.totalStarts
-                                ? 'bg-primary/65'
+                                ? 'bg-primary shadow-[0_0_5px_oklch(0.86_0.22_130/0.35)]'
                                 : 'bg-white/[0.08]'
                             }`}
                           />
