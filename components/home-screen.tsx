@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Sparkles } from "lucide-react";
+import { Play, Sparkles } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -38,10 +38,10 @@ import { Bell } from "lucide-react";
 
 type FirstWord = {
   greeting: string;
-  /** Инструкция интерфейса («выбери шаг ниже») — системным шрифтом,
-      отдельным полем. Рукописный Caveat — ТОЛЬКО голос существа: смешение
-      голоса и UI-указания в одном рукописном пузыре размывает персонажа,
-      а декоративный шрифт к тому же читается медленнее (legibility). */
+  /** Типографическое правило: рукописный шрифт — ТОЛЬКО голос существа.
+      Инструкция интерфейса («выбери шаг ниже») — системный шрифт, отдельным
+      полем: декоративные шрифты читаются медленнее (legibility-исследования),
+      а смешение голоса и UI-указаний в одном пузыре размывает персонажа */
   hint?: string;
   /** Есть план на сегодня — показываем кнопку «Начинаю» */
   actionStep: string | null;
@@ -157,7 +157,7 @@ function buildFirstWord(
       return {
         greeting:
           "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Я рядом.",
-        hint: "Выбери шаг ниже — или напиши, что висит.",
+        hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
         actionStep: null,
         showStarterChips: true,
       };
@@ -174,7 +174,7 @@ function buildFirstWord(
     return {
       greeting:
         "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать.",
-      hint: "Выбери крошечный шаг ниже — или напиши мне, что висит.",
+      hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
       actionStep: null,
       showStarterChips: true,
     };
@@ -343,65 +343,17 @@ export function HomeScreen() {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
-  // Зеркалит точное условие рендера карточки вехи ниже — вычислено один
-  // раз, чтобы разовые формы (имя, весточки) знали, конкурирует ли с ними
-  // сейчас карточка за ту же ограниченную высоту секции.
-  const milestoneShowing =
-    !!stats &&
-    (stats.totalStarts > 0 || !!firstWord?.actionStep) &&
-    !firstWord?.showStarterChips;
-
-  // Остров уже рос сегодня. Считаем один раз: этим же фактом управляется
-  // и строка-открытие на карточке, и скрытие дублирующей ссылки внизу —
-  // два пути в одно место (/app/world) в одной карточке были лишним выбором.
-  const grewToday = !!stats && stats.lastStartDate === todayKey();
-
-  // Приветствие — голос персонажа, вырезать его нельзя. Но на третьем
-  // визите оно уже не знакомство, а препятствие перед единственным нужным
-  // действием: по замерам оно занимало ~35–45% вьюпорта НАД кнопкой, при
-  // том что аудитория открывает экран вечером с истощённой ПФК.
-  // Сворачиваем до трёх строк (не двух: первая фраза часто несёт сам план),
-  // и только когда голос уже узнан — с третьего старта.
-  const [greetingExpanded, setGreetingExpanded] = useState(false);
-  const [greetingOverflows, setGreetingOverflows] = useState(false);
-  const greetingRef = useRef<HTMLParagraphElement>(null);
-  const greetingClamped =
-    !!stats && stats.totalStarts >= 3 && !greetingExpanded;
-
-  useEffect(() => {
-    if (!greetingClamped) {
-      setGreetingOverflows(false);
-      return;
-    }
-    const measure = () => {
-      const el = greetingRef.current;
-      if (el) setGreetingOverflows(el.scrollHeight - el.clientHeight > 2);
-    };
-    measure();
-    // Рукописный Caveat на момент коммита мог ещё не примениться —
-    // высота была бы посчитана по подменному шрифту.
-    let cancelled = false;
-    document.fonts?.ready
-      .then(() => {
-        if (!cancelled) measure();
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [firstWord?.greeting, greetingClamped]);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* max-h + overflow-y-auto: без потолка эта секция (приветствие +
-          разовая форма имени + карточка вехи) забирала себе всю высоту
-          main (h-dvh), а чату ниже оставались крохи — на измеренном
-          сценарии буквально 122px на весь чат, из них 53px видимых.
-          Живое сообщение "Дом" всегда должно оставлять чату честную долю
-          экрана, даже когда верхний блок временно длинный (имя ещё не
-          дано + есть карточка вехи одновременно). */}
+      {/* max-h + overflow-y-auto: без потолка эта секция на невысоком
+          экране (проверено на 700px) толкала композер и нав-бар за
+          пределы вьюпорта — та же причина, по которой в исходной ветке
+          voспроизводится наложение элементов. Сам scroll-cap — минимально
+          необходимая правка, не откат остальной структуры. */}
       <section className="max-h-[60svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
-        <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
+        {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
+            блоками — визуальная теснота = когнитивная теснота для СДВГ */}
+        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
           <div className="flex items-start gap-3">
             {/*
               Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
@@ -436,50 +388,23 @@ export function HomeScreen() {
               Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
               Не на mount (иначе «…» fade-in = jank = negative prediction error).
               AnimatePresence ждёт firstWord, потом slide-up 0.25s.
-
-              initial НЕ ветвится по reduceMotion: useReducedMotion на сервере
-              отдаёт null, а на клиенте при гидратации — уже true, из-за чего
-              серверная и клиентская разметка расходились (React #418,
-              воспроизводился только в режиме «уменьшить движение»). Ветвим
-              длительность, а не стартовое состояние: разметка одинакова на
-              обеих сторонах, а человеку с reduced-motion текст появляется
-              мгновенно.
             */}
             <AnimatePresence>
               {firstWord ? (
                 <motion.div
                   key="greeting"
-                  className="flex min-w-0 flex-col pt-1"
-                  initial={{ opacity: 0, y: 5 }}
+                  className="flex flex-col gap-1 pt-1"
+                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : { type: "spring", stiffness: 400, damping: 30 }
-                  }
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 >
-                  <p
-                    ref={greetingRef}
-                    className={`font-hand text-xl leading-snug ${
-                      greetingClamped ? "line-clamp-3" : ""
-                    }`}
-                  >
+                  <p className="font-hand text-xl leading-snug">
                     {firstWord.greeting}
                   </p>
-                  {greetingClamped && greetingOverflows && (
-                    <button
-                      type="button"
-                      onClick={() => setGreetingExpanded(true)}
-                      className="inline-flex min-h-11 w-fit items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                    >
-                      Дочитать
-                    </button>
-                  )}
-                  {/* Инструкция — системным шрифтом, ниже голоса персонажа:
-                      рукописный Caveat остаётся только тем, что существо
-                      САМО говорит; «выбери шаг ниже» — это UI, не реплика. */}
+                  {/* Инструкция — системным шрифтом: голос кота и указание
+                      интерфейса разделены типографически */}
                   {firstWord.hint && (
-                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                    <p className="text-sm leading-relaxed text-muted-foreground">
                       {firstWord.hint}
                     </p>
                   )}
@@ -488,53 +413,29 @@ export function HomeScreen() {
             </AnimatePresence>
           </div>
 
-          {/* Момент дарения имени: один раз, после первого старта.
-              Названное существо — уже не приложение, а «мой».
-              Не показываем одновременно с карточкой вехи ниже — оба
-              борются за одну и ту же ограниченную высоту секции, и
-              карточка вехи (Goal Gradient) важнее разовой формы. */}
-          {nameLoaded &&
-            !companionName &&
-            stats !== null &&
-            stats.totalStarts >= 1 &&
-            !milestoneShowing && (
-              <form
-                className="glass flex flex-col gap-2 rounded-2xl p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  giveName(nameDraft);
-                }}
-              >
-                <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    placeholder="Как меня зовут?"
-                    maxLength={24}
-                    aria-label="Имя для напарника"
-                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="h-10"
-                    disabled={!nameDraft.trim()}
+          {firstWord?.showStarterChips && (
+            <div className="flex flex-col gap-2">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Первый старт за 15 минут — тап и всё:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {starterChips.map((chip) => (
+                  <Link
+                    key={chip}
+                    href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
-                    Так и зовут
-                  </Button>
-                </div>
-              </form>
-            )}
+                    {chip}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». Тоже уступает
-              карточке вехи, той же логикой, что и форма имени выше. */}
-          {checkinState === "available" && !!companionName && !milestoneShowing && (
+              Ни спама, ни давления — «один тихий раз в день». */}
+          {checkinState === "available" && !!companionName && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
                 <Bell
@@ -575,214 +476,250 @@ export function HomeScreen() {
             </p>
           )}
 
-
-          {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
-              опытный пользователь получал больше трения, чем новичок
-              (3 тапа против 1). Очередь дробления приоритетнее повтора:
-              «следующий шаг» продолжает начатую задачу; без очереди —
-              повтор последнего шага; «Другое дело» — сетап для нового */}
-          {/* Кнопка действия и карточка награды — снова два раздельных
-              блока (по прямой просьбе, не по пересмотру находки о goal
-              gradient — та причина слияния остаётся в силе, это
-              сознательный откат к отдельным блокам). Вариативная строка
-              награды (Sparkles) идёт РЯДОМ С КНОПКОЙ, а не в карточке —
-              её место определено тем же доводом, что и раньше
-              (anticipation ближе всего к моменту нажатия), просто теперь
-              «ближе всего» означает «в этом же блоке», а не «в одной
-              рамке». Показывается только пока не пройдены все 10
-              ориентиров — после десятого карточка сама берёт на себя
-              разговор про находки (pity/редкие), и повторять его же текст
-              рядом с кнопкой было бы дублем. */}
-          {stats &&
-            (stats.totalStarts > 0 || !!firstWord?.actionStep) &&
-            !firstWord?.showStarterChips && (
-            <div className="flex flex-col gap-2">
-              {stats.totalStarts < LANDMARK_COUNT && (
-                <span
-                  className={`flex items-center gap-1.5 text-xs leading-snug ${
-                    pityRipe ? "text-primary" : "text-muted-foreground"
-                  }`}
-                >
-                  <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
-                  {pityRipe
-                    ? "Следующая находка будет необычной — или лучше"
-                    : "И одна находка на остров — какая, не знаю сам"}
-                </span>
-              )}
-              {/* cta-sheen: две короткие волны блика на появление, не
-                  бесконечная петля — эта кнопка открывается десятки раз в
-                  день, вечная анимация здесь = привыкание, глаз перестаёт
-                  её замечать через несколько визитов. */}
-              <Button
-                size="lg"
-                className="cta-sheen w-full gap-2 font-semibold"
-                onClick={() => {
-                  if (firstWord?.actionStep) {
-                    startNow(firstWord.actionStep);
-                    return;
-                  }
-                  const quick = queuedStep ?? lastStepLabel;
-                  return quick
-                    ? router.push(
-                        `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                      )
-                    : router.push("/app/session");
-                }}
-              >
-                <Play className="size-4" aria-hidden="true" />
-                {(() => {
-                  if (firstWord?.actionStep) return "Начинаю";
-                  const quick = queuedStep ?? lastStepLabel;
-                  if (!quick) return "Начать сессию";
-                  // Обрезка по границе слова: рваное «созда…» на
-                  // кнопке-герое читается как брак
-                  const short = trimLabel(quick, 22);
-                  return queuedStep
-                    ? `Следующий шаг: «${short}»`
-                    : `Повторить: «${short}»`;
-                })()}
-              </Button>
-              {(lastStepLabel || firstWord?.actionStep) && (
-                <button
-                  type="button"
-                  onClick={() => router.push("/app/session")}
-                  className="inline-flex min-h-11 items-center justify-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  Другое дело
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Карточка награды — прозрачная, отдельно от кнопки. Целиком
-              одна ссылка на /app/world (как «Весь остров →» раньше — тут
-              это уже не отдельная строка-ссылка, а подпись всей карточки:
-              нажатие в любом месте ведёт туда же, второй раз объявлять то
-              же самое отдельной ссылкой было бы лишним прицелом рядом с
-              первым). Рост «сегодня» — обычный span, не своя ссылка: он
-              внутри уже кликабельной карточки, вложенная ссылка в ссылке
-              невалидна как HTML. */}
+          {/* М2 · Goal gradient: слитая карточка — действие и его награда в
+              одной рамке (по прямой просьбе — взять карточку той ветки
+              как есть, но объединить с кнопкой в одну табличку вместо двух
+              соседних блоков). Раньше здесь стояли два раздельных объекта
+              (кнопка сверху, карточка awards снизу) — при слиянии карточка
+              перестала быть отдельной ссылкой (Link целиком), потому что
+              внутри неё теперь живёт кнопка со своим переходом: кнопка
+              внутри <a> кликалась бы одновременно с переходом самой
+              ссылки — невалидно и запутанно. Вместо этого — свой
+              «Весь остров →» как отдельная маленькая ссылка внизу карточки,
+              как было в проде до этой правки. */}
           {stats && (
-            <Link
-              href="/app/world"
-              className="glass-highlight press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
-            >
+            <div className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  <div className="relative flex items-center gap-3 overflow-hidden">
-                    {/* Призрак следующего ориентира — крупно: он и есть
-                        обещание, ради которого нажимают кнопку выше */}
-                    {/* Призрак — объект предвкушения, он обязан читаться как
-                        конкретная вещь. Приглушение прозрачностью (было
-                        opacity-45 saturate-.25, затем opacity-75/.6) тушило
-                        тёмный спрайт до пятна на тёмной карточке — реальное
-                        осветление пикселей силуэта (brightness) плюс
-                        контурное свечение читается как награда, ожидающая
-                        своего часа, а не как выключенная иконка. Холодная
-                        аура за спрайтом — единственный холодный акцент
-                        сцены (обещание ещё не сбылось), статична, без
-                        анимации: работает на предвкушение, не на привыкание. */}
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -left-6 -top-8 size-28 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
-                    />
+                  {/* Аура за силуэтом: холодный лунный свет из угла карты. */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
+                  />
+                  <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      className="relative h-14 w-14 shrink-0 brightness-150 saturate-[0.75] drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)]"
+                      className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
                     </svg>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className="text-sm leading-snug text-muted-foreground">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
                         Следующий старт вырастит
                       </span>
-                      <span className="text-balance text-lg font-bold leading-tight">
+                      <span className="text-lg font-semibold leading-snug text-foreground text-balance">
                         «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
                       </span>
-                      {/* Сегодняшний рост — отдельная строка-уведомление,
-                          не замена обещания выше: обещание смотрит вперёд
-                          («вырастит»), эта строка — назад, на то, что уже
-                          случилось сегодня. */}
-                      {grewToday && (
-                        <span className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-primary">
-                          Остров уже вырос сегодня
-                          <ArrowRight className="size-3" aria-hidden="true" />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {/* Незавершённость видима, иначе Зейгарник не работает:
-                      десять делений, последнее пустое — видно, сколько
-                      осталось, без единой цифры-упрёка */}
-                  <div
-                    className="flex gap-1"
-                    role="img"
-                    aria-label={`Открыто ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
-                  >
-                    {Array.from({ length: LANDMARK_COUNT }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-1 flex-1 rounded-full ${
-                          i < stats.totalStarts ? "bg-primary" : "bg-white/12"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                      {stats.totalStarts} из {LANDMARK_COUNT} ·{" "}
-                      {LANDMARK_COUNT - stats.totalStarts === 1
-                        ? "остался последний"
-                        : `осталось ${LANDMARK_COUNT - stats.totalStarts}`}
-                    </span>
-                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-primary">
-                      весь остров →
                     </span>
                   </span>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className="text-lg font-bold leading-tight">
+                  {stats.totalStarts > 0 && (
+                    <span
+                      className="flex flex-col gap-1.5"
+                      role="progressbar"
+                      aria-valuenow={stats.totalStarts}
+                      aria-valuemin={0}
+                      aria-valuemax={LANDMARK_COUNT}
+                      aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
+                    >
+                      <span className="flex gap-1">
+                        {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
+                          <span
+                            key={i}
+                            className={`h-1.5 flex-1 rounded-full ${
+                              i < stats.totalStarts
+                                ? 'bg-primary shadow-[0_0_5px_oklch(0.86_0.22_130/0.35)]'
+                                : 'bg-white/[0.08]'
+                            }`}
+                          />
+                        ))}
+                      </span>
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                          {stats.totalStarts} из {LANDMARK_COUNT}
+                          {LANDMARK_COUNT - stats.totalStarts === 1
+                            ? ' · остался последний'
+                            : stats.lastStartDate === todayKey(new Date())
+                              ? ' · вырос сегодня'
+                              : ''}
+                        </span>
+                        <Link
+                          href="/app/world"
+                          className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                        >
+                          весь остров →
+                        </Link>
+                      </span>
+                    </span>
+                  )}
+                  {stats.totalStarts === 0 && (
+                    <Link
+                      href="/app/world"
+                      className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    >
+                      весь остров →
+                    </Link>
+                  )}
+                  {/* Вариативный слой награды — в проде-источнике этот
+                      текст жил только в ветке "totalStarts >= LANDMARK_COUNT"
+                      ниже, то есть впервые появлялся ПОСЛЕ десятого старта —
+                      мимо всего окна раннего удержания, при том что в
+                      продукте drawFind (island-elements.ts) уже считает
+                      находку на КАЖДЫЙ старт. Предсказанная награда
+                      (ориентир назван поимённо) даёт нулевую ошибку
+                      предсказания (Schultz); настоящий всплеск даёт только
+                      неизвестный исход. Перенесено сюда, к моменту
+                      нажатия. */}
+                  <span
+                    className={`flex items-center gap-1.5 text-xs leading-snug ${
+                      pityRipe ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
                     {pityRipe
                       ? "Следующая находка будет необычной — или лучше"
-                      : `Редких находок: ${rareFound} из ${ISLAND_POOL.filter((e) => e.rarity === "rare").length}`}
+                      : "И одна находка на остров — какая, не знаю сам"}
                   </span>
+                </>
+              ) : pityRipe ? (
+                <div className="flex flex-col gap-1">
                   <span className="text-sm leading-snug text-muted-foreground">
-                    {pityRipe
-                      ? "Она уже ждёт твоего старта."
-                      : "Полная сессия повышает шанс редкой."}
+                    Следующая находка будет{" "}
+                    <span className="font-semibold text-reward">
+                      необычной — или лучше
+                    </span>
+                    .
                   </span>
-                  <span className="mt-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                  <Link
+                    href="/app/world"
+                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                  >
+                    она уже ждёт →
+                  </Link>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    Редких находок:{" "}
+                    <span className="font-semibold text-reward">
+                      {rareFound} из{" "}
+                      {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
+                    </span>{" "}
+                    — полная сессия повышает шанс.
+                  </span>
+                  <Link
+                    href="/app/world"
+                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                  >
                     весь остров →
-                  </span>
+                  </Link>
                 </div>
               )}
-            </Link>
-          )}
 
-          {firstWord?.showStarterChips && (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Первый старт за 15 минут — тап и всё:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {starterChips.map((chip) => (
-                  <Link
-                    key={chip}
-                    href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="glass glass-interactive press rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
+              {/* Действие — теперь внутри той же рамки, что и его награда. */}
+              {firstWord?.actionStep ? (
+                <div className="flex flex-col gap-1">
+                  <Button
+                    size="lg"
+                    className="cta-sheen w-full gap-2 font-semibold"
+                    onClick={() => startNow(firstWord.actionStep as string)}
                   >
-                    {chip}
-                  </Link>
-                ))}
-              </div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Каждый старт растит остров →
-              </p>
+                    <Play className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">
+                      Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
+                    </span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 self-center text-muted-foreground"
+                    onClick={() => router.push("/app/session")}
+                  >
+                    Другое дело
+                  </Button>
+                </div>
+              ) : (
+                stats.totalStarts > 0 &&
+                !firstWord?.showStarterChips && (
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="lg"
+                      className="cta-sheen w-full gap-2 font-semibold"
+                      onClick={() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        return quick
+                          ? router.push(
+                              `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                            )
+                          : router.push("/app/session");
+                      }}
+                    >
+                      <Play className="size-4" aria-hidden="true" />
+                      {(() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        if (!quick) return "Начать сессию";
+                        const short = trimLabel(quick, 22);
+                        return queuedStep
+                          ? `Следующий шаг: «${short}»`
+                          : `Повторить: «${short}»`;
+                      })()}
+                    </Button>
+                    {lastStepLabel && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-10 self-center text-muted-foreground"
+                        onClick={() => router.push("/app/session")}
+                      >
+                        Другое дело
+                      </Button>
+                    )}
+                  </div>
+                )
+              )}
             </div>
           )}
 
+          {/* Порядок сверху вниз = приоритет: действие+награда (одна
+              карточка) → отношения (имя). Карточка имени, стоявшая МЕЖДУ
+              действием и наградой, разрывала связку «сделай — и вырастет»
+              лишним социальным решением (serial position + минимизация
+              числа решений до действия) */}
+          {nameLoaded &&
+            !companionName &&
+            stats !== null &&
+            stats.totalStarts >= 1 && (
+              <form
+                className="glass flex flex-col gap-2 rounded-2xl p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  giveName(nameDraft);
+                }}
+              >
+                <p className="font-hand text-lg leading-snug">
+                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+                  откликаться.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Как меня зовут?"
+                    maxLength={24}
+                    aria-label="Имя для напарника"
+                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-10"
+                    disabled={!nameDraft.trim()}
+                  >
+                    Так и зовут
+                  </Button>
+                </div>
+              </form>
+            )}
         </div>
       </section>
 
