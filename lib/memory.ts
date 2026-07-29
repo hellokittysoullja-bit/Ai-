@@ -215,14 +215,16 @@ export type StepQueue = {
 }
 
 export async function getStepQueue(): Promise<StepQueue | null> {
-  return read<StepQueue | null>(KEYS.stepQueue, null)
+  const q = read<StepQueue | null>(KEYS.stepQueue, null)
+  return q && q.steps.length > 0 ? q : null
 }
 
 export async function saveStepQueue(task: string, steps: string[]): Promise<void> {
-  write(KEYS.stepQueue, steps.length > 0 ? { task, steps } : null)
+  const clean = steps.map((s) => s.trim()).filter(Boolean)
+  write(KEYS.stepQueue, clean.length > 0 ? { task, steps: clean } : null)
 }
 
-/** Шаг исполнен (начат) — убираем его из очереди, если он там был */
+/** Шаг исполнен (начат) — убираем его из очереди; пустая очередь очищается целиком */
 export async function consumeQueueStep(step: string): Promise<void> {
   const queue = await getStepQueue()
   if (!queue) return

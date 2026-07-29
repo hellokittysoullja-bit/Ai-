@@ -409,6 +409,10 @@ export function Hero() {
           {/* Главный CTA: на мобильном — последний в кадре (order-5), на
             десктопе — в текстовой колонке сразу под оффером */}
           <div
+            // id для шапки: HeaderCta наблюдает за этим блоком и показывает
+            // свой «Начать» ровно тогда, когда hero-CTA не виден — инвариант
+            // «в кадре всегда есть ровно одно primary-действие»
+            id="hero-cta"
             className="hero-rise order-5 mt-3 flex w-full flex-col items-center gap-2.5 lg:order-none lg:mt-1 lg:items-start"
             style={{ "--rise-delay": "0.78s" } as CSSProperties}
           >
@@ -465,7 +469,9 @@ export function Hero() {
         <div className="contents lg:flex lg:flex-col lg:items-center lg:gap-2">
           {/* Существо в пятне света очага. На коротких экранах сцена
             ужимается, чтобы CTA оставался над сгибом */}
-          <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none [@media(max-height:740px)]:scale-90">
+          {/* Порог 860px (был 740px): реальный iPhone отдаёт странице ~810px —
+              компрессия не срабатывала, и чипы ответа уезжали за сгиб */}
+          <div className="relative order-1 flex origin-bottom flex-col items-center lg:order-none [@media(max-height:860px)]:scale-90 [@media(max-height:700px)]:scale-[0.8]">
             {/* Э5 · Очаг дышит: внешний div держит позиционирование
                 (translate), внутренний — только scale-пульс в такт дыханию
                 кота. Очаг ТЁПЛЫЙ (hue 55): лайм зарезервирован за глазами,
