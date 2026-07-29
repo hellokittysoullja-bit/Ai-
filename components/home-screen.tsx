@@ -122,7 +122,7 @@ function buildFirstWord(
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Сейчас — только ${plan.firstStep.toLowerCase()}. Остальное подождёт.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Сейчас — только ${plan.firstStep.toLowerCase()}. Остальное подождёт.${hourLine}`,
       actionStep: plan.firstStep,
     };
   }
@@ -349,9 +349,11 @@ export function HomeScreen() {
   // родителя, нырял под док (срезанное поле ввода на первом экране)
   const cardsHeader = (
     <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
-        {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
-            блоками — визуальная теснота = когнитивная теснота для СДВГ */}
-        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
+        {/* gap-4/py-5: паузы между блоками сохранены, но вертикаль ужата
+            настолько, чтобы первая реплика чата выглядывала из-под сгиба —
+            живой напарник должен быть виден на первом кадре (вердикт
+            дебатов: v1–v7 показывали реплику, v10 её прятал) */}
+        <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
           <div className="flex items-start gap-3">
             {/*
               Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
@@ -680,8 +682,7 @@ className="surface-card flex flex-col gap-2 rounded-2xl p-3.5"
                 }}
               >
                 <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
+                  Слушай… у меня до сих пор нет имени. Дашь мне его?
                 </p>
                 <label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground" htmlFor="companion-name">
                   Имя напарника
