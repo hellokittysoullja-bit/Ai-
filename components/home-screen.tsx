@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play } from "lucide-react";
+import { ArrowRight, Play, Sparkles } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -343,6 +343,46 @@ export function HomeScreen() {
     (stats.totalStarts > 0 || !!firstWord?.actionStep) &&
     !firstWord?.showStarterChips;
 
+  // Остров уже рос сегодня. Считаем один раз: этим же фактом управляется
+  // и строка-открытие на карточке, и скрытие дублирующей ссылки внизу —
+  // два пути в одно место (/app/world) в одной карточке были лишним выбором.
+  const grewToday = !!stats && stats.lastStartDate === todayKey();
+
+  // Приветствие — голос персонажа, вырезать его нельзя. Но на третьем
+  // визите оно уже не знакомство, а препятствие перед единственным нужным
+  // действием: по замерам оно занимало ~35–45% вьюпорта НАД кнопкой, при
+  // том что аудитория открывает экран вечером с истощённой ПФК.
+  // Сворачиваем до трёх строк (не двух: первая фраза часто несёт сам план),
+  // и только когда голос уже узнан — с третьего старта.
+  const [greetingExpanded, setGreetingExpanded] = useState(false);
+  const [greetingOverflows, setGreetingOverflows] = useState(false);
+  const greetingRef = useRef<HTMLParagraphElement>(null);
+  const greetingClamped =
+    !!stats && stats.totalStarts >= 3 && !greetingExpanded;
+
+  useEffect(() => {
+    if (!greetingClamped) {
+      setGreetingOverflows(false);
+      return;
+    }
+    const measure = () => {
+      const el = greetingRef.current;
+      if (el) setGreetingOverflows(el.scrollHeight - el.clientHeight > 2);
+    };
+    measure();
+    // Рукописный Caveat на момент коммита мог ещё не примениться —
+    // высота была бы посчитана по подменному шрифту.
+    let cancelled = false;
+    document.fonts?.ready
+      .then(() => {
+        if (!cancelled) measure();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [firstWord?.greeting, greetingClamped]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* max-h + overflow-y-auto: без потолка эта секция (приветствие +
@@ -388,18 +428,46 @@ export function HomeScreen() {
               Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
               Не на mount (иначе «…» fade-in = jank = negative prediction error).
               AnimatePresence ждёт firstWord, потом slide-up 0.25s.
+
+              initial НЕ ветвится по reduceMotion: useReducedMotion на сервере
+              отдаёт null, а на клиенте при гидратации — уже true, из-за чего
+              серверная и клиентская разметка расходились (React #418,
+              воспроизводился только в режиме «уменьшить движение»). Ветвим
+              длительность, а не стартовое состояние: разметка одинакова на
+              обеих сторонах, а человеку с reduced-motion текст появляется
+              мгновенно.
             */}
             <AnimatePresence>
               {firstWord ? (
-                <motion.p
+                <motion.div
                   key="greeting"
-                  className="pt-1 font-hand text-xl leading-snug"
-                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+                  className="flex min-w-0 flex-col pt-1"
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 400, damping: 30 }
+                  }
                 >
-                  {firstWord.greeting}
-                </motion.p>
+                  <p
+                    ref={greetingRef}
+                    className={`font-hand text-xl leading-snug ${
+                      greetingClamped ? "line-clamp-3" : ""
+                    }`}
+                  >
+                    {firstWord.greeting}
+                  </p>
+                  {greetingClamped && greetingOverflows && (
+                    <button
+                      type="button"
+                      onClick={() => setGreetingExpanded(true)}
+                      className="inline-flex min-h-11 w-fit items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Дочитать
+                    </button>
+                  )}
+                </motion.div>
               ) : null}
             </AnimatePresence>
           </div>
@@ -547,7 +615,7 @@ export function HomeScreen() {
                           не замена обещания выше: обещание смотрит вперёд
                           («вырастит»), эта строка — назад, на то, что уже
                           случилось сегодня, и зовёт посмотреть. */}
-                      {stats.lastStartDate === todayKey() && (
+                      {grewToday && (
                         <Link
                           href="/app/world"
                           className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
@@ -597,6 +665,30 @@ export function HomeScreen() {
                 </div>
               )}
 
+              {/* Вариативный слой награды — прямо над кнопкой, ближе всего
+                  к моменту нажатия.
+                  Ориентир выше назван поимённо и потому полностью предсказуем:
+                  по Schultz предсказанная награда даёт ошибку предсказания ≈ 0,
+                  то есть главное видимое обещание экрана нейрохимически пустое.
+                  Настоящий всплеск даёт неизвестный исход, и он в продукте
+                  ЕСТЬ (drawFind с редкостями), но рендерился только в ветке
+                  «все 10 ориентиров открыты» — то есть впервые показывался
+                  после десятого старта, мимо всего окна удержания.
+                  Обе формулировки честные: при pityRipe drawFind
+                  действительно поднимает редкость до uncommon+
+                  (island-elements.ts), это описание реальной механики,
+                  а не выдуманный дефицит. */}
+              <span
+                className={`flex items-center gap-1.5 text-xs leading-snug ${
+                  pityRipe ? "text-primary" : "text-muted-foreground"
+                }`}
+              >
+                <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
+                {pityRipe
+                  ? "Следующая находка будет необычной — или лучше"
+                  : "И одна находка на остров — какая, не знаю сам"}
+              </span>
+
               {/* Действие — внутри той же рамки, что и его награда */}
               <Button
                 size="lg"
@@ -631,6 +723,10 @@ export function HomeScreen() {
               {/* inline-flex + items-center на ОБОИХ: у <a> min-h-11 сам по
                   себе ничего не центрирует (инлайновый элемент), из-за чего
                   «Весь остров» стоял выше «Другое дело» на одной строке */}
+              {/* «Весь остров» скрыт, когда выше уже стоит строка-открытие
+                  «Остров уже вырос сегодня — смотри»: обе ведут в /app/world,
+                  и два пути в одно место внутри одной карточки — лишний
+                  выбор там, где карточка задумана как одно решение (Хик). */}
               <div className="flex items-center justify-between gap-2">
                 {lastStepLabel || firstWord?.actionStep ? (
                   <button
@@ -643,12 +739,14 @@ export function HomeScreen() {
                 ) : (
                   <span />
                 )}
-                <Link
-                  href="/app/world"
-                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  Весь остров →
-                </Link>
+                {!grewToday && (
+                  <Link
+                    href="/app/world"
+                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  >
+                    Весь остров →
+                  </Link>
+                )}
               </div>
             </div>
           )}

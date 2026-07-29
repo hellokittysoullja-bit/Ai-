@@ -705,23 +705,30 @@ export function CompanionChat({
             aria-label="Отправить"
             className="size-10 shrink-0 rounded-xl"
           >
+            {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
+                {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
+                разное дерево на сервере (useReducedMotion → null) и на клиенте
+                при гидратации (→ true) — React #418, воспроизводилось только
+                в режиме «уменьшить движение». Структура теперь одна и та же,
+                варьируется лишь длительность: при reduced-motion стрелка
+                меняется мгновенно, без полёта. */}
             <span className="relative flex size-5 items-center justify-center overflow-hidden">
-              {reduceMotion ? (
-                <ArrowUp className="size-5" />
-              ) : (
-                <AnimatePresence mode="popLayout" initial={false}>
-                  <motion.span
-                    key={sendCount}
-                    initial={{ y: 10, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -14, opacity: 0 }}
-                    transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
-                    className="absolute inset-0 flex items-center justify-center"
-                  >
-                    <ArrowUp className="size-5" />
-                  </motion.span>
-                </AnimatePresence>
-              )}
+              <AnimatePresence mode="popLayout" initial={false}>
+                <motion.span
+                  key={sendCount}
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -14, opacity: 0 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                  }
+                  className="absolute inset-0 flex items-center justify-center"
+                >
+                  <ArrowUp className="size-5" />
+                </motion.span>
+              </AnimatePresence>
             </span>
           </Button>
         </div>
