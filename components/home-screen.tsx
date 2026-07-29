@@ -723,10 +723,18 @@ export function HomeScreen() {
               {/* inline-flex + items-center на ОБОИХ: у <a> min-h-11 сам по
                   себе ничего не центрирует (инлайновый элемент), из-за чего
                   «Весь остров» стоял выше «Другое дело» на одной строке */}
-              {/* «Весь остров» скрыт, когда выше уже стоит строка-открытие
-                  «Остров уже вырос сегодня — смотри»: обе ведут в /app/world,
-                  и два пути в одно место внутри одной карточки — лишний
-                  выбор там, где карточка задумана как одно решение (Хик). */}
+              {/* Прошлый проход прятал эту ссылку, когда выше уже стоит
+                  строка-открытие «Остров уже вырос сегодня — смотри», считая
+                  оба пути дублем (оба ведут в /app/world) — находка по
+                  Хику. Пересмотрел: у них разные референты. «Смотри» —
+                  указывает на КОНКРЕТНОЕ событие («то, что выросло сегодня»,
+                  контингентно, разово), «Весь остров» — постоянная
+                  wayfinding-ссылка на обзор целиком, её саму по себе Хик не
+                  задевает (одна тихая второстепенная ссылка под primary-
+                  кнопкой — стандартный паттерн, не конкурирующий выбор).
+                  Прятать её означало убирать единственный ПОСТОЯННЫЙ путь на
+                  остров ровно в те дни, когда человек реально что-то вырастил
+                  — то есть худший день для потери этого выхода. Возвращаю. */}
               <div className="flex items-center justify-between gap-2">
                 {lastStepLabel || firstWord?.actionStep ? (
                   <button
@@ -739,14 +747,12 @@ export function HomeScreen() {
                 ) : (
                   <span />
                 )}
-                {!grewToday && (
-                  <Link
-                    href="/app/world"
-                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    Весь остров →
-                  </Link>
-                )}
+                <Link
+                  href="/app/world"
+                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Весь остров →
+                </Link>
               </div>
             </div>
           )}
