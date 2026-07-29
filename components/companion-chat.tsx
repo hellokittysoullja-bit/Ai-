@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
-import { MascotSvg } from '@/components/mascot-svg'
+import { MascotSvg, type MascotExpression } from '@/components/mascot-svg'
 import {
   ArrowDown,
   ArrowRight,
@@ -44,12 +44,23 @@ type CompanionChatProps = {
   showSuggestions?: boolean
 }
 
-function CompanionAvatar({ reacting = false }: { reacting?: boolean }) {
+function CompanionAvatar({
+  reacting = false,
+  expression = 'calm',
+}: {
+  reacting?: boolean
+  expression?: MascotExpression
+}) {
   // Кружок-подложка: тёмный кот на тёмном фоне читался пятнышком.
   // Тёплое кольцо — тот же очаг, что горит на лендинге и на «Доме»:
   // отделяет существо от фона и держит один световой язык во всём
   // продукте. Реакция на новую реплику — контингентный социальный
   // отклик: существо отзывается на СОБЫТИЕ, а не мигает по таймеру.
+  // Два независимых сигнала: reacting — «это только что пришло» (кольцо),
+  // expression — «что вообще сказано» (мимика, читается из текста реплики
+  // в inferExpression). Радость от новизны и тон сообщения не всегда
+  // совпадают: кот может искренне обрадоваться (кольцо), сказав при этом
+  // что-то сфокусированное — оба сигнала живут не подменяя друг друга.
   return (
     <div
       className="relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80"
@@ -60,9 +71,20 @@ function CompanionAvatar({ reacting = false }: { reacting?: boolean }) {
         transition: 'box-shadow 260ms ease-out',
       }}
     >
-      <MascotSvg expression={reacting ? 'happy' : 'calm'} size={30} />
+      <MascotSvg expression={reacting ? 'happy' : expression} size={30} />
     </div>
   )
+}
+
+/** Мимика существа считается из содержимого его же реплики — ноль
+    дополнительного состояния, тот же приём, что у героя лендинга.
+    Карточка «Начинаю» — само предвкушение старта, excited оправдан сюжетно
+    сильнее, чем нейтральный calm. */
+function inferExpression(text: string, hasStartCard: boolean): MascotExpression {
+  if (hasStartCard) return 'excited'
+  if (/(!|отлично|получилось|горжусь|ура|красота|засчитан)/i.test(text)) return 'happy'
+  if (/\?\s*$/.test(text)) return 'focused'
+  return 'calm'
 }
 
 function formatClock(iso: string): string {
@@ -377,10 +399,11 @@ export function CompanionChat({
             transition={{ type: 'spring', stiffness: 260, damping: 22 }}
           >
             <CompanionAvatar />
-            {/* Тот же материал, что у реплик ниже (.glass): приветствие и
-                сообщения произносит один и тот же персонаж, а выглядели они
-                как два разных источника — сплошная заливка против стекла. */}
-            <div className="glass max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]">
+            {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
+                приветствие и сообщения произносит один и тот же персонаж —
+                и один и тот же материал, с гарантированным контрастом
+                текста независимо от участка сцены под пузырём. */}
+            <div className="chat-bubble-cat max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground">
               {greeting}
             </div>
           </motion.div>
@@ -451,6 +474,18 @@ export function CompanionChat({
             const isLastOfGroup = !next || next.role !== message.role
             const isUser = message.role === 'user'
 
+            // Мимика существа — из содержимого ЕГО ЖЕ реплики, ноль
+            // дополнительного состояния (тот же приём, что у героя
+            // лендинга). Карточка «Начинаю» — само предвкушение старта.
+            const fullText = message.parts
+              .filter((p) => p.type === 'text')
+              .map((p) => (p.type === 'text' ? p.text : ''))
+              .join(' ')
+            const hasStartCard = message.parts.some((p) => p.type === 'tool-startFocus')
+            const expression: MascotExpression = isUser
+              ? 'calm'
+              : inferExpression(fullText, hasStartCard)
+
             // Разделитель дня: только когда дата реально СМЕНИЛАСЬ между
             // соседними репликами — на свежем чате без истории делитель
             // не нужен, «Сегодня» перед первой же репликой — просто шум.
@@ -487,7 +522,10 @@ export function CompanionChat({
                     >
                       {!isUser &&
                         (isFirstOfGroup ? (
-                          <CompanionAvatar reacting={reactingId === message.id} />
+                          <CompanionAvatar
+                            reacting={reactingId === message.id}
+                            expression={expression}
+                          />
                         ) : (
                           // Место аватара держим всегда: без распорки вторая
                           // реплика группы уезжала под аватар и колонка «плыла»
@@ -496,8 +534,8 @@ export function CompanionChat({
                       <div
                         className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           isUser
-                            ? `ml-auto bg-gradient-to-br from-primary to-primary/85 px-3 py-2 text-sm leading-relaxed text-primary-foreground shadow-[0_4px_14px_-6px_oklch(0.72_0.17_55/0.45)] ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
-                            : `glass px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)] ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
+                            ? `chat-bubble-user ml-auto px-3 py-2 text-sm leading-relaxed ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
+                            : `chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
                         }`}
                       >
                         {part.text}
@@ -515,7 +553,7 @@ export function CompanionChat({
                   return (
                     <div
                       key={i}
-                      className="glass ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
+                      className="chat-bubble-cat ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3"
                     >
                       <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
                         <CalendarCheck className="size-3.5" aria-hidden="true" />
@@ -539,7 +577,8 @@ export function CompanionChat({
                   return (
                     <div
                       key={i}
-                      className="glass ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
+                      className="glass start-card-breathe ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3"
+                      style={{ '--glass-border': 'color-mix(in oklab, var(--primary) 45%, transparent)' } as CSSProperties}
                     >
                       <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
                         готов к старту · {d} мин
@@ -547,7 +586,7 @@ export function CompanionChat({
                       <span className="text-sm font-semibold">{firstStep}</span>
                       <Button
                         size="sm"
-                        className="gap-1.5 font-semibold"
+                        className="cta-sheen gap-1.5 font-semibold"
                         onClick={() =>
                           router.push(
                             `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,

@@ -38,6 +38,11 @@ import { Bell } from "lucide-react";
 
 type FirstWord = {
   greeting: string;
+  /** Инструкция интерфейса («выбери шаг ниже») — системным шрифтом,
+      отдельным полем. Рукописный Caveat — ТОЛЬКО голос существа: смешение
+      голоса и UI-указания в одном рукописном пузыре размывает персонажа,
+      а декоративный шрифт к тому же читается медленнее (legibility). */
+  hint?: string;
   /** Есть план на сегодня — показываем кнопку «Начинаю» */
   actionStep: string | null;
   /** Новичок без стартов — показываем чипы мгновенного первого старта */
@@ -151,7 +156,8 @@ function buildFirstWord(
     if (intro === "procrastinate") {
       return {
         greeting:
-          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Выбери шаг ниже, я рядом.",
+          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Я рядом.",
+        hint: "Выбери шаг ниже — или напиши, что висит.",
         actionStep: null,
         showStarterChips: true,
       };
@@ -159,14 +165,16 @@ function buildFirstWord(
     if (intro === "curious") {
       return {
         greeting:
-          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов. Попробуй один крошечный шаг — увидишь, как это работает.",
+          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов.",
+        hint: "Попробуй один крошечный шаг ниже — увидишь, как это работает.",
         actionStep: null,
         showStarterChips: true,
       };
     }
     return {
       greeting:
-        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
+        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать.",
+      hint: "Выбери крошечный шаг ниже — или напиши мне, что висит.",
       actionStep: null,
       showStarterChips: true,
     };
@@ -467,6 +475,14 @@ export function HomeScreen() {
                       Дочитать
                     </button>
                   )}
+                  {/* Инструкция — системным шрифтом, ниже голоса персонажа:
+                      рукописный Caveat остаётся только тем, что существо
+                      САМО говорит; «выбери шаг ниже» — это UI, не реплика. */}
+                  {firstWord.hint && (
+                    <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                      {firstWord.hint}
+                    </p>
+                  )}
                 </motion.div>
               ) : null}
             </AnimatePresence>
@@ -590,16 +606,26 @@ export function HomeScreen() {
             <div className="glass-highlight flex flex-col gap-3 rounded-2xl p-4">
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  <div className="flex items-center gap-3">
+                  <div className="relative flex items-center gap-3 overflow-hidden">
                     {/* Призрак следующего ориентира — крупно: он и есть
                         обещание, ради которого нажимают кнопку ниже */}
                     {/* Призрак — объект предвкушения, он обязан читаться как
-                        конкретная вещь. На opacity-45 + saturate-.25 тёмный
-                        спрайт на тёмной карточке превращался в смазанное
-                        пятно: обещание есть, а разглядеть нечего. */}
+                        конкретная вещь. Приглушение прозрачностью (было
+                        opacity-45 saturate-.25, затем opacity-75/.6) тушило
+                        тёмный спрайт до пятна на тёмной карточке — реальное
+                        осветление пикселей силуэта (brightness) плюс
+                        контурное свечение читается как награда, ожидающая
+                        своего часа, а не как выключенная иконка. Холодная
+                        аура за спрайтом — единственный холодный акцент
+                        сцены (обещание ещё не сбылось), статична, без
+                        анимации: работает на предвкушение, не на привыкание. */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -left-6 -top-8 size-28 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
+                    />
                     <svg
-                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 26} ${landmarkAnchors[stats.totalStarts].y - 40} 52 52`}
-                      className="h-14 w-14 shrink-0 opacity-75 saturate-[0.6]"
+                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
+                      className="relative h-14 w-14 shrink-0 brightness-150 saturate-[0.75] drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
@@ -689,10 +715,14 @@ export function HomeScreen() {
                   : "И одна находка на остров — какая, не знаю сам"}
               </span>
 
-              {/* Действие — внутри той же рамки, что и его награда */}
+              {/* Действие — внутри той же рамки, что и его награда.
+                  cta-sheen: две короткие волны блика на появление, не
+                  бесконечная петля — эта кнопка открывается десятки раз в
+                  день, вечная анимация здесь = привыкание, глаз перестаёт
+                  её замечать через несколько визитов. */}
               <Button
                 size="lg"
-                className="w-full gap-2 font-semibold"
+                className="cta-sheen w-full gap-2 font-semibold"
                 onClick={() => {
                   if (firstWord?.actionStep) {
                     startNow(firstWord.actionStep);
