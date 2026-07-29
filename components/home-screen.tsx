@@ -334,7 +334,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, д��ступны ли весточки
+    // Тихо ставим service worker и узнаём, д����ступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -343,9 +343,12 @@ export function HomeScreen() {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+  // Карточки Дома собираются в переменную и уходят в CompanionChat как
+  // шапка ЕДИНОЙ скролл-ленты: раньше секция и чат были соседями по
+  // документному скроллу, и sticky-композер, зажатый верхом своего
+  // родителя, нырял под док (срезанное поле ввода на первом экране)
+  const cardsHeader = (
+    <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
         {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
             блоками — визуальная теснота = когнитивная теснота для СДВГ */}
         <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
@@ -715,15 +718,17 @@ export function HomeScreen() {
             )}
         </div>
       </section>
+  );
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <CompanionChat
-          mode="companion"
-          greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
-          onPlanSaved={refresh}
-          showSuggestions={!firstWord?.showStarterChips}
-        />
-      </div>
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <CompanionChat
+        mode="companion"
+        greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
+        header={cardsHeader}
+        onPlanSaved={refresh}
+        showSuggestions={!firstWord?.showStarterChips}
+      />
     </div>
   );
 }

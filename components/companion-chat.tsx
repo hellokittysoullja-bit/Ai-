@@ -32,6 +32,10 @@ type CompanionChatProps = {
   mode: 'companion' | 'focus'
   greeting: string
   placeholder?: string
+  /** Контент, который скроллится ВМЕСТЕ с лентой над сообщениями
+      (карточки Дома). Один скролл-контейнер = композер всегда виден
+      над доком — лечит «поле ввода срезано доком» на Доме */
+  header?: React.ReactNode
   onPlanSaved?: () => void
   /** Скрыть чипы-подсказки пустого чата. Нужно, когда над чатом уже показан
       свой набор чипов (стартер-чипы новичка на HomeScreen) — два визуально
@@ -159,6 +163,7 @@ export function CompanionChat({
   mode,
   greeting,
   placeholder,
+  header,
   onPlanSaved,
   showSuggestions = true,
 }: CompanionChatProps) {
@@ -293,6 +298,16 @@ export function CompanionChat({
   // вслепую
   const [showJump, setShowJump] = useState(false)
   useEffect(() => {
+    // На Доме карточки (CTA, цель) — шапка той же ленты: восстановленная
+    // история НЕ должна проматывать их при загрузке (CTA обязан быть
+    // первым, что видит человек). Скроллим только к живым сообщениям
+    // этой сессии; в режиме фокуса поведение прежнее.
+    if (mode === 'companion') {
+      const hasLive = messages.some(
+        (m) => !(bornBeforeRef.current?.has(m.id) ?? false),
+      )
+      if (!hasLive) return
+    }
     const lastRole = messages[messages.length - 1]?.role
     if (nearBottomRef.current || lastRole === 'user') {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -352,8 +367,12 @@ export function CompanionChat({
         // всю страницу (iOS scroll chaining)
         className="relative flex flex-1 flex-col overflow-y-auto overscroll-contain"
       >
+        {/* Карточки Дома — шапка ленты: один скролл на всё, композер
+            никогда не ныряет под док (архитектура Telegram: контент
+            и сообщения в одном контейнере, инпут — вне его) */}
+        {header}
         {/* mt-auto: лента растёт от дока ввода вверх (паттерн Telegram) —
-            короткий чат обжит и примыкает к рукам, а не висит наве��ху,
+            короткий чат обжит и примыкает к рукам, а не висит наве����ху,
             оставляя мёртвую чёрную дыру между собой и инпутом */}
         {/* pb-10: нижний зазор под градиент растворения дока — прежний
             py-4 позволял чипам заезжать под градиент и полусрезаться */}
@@ -703,11 +722,15 @@ export function CompanionChat({
           // границе панели, свет и фон едины, как у очага)
           className="relative bg-background/92 px-4 py-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8 before:bg-gradient-to-t before:from-background/80 before:to-transparent"
         >
-          <div className="mx-auto flex max-w-md items-end gap-2">
+          {/* ЕДИНАЯ капсула (паттерн iMessage/Telegram): поле и кнопка
+              отправки — один материал, а не поле + оторванный круг,
+              читавшийся как «скролл наверх». Свечение фокуса — на капсуле
+              через :focus-within */}
+          <div className="glass chat-input-dock mx-auto flex max-w-md items-end gap-1.5 rounded-2xl p-1.5 pl-4 transition-shadow duration-300">
             {/* textarea вместо input: длинная мысль не прячется за одной
                 строкой (стандарт Telegram/iMessage). Растёт до ~4 строк
-                через field-sizing / авто-высоту; Enter — отправить,
-                Shift+Enter — новая ст��ока */}
+                через авто-высоту; Enter — отправить, Shift+Enter — новая
+                строка */}
             <textarea
               ref={(el) => {
                 // Схлопываем высоту после отправки (submit чистит input в
@@ -738,16 +761,15 @@ export function CompanionChat({
               aria-label="Сообщение напарнику"
               // text-base (16px) обязателен: при font-size < 16px iOS Safari
               // принудительно зумит страницу на фокусе — главный «дешёвый»
-              // тик мобильных сайтов. .chat-input-dock — тёплое свечение
-              // кромки на фокусе: «напарник заметил, что ты пишешь»
-              className="glass chat-input-dock max-h-27 min-h-11 min-w-0 flex-1 resize-none rounded-xl px-4 py-2.5 text-base leading-relaxed transition-shadow duration-300"
+              // тик мобильных сайтов
+              className="max-h-27 min-h-9 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground"
             />
             <Button
               type="submit"
               size="icon"
               disabled={!canSend || !input.trim()}
               aria-label="Отправить"
-              className="press size-11 shrink-0 rounded-xl transition-opacity duration-200"
+              className="press size-9 shrink-0 rounded-xl transition-opacity duration-200"
             >
               {/* Стрелка «выстреливает» вверх при каждой отправке — жест
                   подтверждён телом, сообщение реально улетело */}
@@ -760,7 +782,7 @@ export function CompanionChat({
                 transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                 className="flex"
               >
-                <ArrowUp className="size-5" />
+                <ArrowUp className="size-4" />
               </motion.span>
             </Button>
           </div>
