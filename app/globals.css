@@ -440,17 +440,14 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     0 4px 18px -6px oklch(0.86 0.22 130 / 0.4);
 }
 
-/* Проблеск по CTA: раз в 5s по кнопке пробегает быстрый диагональный блик —
-   приём премиальных кнопок (Apple Pay, AAA-геймдев). Свет ЛОВИТСЯ на
-   поверхности, а не излучается ею — консистентно закону «светится мир».
-   Один короткий проход + долгая пауза: выше порога заметности, ниже
-   порога раздражения. */
+/* Проблеск по CTA: ОДИН диагональный блик при появлении кнопки — приём
+   премиальных кнопок (Apple Pay), свет ловится на поверхности, а не
+   излучается ею. Ровно один проход, НЕ цикл: периодическое движение на
+   периферии для СДВГ — раздражитель, который невозможно «доглядеть до
+   конца» (тишина v1/v2/v5 + аффорданс v7, без компромисса). */
 @keyframes cta-sheen-sweep {
   0% {
     transform: translateX(-140%) skewX(-18deg);
-  }
-  18% {
-    transform: translateX(300%) skewX(-18deg);
   }
   100% {
     transform: translateX(300%) skewX(-18deg);
@@ -473,8 +470,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     transparent 100%
   );
   transform: translateX(-140%) skewX(-18deg);
-  animation: cta-sheen-sweep 5s ease-in-out infinite;
-  animation-delay: 1.2s;
+  animation: cta-sheen-sweep 1.1s ease-in-out 1.4s 1 both;
 }
 @media (prefers-reduced-motion: reduce) {
   .cta-sheen::after {

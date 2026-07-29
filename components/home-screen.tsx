@@ -564,25 +564,26 @@ export function HomeScreen() {
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  {/* Аура за силуэтом: холодный лунный свет из угла карты.
-                      Средняя дозировка (0.16): v3 с 0.22 читался
-                      «затмением», финальный откат до 0.1 гасил награду
-                      в чёрный блин — обещание обязано манить (reward
-                      anticipation, Schultz), холодный оттенок оправдан
-                      сюжетно: луна — единственный холодный свет сцены */}
+                  {/* Аура за силуэтом: широкое пятно НИЗКОЙ яркости —
+                      заметность издалека берём площадью (плюс v3), а не
+                      интенсивностью (минус v3). Нейтрально-тёплый оттенок,
+                      не голубой: в сцене два света — костёр и неон, третий
+                      цветовой голос не вводим (дисциплина v4) */}
                   <span
                     aria-hidden="true"
-                    className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
+                    className="pointer-events-none absolute -left-8 -top-10 size-40 rounded-full bg-[radial-gradient(circle,oklch(0.92_0.04_90/0.14)_0%,transparent_62%)]"
                   />
                   <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // brightness-150: SVG-ассеты ориентиров нарисованы
-                      // под тёмную сцену Мира — в карточке без осветления
-                      // тёмный диск читался «чёрным блином-затмением», а
-                      // не наградой. Осветляем именно пиксели силуэта +
-                      // умеренное контурное свечение 7px/0.4
-                      className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
+                      // БЕЗ фильтров (плюс v6: авторский цвет ассета).
+                      // «Чёрный блин» создавали мои же приглушающие фильтры
+                      // (opacity-85/saturate-0.55), а не сам ассет: луна в
+                      // спрайте — тёплый диск 0.85, яркий сам по себе.
+                      // brightness-150 был костылём поверх и ломал тона
+                      // остальных девяти ориентиров. Лёгкая тень-подсветка
+                      // по контуру — единственная добавка
+                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_6px_oklch(0.85_0.1_70/0.35)]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
