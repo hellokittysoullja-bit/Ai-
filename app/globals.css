@@ -441,7 +441,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 }
 
 /* Проблеск по CTA: ОДИН диагональный блик при появлении кнопки — приём
-   премиальных кнопок (Apple Pay), свет ловится на поверхности, а не
+   премиальных кноп��к (Apple Pay), свет ловится на поверхности, а не
    излучается ею. Ровно один проход, НЕ цикл: периодическое движение на
    периферии для СДВГ — раздражитель, который невозможно «доглядеть до
    конца» (тишина v1/v2/v5 + аффорданс v7, без компромисса). */
@@ -616,7 +616,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    неотличимо от второстепенного по глубине. Этот класс — сознательно
    редкий: один такой элемент на секцию, не больше, иначе ранг исчезает
    так же, как исчезает акцент, если лаймовый — это весь текст. */
-/* Глубина резкости у звёзд острова: ближние чётче и ярче, дальние —
+/* Глубина резкости у звёзд острова: ближние чётче и ��рче, дальние —
    размыты и тусклее. Статичный fallback для prefers-reduced-motion —
    SMIL <animate> поверх него мерцает, когда движение разрешено. */
 .star-far {
@@ -771,4 +771,51 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     inset 0 -12px 26px -20px oklch(0.72 0.17 55 / 0.5),
     inset 0 0 24px oklch(1 0 0 / 0.025),
     0 10px 28px -14px oklch(0 0 0 / 0.5);
+}
+
+/* Дом: три материала вместо каскада glass/glow/shine. */
+.surface-card {
+  background: oklch(0.205 0.012 145 / 0.92);
+  border: 1px solid oklch(1 0 0 / 0.11);
+  box-shadow: 0 8px 24px -18px oklch(0 0 0 / 0.65);
+}
+
+.action-chip {
+  background: oklch(1 0 0 / 0.045);
+  border: 1px solid oklch(1 0 0 / 0.12);
+  transition: background 120ms ease, border-color 120ms ease, transform 100ms ease;
+}
+.action-chip:active { transform: scale(0.98); }
+
+.home-primary-action {
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.25);
+}
+
+.chat-bubble-cat {
+  background: oklch(0.205 0.012 145 / 0.94);
+  backdrop-filter: none;
+  border: 1px solid oklch(1 0 0 / 0.11);
+  box-shadow: 0 6px 18px -16px oklch(0 0 0 / 0.7);
+}
+
+.chat-bubble-user {
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: none;
+}
+
+.chat-input-dock {
+  background: oklch(0.19 0.01 145 / 0.98);
+  border: 1px solid oklch(1 0 0 / 0.14);
+  box-shadow: none;
+}
+.chat-input-dock:focus-within {
+  border-color: color-mix(in oklab, var(--primary) 70%, transparent);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 55%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .action-chip,
+  .home-primary-action,
+  .chat-input-dock { transition: none; }
 }

@@ -122,7 +122,7 @@ function buildFirstWord(
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Сейчас — только ${plan.firstStep.toLowerCase()}. Остальное подождёт.`,
       actionStep: plan.firstStep,
     };
   }
@@ -363,25 +363,19 @@ export function HomeScreen() {
               статичный: существо живёт в своём мире и на этом экране, не в
               списке иконок. Continuity без анимационной цены.
             */}
-            <div className="relative shrink-0">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.16)_0%,transparent_70%)]"
+            <motion.div
+              className="shrink-0"
+              animate={
+                shouldAnimateMascot ? { scale: [1, 1.07, 0.98, 1] } : {}
+              }
+              transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
+            >
+              <MascotSvg
+                expression={mascotExpression}
+                label={companionName ?? "Напарник"}
+                size={48}
               />
-              <motion.div
-                className="relative"
-                animate={
-                  shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
-                }
-                transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
-              >
-                <MascotSvg
-                  expression={mascotExpression}
-                  label={companionName ?? "Напарник"}
-                  size={52}
-                />
-              </motion.div>
-            </div>
+            </motion.div>
             {/*
               Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
               Не на mount (иначе «…» fade-in = jank = negative prediction error).
@@ -415,7 +409,7 @@ export function HomeScreen() {
             <div className="flex flex-col gap-1">
               <Button
                 size="lg"
-                className="cta-sheen w-full gap-2 font-semibold"
+                className="home-primary-action w-full gap-2 font-semibold"
                 onClick={() => startNow(firstWord.actionStep as string)}
               >
                 <Play className="size-4 shrink-0" aria-hidden="true" />
@@ -431,14 +425,13 @@ export function HomeScreen() {
               {/* Выход «Другое дело» (пакет Клода): явный второй путь —
                   для СДВГ отсутствие альтернативы у единственного CTA
                   читается как ловушка и подталкивает к избеганию */}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-10 self-center text-muted-foreground"
+              <button
+                type="button"
+                className="press inline-flex min-h-11 items-center justify-center gap-1 self-center px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => router.push("/app/session")}
               >
-                Другое дело
-              </Button>
+                Другое дело <span aria-hidden="true">→</span>
+              </button>
             </div>
           )}
 
@@ -446,7 +439,7 @@ export function HomeScreen() {
               опытный пользователь получал больше трения, чем новичок
               (3 тапа против 1). Очередь дробления приоритетнее повтора:
               «следующий шаг» продолжает начатую задачу; без очереди —
-              повтор последнего шага; «Другое дело» — сетап для нового */}
+              повтор посл��днего шага; «Другое дело» — сетап для нового */}
           {stats &&
             stats.totalStarts > 0 &&
             !firstWord?.actionStep &&
@@ -563,7 +556,7 @@ export function HomeScreen() {
               href="/app/world"
               // relative + overflow-hidden: внутри живёт лунная аура.
               // Тонкая тёплая кромка сверху — свет костра касается карты
-              className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
+              className="surface-card press relative flex min-h-28 flex-col gap-2.5 overflow-hidden rounded-2xl px-4 py-3.5"
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
@@ -572,11 +565,7 @@ export function HomeScreen() {
                       интенсивностью (минус v3). Нейтрально-тёплый оттенок,
                       не голубой: в сцене два света — костёр и неон, третий
                       цветовой голос не вводим (дисциплина v4) */}
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -left-8 -top-10 size-40 rounded-full bg-[radial-gradient(circle,oklch(0.92_0.04_90/0.14)_0%,transparent_62%)]"
-                  />
-                  <span className="relative flex items-center gap-3.5">
+                  <span className="relative flex items-center gap-3">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
                       // БЕЗ фильтров (плюс v6: авторский цвет ассета).
@@ -586,7 +575,7 @@ export function HomeScreen() {
                       // brightness-150 был костылём поверх и ломал тона
                       // остальных девяти ориентиров. Лёгкая тень-подсветка
                       // по контуру — единственная добавка
-                      className="h-14 w-14 shrink-0 drop-shadow-[0_0_6px_oklch(0.85_0.1_70/0.35)]"
+                      className="h-12 w-12 shrink-0"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
@@ -625,8 +614,8 @@ export function HomeScreen() {
                             key={i}
                             className={`h-1.5 flex-1 rounded-full ${
                               i < stats.totalStarts
-                                ? 'bg-primary shadow-[0_0_5px_oklch(0.86_0.22_130/0.35)]'
-                                : 'bg-white/[0.08]'
+                                ? 'bg-primary'
+                                : 'bg-white/[0.13]'
                             }`}
                           />
                         ))}
@@ -686,7 +675,7 @@ export function HomeScreen() {
             stats !== null &&
             stats.totalStarts >= 1 && (
               <form
-                className="glass flex flex-col gap-2 rounded-2xl p-3"
+className="surface-card flex flex-col gap-2 rounded-2xl p-3.5"
                 onSubmit={(e) => {
                   e.preventDefault();
                   giveName(nameDraft);
@@ -696,8 +685,12 @@ export function HomeScreen() {
                   Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
                   откликаться.
                 </p>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground" htmlFor="companion-name">
+                  Имя напарника
+                </label>
                 <div className="flex gap-2">
                   <input
+                    id="companion-name"
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
                     placeholder="Как меня зовут?"
