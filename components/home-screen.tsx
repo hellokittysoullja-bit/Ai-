@@ -38,6 +38,11 @@ import { Bell } from "lucide-react";
 
 type FirstWord = {
   greeting: string;
+  /** Типографическое правило: рукописный шрифт — ТОЛЬКО голос существа.
+      Инструкция интерфейса («выбери шаг ниже») — системный шрифт, отдельным
+      полем: декоративные шрифты читаются медленнее (legibility-исследования),
+      а смешение голоса и UI-указаний в одном пузыре размывает персонажа */
+  hint?: string;
   /** Есть план на сегодня — показываем кнопку «Начинаю» */
   actionStep: string | null;
   /** Новичок без стартов — показываем чипы мгновенного первого старта */
@@ -151,7 +156,8 @@ function buildFirstWord(
     if (intro === "procrastinate") {
       return {
         greeting:
-          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Выбери шаг ниже, я рядом.",
+          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Я рядом.",
+        hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
         actionStep: null,
         showStarterChips: true,
       };
@@ -159,14 +165,16 @@ function buildFirstWord(
     if (intro === "curious") {
       return {
         greeting:
-          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов. Попробуй один крошечный шаг — увидишь, как это работает.",
+          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов.",
+        hint: "Попробуй один крошечный шаг ниже — увидишь, как это работает.",
         actionStep: null,
         showStarterChips: true,
       };
     }
     return {
       greeting:
-        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать. Выбери крошечный шаг ниже — и начнём прямо сейчас. Или напиши мне, что висит.",
+        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать.",
+      hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
       actionStep: null,
       showStarterChips: true,
     };
@@ -326,7 +334,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, доступны ли весточки
+    // Тихо ставим service worker и узнаём, д��ступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -338,7 +346,9 @@ export function HomeScreen() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
-        <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
+        {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
+            блоками — визуальная теснота = когнитивная теснота для СДВГ */}
+        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
           <div className="flex items-start gap-3">
             {/*
               Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
@@ -376,110 +386,57 @@ export function HomeScreen() {
             */}
             <AnimatePresence>
               {firstWord ? (
-                <motion.p
+                <motion.div
                   key="greeting"
-                  className="pt-1 font-hand text-xl leading-snug"
+                  className="flex flex-col gap-1 pt-1"
                   initial={reduceMotion ? false : { opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 >
-                  {firstWord.greeting}
-                </motion.p>
+                  <p className="font-hand text-xl leading-snug">
+                    {firstWord.greeting}
+                  </p>
+                  {/* Инструкция — системным шрифтом: голос кота и указание
+                      интерфейса разделены типографически */}
+                  {firstWord.hint && (
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {firstWord.hint}
+                    </p>
+                  )}
+                </motion.div>
               ) : null}
             </AnimatePresence>
           </div>
 
-          {/* Момент дарения имени: один раз, после первого старта.
-              Названное существо — уже не приложение, а «мой». */}
-          {nameLoaded &&
-            !companionName &&
-            stats !== null &&
-            stats.totalStarts >= 1 && (
-              <form
-                className="glass flex flex-col gap-2 rounded-2xl p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  giveName(nameDraft);
-                }}
+          {firstWord?.actionStep && (
+            <div className="flex flex-col gap-1">
+              <Button
+                size="lg"
+                className="cta-sheen w-full gap-2 font-semibold"
+                onClick={() => startNow(firstWord.actionStep as string)}
               >
-                <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    placeholder="Как меня зовут?"
-                    maxLength={24}
-                    aria-label="Имя для напарника"
-                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="h-10"
-                    disabled={!nameDraft.trim()}
-                  >
-                    Так и зовут
-                  </Button>
-                </div>
-              </form>
-            )}
-
-          {/* Весточки от напарника: предлагаем один раз, после того как
-              человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». */}
-          {checkinState === "available" && !!companionName && (
-            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
-              <div className="flex items-start gap-2">
-                <Bell
-                  className="mt-0.5 size-4 shrink-0 text-primary"
-                  aria-hidden="true"
-                />
-                <p className="font-hand text-lg leading-snug">
-                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
-                  раз, без спама — и никаких «ты пропал».
-                </p>
-              </div>
+                <Play className="size-4 shrink-0" aria-hidden="true" />
+                {/* Задача — в лейбле (как в проде было «Повторить: …»):
+                    кнопка с конкретикой снимает последнюю микро-неопределённость
+                    «а что именно начнётся?» — labeled CTA конвертит лучше
+                    generic (исследования NN/g по link labels). trimLabel
+                    защищает от длинных задач. */}
+                <span className="truncate">
+                  Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
+                </span>
+              </Button>
+              {/* Выход «Другое дело» (пакет Клода): явный второй путь —
+                  для СДВГ отсутствие альтернативы у единственного CTA
+                  читается как ловушка и подталкивает к избеганию */}
               <Button
                 size="sm"
-                variant="secondary"
-                className="h-10 self-start"
-                onClick={turnOnCheckins}
-                disabled={checkinBusy}
+                variant="ghost"
+                className="h-10 self-center text-muted-foreground"
+                onClick={() => router.push("/app/session")}
               >
-                {checkinBusy ? "Секунду…" : "Да, махай мне"}
+                Другое дело
               </Button>
-              {checkinHint && (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Почти получилось: чтобы я мог писать первым, добавь меня на
-                  экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
-                  раз.
-                </p>
-              )}
             </div>
-          )}
-
-          {checkinState === "enabled" && !!companionName && (
-            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
-              <Bell
-                className="size-3.5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              {companionName} будет тихо махать тебе с острова раз в день.
-            </p>
-          )}
-
-          {firstWord?.actionStep && (
-            <Button
-              size="lg"
-              className="w-full gap-2 font-semibold"
-              onClick={() => startNow(firstWord.actionStep as string)}
-            >
-              <Play className="size-4" aria-hidden="true" />
-              Начинаю
-            </Button>
           )}
 
           {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
@@ -539,44 +496,160 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="glass glass-interactive press rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {chip}
                   </Link>
                 ))}
               </div>
-              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                Каждый старт растит остров →
-              </p>
             </div>
           )}
 
+          {/* Весточки от напарника: предлагаем один раз, после того как
+              человек уже назвал существо. Только там, где браузер их умеет.
+              Ни спама, ни давления — «один тихий раз в день». */}
+          {checkinState === "available" && !!companionName && (
+            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
+              <div className="flex items-start gap-2">
+                <Bell
+                  className="mt-0.5 size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <p className="font-hand text-lg leading-snug">
+                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
+                  раз, без спама — и никаких «ты пропал».
+                </p>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="h-10 self-start"
+                onClick={turnOnCheckins}
+                disabled={checkinBusy}
+              >
+                {checkinBusy ? "Секунду…" : "Да, махай мне"}
+              </Button>
+              {checkinHint && (
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Почти получилось: чтобы я мог писать первым, добавь меня на
+                  экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
+                  раз.
+                </p>
+              )}
+            </div>
+          )}
+
+          {checkinState === "enabled" && !!companionName && (
+            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
+              <Bell
+                className="size-3.5 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              {companionName} будет тихо махать тебе с острова раз в день.
+            </p>
+          )}
+
           {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
-              Дома (раньше — только в Мире). До 10-го старта — следующий
-              ориентир с призрачным силуэтом; дальше — счёт редких находок */}
-          {stats && stats.totalStarts > 0 && (
+              Дома (раньше — только в Мире). Показывается и новичку с нуля
+              стартов — призрачный силуэт первой находки работает сильнее,
+              чем голая строка «Каждый старт растит остров»: конкретное
+              обещание вместо абстракции. До 10-го старта — следующий
+              ориентир с силуэтом; дальше — счёт редких находок */}
+          {stats && (
             <Link
               href="/app/world"
-              className="glass press flex items-center gap-3 rounded-2xl px-4 py-2.5"
+              // relative + overflow-hidden: внутри живёт лунная аура.
+              // Тонкая тёплая кромка сверху — свет костра касается карты
+              className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  <svg
-                    viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                    className="h-9 w-9 shrink-0 opacity-60 saturate-[0.35]"
+                  {/* Аура за силуэтом: холодный лунный свет из угла карты.
+                      Средняя дозировка (0.16): v3 с 0.22 читался
+                      «затмением», финальный откат до 0.1 гасил награду
+                      в чёрный блин — обещание обязано манить (reward
+                      anticipation, Schultz), холодный оттенок оправдан
+                      сюжетно: луна — единственный холодный свет сцены */}
+                  <span
                     aria-hidden="true"
-                  >
-                    {landmarkNodes[stats.totalStarts]}
-                  </svg>
-                  <span className="min-w-0 text-sm leading-snug text-muted-foreground">
-                    Следующий старт вырастит{" "}
-                    <span className="font-semibold text-foreground">
-                      «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                    className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
+                  />
+                  <span className="relative flex items-center gap-3.5">
+                    <svg
+                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
+                      // brightness-150: SVG-ассеты ориентиров нарисованы
+                      // под тёмную сцену Мира — в карточке без осветления
+                      // тёмный диск читался «чёрным блином-затмением», а
+                      // не наградой. Осветляем именно пиксели силуэта +
+                      // умеренное контурное свечение 7px/0.4
+                      className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
+                      aria-hidden="true"
+                    >
+                      {landmarkNodes[stats.totalStarts]}
+                    </svg>
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                        Следующий старт вырастит
+                      </span>
+                      <span className="text-lg font-semibold leading-snug text-foreground text-balance">
+                        «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                      </span>
                     </span>
-                    {stats.lastStartDate === todayKey(new Date())
-                      ? " — остров уже вырос сегодня, смотри →"
-                      : " →"}
                   </span>
+                  {/* Endowed progress (Nunes & Drèze, 2006): видим��я
+                      заполненная часть пути к находке. Только при
+                      totalStarts > 0 — пустой бар у новичка демотивирует */}
+                  {stats.totalStarts > 0 && (
+                    <span
+                      className="flex flex-col gap-1.5"
+                      role="progressbar"
+                      aria-valuenow={stats.totalStarts}
+                      aria-valuemin={0}
+                      aria-valuemax={LANDMARK_COUNT}
+                      aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
+                    >
+                      {/* Сегменты-фишки (unit bias): каждый тик = один
+                          реальный старт. h-1.5 + gap-1 — деления читаются
+                          раздельно, не сливаются в полоску. Полный bg-primary
+                          с мягким глоу: приглушение до /65 давало грязный
+                          оливковый (полупрозрачный зелёный на тёмном стекле
+                          мутнеет) — заработанный прогресс обязан выглядеть
+                          живым; CTA сохраняет главенство размером массы */}
+                      <span className="flex gap-1">
+                        {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
+                          <span
+                            key={i}
+                            className={`h-1.5 flex-1 rounded-full ${
+                              i < stats.totalStarts
+                                ? 'bg-primary shadow-[0_0_5px_oklch(0.86_0.22_130/0.35)]'
+                                : 'bg-white/[0.08]'
+                            }`}
+                          />
+                        ))}
+                      </span>
+                      <span className="flex items-baseline justify-between gap-2">
+                        {/* Вербальный фрейминг близости (goal-gradient,
+                            Kivetz 2006): «остался последний» сильнее голого
+                            счёта */}
+                        <span className="font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                          {stats.totalStarts} из {LANDMARK_COUNT}
+                          {LANDMARK_COUNT - stats.totalStarts === 1
+                            ? ' · остался последний'
+                            : stats.lastStartDate === todayKey(new Date())
+                              ? ' · вырос сегодня'
+                              : ''}
+                        </span>
+                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                          весь остров →
+                        </span>
+                      </span>
+                    </span>
+                  )}
+                  {stats.totalStarts === 0 && (
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+                      весь остров →
+                    </span>
+                  )}
                 </>
               ) : pityRipe ? (
                 <span className="text-sm leading-snug text-muted-foreground">
@@ -598,6 +671,47 @@ export function HomeScreen() {
               )}
             </Link>
           )}
+
+          {/* Порядок сверху вниз = приоритет: действие (CTA) → награда
+              (goal-карта) → отношения (имя). Карточка имени, стоявшая
+              МЕЖДУ действием и наградой, разрывала связку «сделай — и
+              вырастет» лишним социальным решением (serial position +
+              минимизация числа решений до действия) */}
+          {nameLoaded &&
+            !companionName &&
+            stats !== null &&
+            stats.totalStarts >= 1 && (
+              <form
+                className="glass flex flex-col gap-2 rounded-2xl p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  giveName(nameDraft);
+                }}
+              >
+                <p className="font-hand text-lg leading-snug">
+                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+                  откликаться.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Как меня зовут?"
+                    maxLength={24}
+                    aria-label="Имя для напарника"
+                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                  />
+                  <Button
+                    type="submit"
+                    size="sm"
+                    className="h-10"
+                    disabled={!nameDraft.trim()}
+                  >
+                    Так и зовут
+                  </Button>
+                </div>
+              </form>
+            )}
         </div>
       </section>
 
