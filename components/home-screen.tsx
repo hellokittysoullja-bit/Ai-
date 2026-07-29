@@ -121,8 +121,17 @@ function buildFirstWord(
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
+    // Zeigarnik + implementation intention: если назначенное время уже
+    // прошло, напарник это ЗАМЕЧАЕТ — без вины, как факт присутствия.
+    // Игнорирование прошедшего времени читается как фальшь скрипта.
+    const timePassed = plan.startTime
+      ? (() => {
+          const [h, m] = plan.startTime.split(":").map(Number);
+          return hour > h || (hour === h && now.getMinutes() >= m);
+        })()
+      : false;
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Сейчас — только ${plan.firstStep.toLowerCase()}. Остальное подождёт.${hourLine}`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Сейчас — только ${plan.firstStep.toLowerCase()}. Остальное подождёт.${timePassed ? " Время подошло — я уже тут." : ""}${hourLine}`,
       actionStep: plan.firstStep,
     };
   }
@@ -411,7 +420,7 @@ export function HomeScreen() {
             <div className="flex flex-col gap-1">
               <Button
                 size="lg"
-                className="home-primary-action h-auto min-h-12 w-full gap-2 whitespace-normal py-3 font-semibold"
+                className="home-primary-action press h-auto min-h-12 w-full gap-2 whitespace-normal py-3 font-semibold"
                 onClick={() => startNow(firstWord.actionStep as string)}
               >
                 <Play className="size-4 shrink-0" aria-hidden="true" />
@@ -445,9 +454,12 @@ export function HomeScreen() {
             !firstWord?.actionStep &&
             !firstWord?.showStarterChips && (
               <div className="flex flex-col gap-2">
+                {/* Тот же материал, что у планового CTA: роль «главное
+                    действие экрана» одна — и материал один (Gestalt
+                    similarity, консистентный game feel) */}
                 <Button
                   size="lg"
-                  className="w-full gap-2 font-semibold"
+                  className="home-primary-action press h-auto min-h-12 w-full gap-2 whitespace-normal py-3 font-semibold"
                   onClick={() => {
                     const quick = queuedStep ?? lastStepLabel;
                     return quick
@@ -469,15 +481,16 @@ export function HomeScreen() {
                       : `Повторить: «${short}»`;
                   })()}
                 </Button>
+                {/* Идентичен выходу у планового CTA: один паттерн
+                    «второй путь» на весь экран */}
                 {lastStepLabel && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-10 self-center text-muted-foreground"
+                  <button
+                    type="button"
+                    className="press inline-flex min-h-11 items-center justify-center gap-1 self-center px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
                     onClick={() => router.push("/app/session")}
                   >
-                    Другое дело
-                  </Button>
+                    Другое дело <span aria-hidden="true">→</span>
+                  </button>
                 )}
               </div>
             )}
@@ -638,9 +651,30 @@ export function HomeScreen() {
                       </span>
                     </span>
                   )}
+                  {/* Goal gradient для новичка: трек виден и на нуле,
+                      но первое деление подсвечено как ЦЕЛЬ (primary/30),
+                      а не как заработанное — честный якорь «один старт =
+                      одно деление» без фальшивого прогресса */}
                   {stats.totalStarts === 0 && (
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
-                      весь остров →
+                    <span className="flex flex-col gap-1.5">
+                      <span className="flex gap-1" aria-hidden="true">
+                        {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
+                          <span
+                            key={i}
+                            className={`h-1.5 flex-1 rounded-full ${
+                              i === 0 ? "bg-primary/30" : "bg-white/[0.13]"
+                            }`}
+                          />
+                        ))}
+                      </span>
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                          первый старт = первое деление
+                        </span>
+                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                          весь остров →
+                        </span>
+                      </span>
                     </span>
                   )}
                 </>
