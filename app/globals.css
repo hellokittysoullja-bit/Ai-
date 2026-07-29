@@ -400,48 +400,19 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    тех же трёх слоях, что и .glass: преломление, кромка, тень.
    ========================================================================== */
 .chat-bubble-cat {
-  background:
-    radial-gradient(
-      120% 90% at 20% 100%,
-      oklch(0.72 0.17 55 / 0.1) 0%,
-      transparent 55%
-    ),
-    linear-gradient(
-      155deg,
-      oklch(1 0 0 / 0.11) 0%,
-      oklch(1 0 0 / 0.045) 55%,
-      oklch(1 0 0 / 0.02) 100%
-    ),
-    /* Тёмная подложка (пакет Клода): стеклянный пузырь на светлеющих
-       участках сцены терял контраст текста — плотное тёмное основание
-       под преломлением держит белый текст в зоне AAA-читаемости */
-    linear-gradient(oklch(0.16 0.02 150 / 0.62), oklch(0.16 0.02 150 / 0.62));
-  backdrop-filter: blur(16px) saturate(150%);
-  border: 1px solid oklch(1 0 0 / 0.14);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.16),
-    0 8px 22px -14px oklch(0 0 0 / 0.55);
+  background: oklch(0.18 0.012 135 / 0.9);
+  border: 1px solid oklch(1 0 0 / 0.12);
+  box-shadow: 0 8px 22px -16px oklch(0 0 0 / 0.58);
 }
 
 .chat-bubble-user {
-  /* Вертикальный градиент вместо плоской заливки: свет сверху, масса
-     снизу — материал с объёмом (приём кнопок Stripe/Linear), плоская
-     заливка на OLED читалась как «наклейка» */
-  background: linear-gradient(
-    to bottom,
-    oklch(0.9 0.21 130) 0%,
-    var(--primary) 55%,
-    oklch(0.8 0.2 132) 100%
-  );
+  background: var(--primary);
   color: var(--primary-foreground);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.4),
-    inset 0 -1px 0 oklch(0 0 0 / 0.12),
-    0 4px 18px -6px oklch(0.86 0.22 130 / 0.4);
+  box-shadow: inset 0 1px 0 oklch(1 0 0 / 0.22);
 }
 
 /* Проблеск по CTA: ОДИН диагональный блик при появлении кнопки — приём
-   премиальных кноп��к (Apple Pay), свет ловится на поверхности, а не
+   премиальных кноп����к (Apple Pay), свет ловится на поверхности, а не
    излучается ею. Ровно один проход, НЕ цикл: периодическое движение на
    периферии для СДВГ — раздражитель, который невозможно «доглядеть до
    конца» (тишина v1/v2/v5 + аффорданс v7, без компромисса). */
@@ -504,11 +475,14 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 /* Док ввода: поле отвечает на фокус тёплым свечением кромки — «напарник
    заметил, что ты начал писать». border через переменную .glass — каскад-
    безопасно (см. комментарий к .glass ниже) */
+.chat-input-dock {
+  background: oklch(0.17 0.01 135 / 0.92);
+  border: 1px solid oklch(1 0 0 / 0.16);
+}
 .chat-input-dock:focus-within {
-  --glass-border: color-mix(in oklab, var(--primary) 45%, transparent);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.2),
-    0 0 18px -6px oklch(0.86 0.22 130 / 0.35);
+  border-color: color-mix(in oklab, var(--primary) 65%, transparent);
+  outline: 2px solid color-mix(in oklab, var(--primary) 18%, transparent);
+  outline-offset: 1px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -682,7 +656,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 }
 
 /* Э5 · Дыхание очага: тёплое пятно за существом пульсирует в такт его
-   дыханию (4s — тот же цикл, что scale-дыхание маскота). Диегетический
+   дыхан��ю (4s — тот же цикл, что scale-дыхание маскота). Диегетический
    свет живёт; НЕ вешать на элемент с собственным translate — только на
    вложенный слой без позиционных трансформов. */
 @keyframes hearth-breathe {

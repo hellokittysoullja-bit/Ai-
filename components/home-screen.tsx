@@ -290,7 +290,7 @@ export function HomeScreen() {
     stats.daysAway !== null && stats.daysAway >= 1;
 
   // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
-  // есть шаг — собран, поздний вечер — сонный, и��аче спокоен
+  // есть шаг — собран, поздний вечер — сон��ый, и��аче спокоен
   const hour = new Date().getHours();
   const mascotExpression: MascotExpression =
     stats?.daysAway !== null && stats !== null && stats.daysAway >= 2
@@ -359,7 +359,7 @@ export function HomeScreen() {
   // документному скроллу, и sticky-композер, зажатый верхом своего
   // родителя, нырял под док (срезанное поле ввода на первом экране)
   const cardsHeader = (
-    <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+    <section className="border-b border-white/[0.06] bg-card/20">
         {/* gap-4/py-5: паузы между блоками сохранены, но вертикаль ужата
             настолько, чтобы первая реплика чата выглядывала из-под сгиба —
             живой напарник должен быть виден на первом кадре (вердикт
@@ -571,7 +571,7 @@ export function HomeScreen() {
               href="/app/world"
               // relative + overflow-hidden: внутри живёт лунная аура.
               // Тонкая тёплая кромка сверху — свет костра касается карты
-              className="surface-card press relative flex min-h-28 flex-col gap-2.5 overflow-hidden rounded-2xl px-4 py-3.5"
+              className="surface-card press relative flex min-h-28 flex-col gap-2 overflow-hidden rounded-2xl px-4 py-3"
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>

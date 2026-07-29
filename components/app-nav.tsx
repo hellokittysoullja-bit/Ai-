@@ -77,18 +77,14 @@ export function AppNav() {
                   : "text-muted-foreground hover:bg-white/[0.03] hover:text-foreground"
               }`}
             >
-              {/* Светящаяся пилюля активного таба (характер v7, фото
-                  пользователя): игровое «ты здесь» светом очага, перетекает
-                  между табами пружиной. Один слой света, без каскада */}
+              {/* Спокойный active-state: tint + короткая линия. Он сохраняет
+                  игровую узнаваемость исходника, но не превращает каждый вход
+                  на Дом в зелёное световое пятно. */}
               {active && (
                 <motion.span
                   layoutId="nav-mark"
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                  className="absolute inset-0 rounded-2xl bg-primary/10"
-                  style={{
-                    boxShadow:
-                      "0 0 16px -4px oklch(0.86 0.22 130 / 0.3)",
-                  }}
+                  className="absolute inset-0 rounded-2xl bg-primary/[0.07] after:absolute after:inset-x-7 after:top-0 after:h-0.5 after:rounded-full after:bg-primary"
                   aria-hidden="true"
                 />
               )}
