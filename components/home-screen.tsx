@@ -581,142 +581,35 @@ export function HomeScreen() {
               (3 тапа против 1). Очередь дробления приоритетнее повтора:
               «следующий шаг» продолжает начатую задачу; без очереди —
               повтор последнего шага; «Другое дело» — сетап для нового */}
-          {/* Единый блок «действие + его награда».
-              Раньше это были два соседних объекта: кнопка сверху, карточка
-              прогресса ниже. Ассоциация «нажал → выросло» тем слабее, чем
-              дальше действие и его результат разнесены в кадре — поэтому
-              награда теперь физически обрамляет кнопку, а не соседствует
-              с ней. Второе: продукт сознательно отказался от стриков, то
-              есть отдал loss aversion; законная White Hat-замена — видимое
-              накопление и предвкушение именованного будущего состояния
-              (goal gradient усиливается только когда близость к цели
-              перцептивно очевидна). Раньше это состояние было отрендерено
-              строкой text-muted-foreground с почти чёрной иконкой —
-              сильнейшая точка жизненного цикла подавалась тише кнопки
-              «Другое дело». Это единственный .glass-highlight на экране:
-              третий материальный ярус обязан оставаться редким. */}
-          {/* Условие включает actionStep, а не только totalStarts > 0:
-              план на сегодня может существовать при нуле стартов (LLM
-              сохраняет план из чата, не требуя ни одной сессии). Без этой
-              ветки такой человек остался бы на экране вообще без кнопки —
-              текст «жми кнопку» есть, кнопки нет. */}
+          {/* Кнопка действия и карточка награды — снова два раздельных
+              блока (по прямой просьбе, не по пересмотру находки о goal
+              gradient — та причина слияния остаётся в силе, это
+              сознательный откат к отдельным блокам). Вариативная строка
+              награды (Sparkles) идёт РЯДОМ С КНОПКОЙ, а не в карточке —
+              её место определено тем же доводом, что и раньше
+              (anticipation ближе всего к моменту нажатия), просто теперь
+              «ближе всего» означает «в этом же блоке», а не «в одной
+              рамке». Показывается только пока не пройдены все 10
+              ориентиров — после десятого карточка сама берёт на себя
+              разговор про находки (pity/редкие), и повторять его же текст
+              рядом с кнопкой было бы дублем. */}
           {stats &&
             (stats.totalStarts > 0 || !!firstWord?.actionStep) &&
             !firstWord?.showStarterChips && (
-            <div className="glass-highlight flex flex-col gap-3 rounded-2xl p-4">
-              {stats.totalStarts < LANDMARK_COUNT ? (
-                <>
-                  <div className="relative flex items-center gap-3 overflow-hidden">
-                    {/* Призрак следующего ориентира — крупно: он и есть
-                        обещание, ради которого нажимают кнопку ниже */}
-                    {/* Призрак — объект предвкушения, он обязан читаться как
-                        конкретная вещь. Приглушение прозрачностью (было
-                        opacity-45 saturate-.25, затем opacity-75/.6) тушило
-                        тёмный спрайт до пятна на тёмной карточке — реальное
-                        осветление пикселей силуэта (brightness) плюс
-                        контурное свечение читается как награда, ожидающая
-                        своего часа, а не как выключенная иконка. Холодная
-                        аура за спрайтом — единственный холодный акцент
-                        сцены (обещание ещё не сбылось), статична, без
-                        анимации: работает на предвкушение, не на привыкание. */}
-                    <span
-                      aria-hidden="true"
-                      className="pointer-events-none absolute -left-6 -top-8 size-28 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
-                    />
-                    <svg
-                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      className="relative h-14 w-14 shrink-0 brightness-150 saturate-[0.75] drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)]"
-                      aria-hidden="true"
-                    >
-                      {landmarkNodes[stats.totalStarts]}
-                    </svg>
-                    <div className="flex min-w-0 flex-col gap-1">
-                      <span className="text-sm leading-snug text-muted-foreground">
-                        Следующий старт вырастит
-                      </span>
-                      <span className="text-balance text-lg font-bold leading-tight">
-                        «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
-                      </span>
-                      {/* Сегодняшний рост — отдельная строка-уведомление,
-                          не замена обещания выше: обещание смотрит вперёд
-                          («вырастит»), эта строка — назад, на то, что уже
-                          случилось сегодня, и зовёт посмотреть. */}
-                      {grewToday && (
-                        <Link
-                          href="/app/world"
-                          className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline"
-                        >
-                          Остров уже вырос сегодня — смотри
-                          <ArrowRight className="size-3" aria-hidden="true" />
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                  {/* Незавершённость видима, иначе Зейгарник не работает:
-                      десять делений, последнее пустое — видно, сколько
-                      осталось, без единой цифры-упрёка */}
-                  <div
-                    className="flex gap-1"
-                    role="img"
-                    aria-label={`Открыто ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
-                  >
-                    {Array.from({ length: LANDMARK_COUNT }).map((_, i) => (
-                      <span
-                        key={i}
-                        className={`h-1 flex-1 rounded-full ${
-                          i < stats.totalStarts ? "bg-primary" : "bg-white/12"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                  <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                    {stats.totalStarts} из {LANDMARK_COUNT} ·{" "}
-                    {LANDMARK_COUNT - stats.totalStarts === 1
-                      ? "остался последний"
-                      : `осталось ${LANDMARK_COUNT - stats.totalStarts}`}
-                  </span>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className="text-lg font-bold leading-tight">
-                    {pityRipe
-                      ? "Следующая находка будет необычной — или лучше"
-                      : `Редких находок: ${rareFound} из ${ISLAND_POOL.filter((e) => e.rarity === "rare").length}`}
-                  </span>
-                  <span className="text-sm leading-snug text-muted-foreground">
-                    {pityRipe
-                      ? "Она уже ждёт твоего старта."
-                      : "Полная сессия повышает шанс редкой."}
-                  </span>
-                </div>
+            <div className="flex flex-col gap-2">
+              {stats.totalStarts < LANDMARK_COUNT && (
+                <span
+                  className={`flex items-center gap-1.5 text-xs leading-snug ${
+                    pityRipe ? "text-primary" : "text-muted-foreground"
+                  }`}
+                >
+                  <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
+                  {pityRipe
+                    ? "Следующая находка будет необычной — или лучше"
+                    : "И одна находка на остров — какая, не знаю сам"}
+                </span>
               )}
-
-              {/* Вариативный слой награды — прямо над кнопкой, ближе всего
-                  к моменту нажатия.
-                  Ориентир выше назван поимённо и потому полностью предсказуем:
-                  по Schultz предсказанная награда даёт ошибку предсказания ≈ 0,
-                  то есть главное видимое обещание экрана нейрохимически пустое.
-                  Настоящий всплеск даёт неизвестный исход, и он в продукте
-                  ЕСТЬ (drawFind с редкостями), но рендерился только в ветке
-                  «все 10 ориентиров открыты» — то есть впервые показывался
-                  после десятого старта, мимо всего окна удержания.
-                  Обе формулировки честные: при pityRipe drawFind
-                  действительно поднимает редкость до uncommon+
-                  (island-elements.ts), это описание реальной механики,
-                  а не выдуманный дефицит. */}
-              <span
-                className={`flex items-center gap-1.5 text-xs leading-snug ${
-                  pityRipe ? "text-primary" : "text-muted-foreground"
-                }`}
-              >
-                <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
-                {pityRipe
-                  ? "Следующая находка будет необычной — или лучше"
-                  : "И одна находка на остров — какая, не знаю сам"}
-              </span>
-
-              {/* Действие — внутри той же рамки, что и его награда.
-                  cta-sheen: две короткие волны блика на появление, не
+              {/* cta-sheen: две короткие волны блика на появление, не
                   бесконечная петля — эта кнопка открывается десятки раз в
                   день, вечная анимация здесь = привыкание, глаз перестаёт
                   её замечать через несколько визитов. */}
@@ -749,42 +642,123 @@ export function HomeScreen() {
                     : `Повторить: «${short}»`;
                 })()}
               </Button>
-
-              {/* inline-flex + items-center на ОБОИХ: у <a> min-h-11 сам по
-                  себе ничего не центрирует (инлайновый элемент), из-за чего
-                  «Весь остров» стоял выше «Другое дело» на одной строке */}
-              {/* Прошлый проход прятал эту ссылку, когда выше уже стоит
-                  строка-открытие «Остров уже вырос сегодня — смотри», считая
-                  оба пути дублем (оба ведут в /app/world) — находка по
-                  Хику. Пересмотрел: у них разные референты. «Смотри» —
-                  указывает на КОНКРЕТНОЕ событие («то, что выросло сегодня»,
-                  контингентно, разово), «Весь остров» — постоянная
-                  wayfinding-ссылка на обзор целиком, её саму по себе Хик не
-                  задевает (одна тихая второстепенная ссылка под primary-
-                  кнопкой — стандартный паттерн, не конкурирующий выбор).
-                  Прятать её означало убирать единственный ПОСТОЯННЫЙ путь на
-                  остров ровно в те дни, когда человек реально что-то вырастил
-                  — то есть худший день для потери этого выхода. Возвращаю. */}
-              <div className="flex items-center justify-between gap-2">
-                {lastStepLabel || firstWord?.actionStep ? (
-                  <button
-                    type="button"
-                    onClick={() => router.push("/app/session")}
-                    className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                  >
-                    Другое дело
-                  </button>
-                ) : (
-                  <span />
-                )}
-                <Link
-                  href="/app/world"
-                  className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              {(lastStepLabel || firstWord?.actionStep) && (
+                <button
+                  type="button"
+                  onClick={() => router.push("/app/session")}
+                  className="inline-flex min-h-11 items-center justify-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 >
-                  Весь остров →
-                </Link>
-              </div>
+                  Другое дело
+                </button>
+              )}
             </div>
+          )}
+
+          {/* Карточка награды — прозрачная, отдельно от кнопки. Целиком
+              одна ссылка на /app/world (как «Весь остров →» раньше — тут
+              это уже не отдельная строка-ссылка, а подпись всей карточки:
+              нажатие в любом месте ведёт туда же, второй раз объявлять то
+              же самое отдельной ссылкой было бы лишним прицелом рядом с
+              первым). Рост «сегодня» — обычный span, не своя ссылка: он
+              внутри уже кликабельной карточки, вложенная ссылка в ссылке
+              невалидна как HTML. */}
+          {stats && (
+            <Link
+              href="/app/world"
+              className="glass-highlight press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
+            >
+              {stats.totalStarts < LANDMARK_COUNT ? (
+                <>
+                  <div className="relative flex items-center gap-3 overflow-hidden">
+                    {/* Призрак следующего ориентира — крупно: он и есть
+                        обещание, ради которого нажимают кнопку выше */}
+                    {/* Призрак — объект предвкушения, он обязан читаться как
+                        конкретная вещь. Приглушение прозрачностью (было
+                        opacity-45 saturate-.25, затем opacity-75/.6) тушило
+                        тёмный спрайт до пятна на тёмной карточке — реальное
+                        осветление пикселей силуэта (brightness) плюс
+                        контурное свечение читается как награда, ожидающая
+                        своего часа, а не как выключенная иконка. Холодная
+                        аура за спрайтом — единственный холодный акцент
+                        сцены (обещание ещё не сбылось), статична, без
+                        анимации: работает на предвкушение, не на привыкание. */}
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute -left-6 -top-8 size-28 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
+                    />
+                    <svg
+                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
+                      className="relative h-14 w-14 shrink-0 brightness-150 saturate-[0.75] drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)]"
+                      aria-hidden="true"
+                    >
+                      {landmarkNodes[stats.totalStarts]}
+                    </svg>
+                    <div className="flex min-w-0 flex-col gap-1">
+                      <span className="text-sm leading-snug text-muted-foreground">
+                        Следующий старт вырастит
+                      </span>
+                      <span className="text-balance text-lg font-bold leading-tight">
+                        «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
+                      </span>
+                      {/* Сегодняшний рост — отдельная строка-уведомление,
+                          не замена обещания выше: обещание смотрит вперёд
+                          («вырастит»), эта строка — назад, на то, что уже
+                          случилось сегодня. */}
+                      {grewToday && (
+                        <span className="mt-0.5 inline-flex w-fit items-center gap-1 text-xs font-medium text-primary">
+                          Остров уже вырос сегодня
+                          <ArrowRight className="size-3" aria-hidden="true" />
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Незавершённость видима, иначе Зейгарник не работает:
+                      десять делений, последнее пустое — видно, сколько
+                      осталось, без единой цифры-упрёка */}
+                  <div
+                    className="flex gap-1"
+                    role="img"
+                    aria-label={`Открыто ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
+                  >
+                    {Array.from({ length: LANDMARK_COUNT }).map((_, i) => (
+                      <span
+                        key={i}
+                        className={`h-1 flex-1 rounded-full ${
+                          i < stats.totalStarts ? "bg-primary" : "bg-white/12"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      {stats.totalStarts} из {LANDMARK_COUNT} ·{" "}
+                      {LANDMARK_COUNT - stats.totalStarts === 1
+                        ? "остался последний"
+                        : `осталось ${LANDMARK_COUNT - stats.totalStarts}`}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-primary">
+                      весь остров →
+                    </span>
+                  </span>
+                </>
+              ) : (
+                <div className="flex flex-col gap-1">
+                  <span className="text-lg font-bold leading-tight">
+                    {pityRipe
+                      ? "Следующая находка будет необычной — или лучше"
+                      : `Редких находок: ${rareFound} из ${ISLAND_POOL.filter((e) => e.rarity === "rare").length}`}
+                  </span>
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    {pityRipe
+                      ? "Она уже ждёт твоего старта."
+                      : "Полная сессия повышает шанс редкой."}
+                  </span>
+                  <span className="mt-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                    весь остров →
+                  </span>
+                </div>
+              )}
+            </Link>
           )}
 
           {firstWord?.showStarterChips && (
