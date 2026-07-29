@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
@@ -343,6 +343,46 @@ export function HomeScreen() {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
+  // Карточка награды, форма имени и весточки могут показаться в один
+  // рендер (companionName появляется только после totalStarts >= 1 —
+  // ровно там же, где уже показана карточка, так что взаимоисключающий
+  // гейт между ними тут не работает, условия пересекаются, а не
+  // разделяются). Сдерживает совместное появление scroll-cap секции
+  // ниже, не мутуальное исключение.
+
+  // Приветствие — голос персонажа, вырезать нельзя. Но с третьего визита
+  // это уже не знакомство, а стена текста перед единственной нужной
+  // кнопкой — сворачиваем до трёх строк (не двух: первая фраза часто несёт
+  // сам план) с «Дочитать», и только когда голос уже узнан.
+  const [greetingExpanded, setGreetingExpanded] = useState(false);
+  const [greetingOverflows, setGreetingOverflows] = useState(false);
+  const greetingRef = useRef<HTMLParagraphElement>(null);
+  const greetingClamped =
+    !!stats && stats.totalStarts >= 3 && !greetingExpanded;
+
+  useEffect(() => {
+    if (!greetingClamped) {
+      setGreetingOverflows(false);
+      return;
+    }
+    const measure = () => {
+      const el = greetingRef.current;
+      if (el) setGreetingOverflows(el.scrollHeight - el.clientHeight > 2);
+    };
+    measure();
+    // Рукописный Caveat на момент коммита мог ещё не примениться — высота
+    // была бы посчитана по подменному шрифту.
+    let cancelled = false;
+    document.fonts?.ready
+      .then(() => {
+        if (!cancelled) measure();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [firstWord?.greeting, greetingClamped]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* max-h + overflow-y-auto: без потолка эта секция на невысоком
@@ -394,13 +434,31 @@ export function HomeScreen() {
                 <motion.div
                   key="greeting"
                   className="flex flex-col gap-1 pt-1"
-                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 400, damping: 30 }
+                  }
                 >
-                  <p className="font-hand text-xl leading-snug">
+                  <p
+                    ref={greetingRef}
+                    className={`font-hand text-xl leading-snug ${
+                      greetingClamped ? "line-clamp-3" : ""
+                    }`}
+                  >
                     {firstWord.greeting}
                   </p>
+                  {greetingClamped && greetingOverflows && (
+                    <button
+                      type="button"
+                      onClick={() => setGreetingExpanded(true)}
+                      className="inline-flex min-h-11 w-fit items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Дочитать
+                    </button>
+                  )}
                   {/* Инструкция — системным шрифтом: голос кота и указание
                       интерфейса разделены типографически */}
                   {firstWord.hint && (
@@ -434,7 +492,13 @@ export function HomeScreen() {
 
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». */}
+              Ни спама, ни давления — «один тихий раз в день».
+              НЕ гейчу через milestoneShowing: companionName появляется
+              только после totalStarts >= 1, а тогда milestoneShowing уже
+              всегда true (пересекающиеся, а не взаимоисключающие условия) —
+              такой гейт молча убил бы этот блок навсегда. Совместное
+              появление с карточкой сдерживает scroll-cap секции, не
+              взаимное исключение. */}
           {checkinState === "available" && !!companionName && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
