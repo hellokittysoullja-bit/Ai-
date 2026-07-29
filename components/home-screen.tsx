@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { Play, Sparkles } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -334,7 +334,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, д��ступны ли весточки
+    // Тихо ставим service worker и узнаём, доступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -343,9 +343,54 @@ export function HomeScreen() {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
+  // Карточка награды, форма имени и весточки могут показаться в один
+  // рендер (companionName появляется только после totalStarts >= 1 —
+  // ровно там же, где уже показана карточка, так что взаимоисключающий
+  // гейт между ними тут не работает, условия пересекаются, а не
+  // разделяются). Сдерживает совместное появление scroll-cap секции
+  // ниже, не мутуальное исключение.
+
+  // Приветствие — голос персонажа, вырезать нельзя. Но с третьего визита
+  // это уже не знакомство, а стена текста перед единственной нужной
+  // кнопкой — сворачиваем до трёх строк (не двух: первая фраза часто несёт
+  // сам план) с «Дочитать», и только когда голос уже узнан.
+  const [greetingExpanded, setGreetingExpanded] = useState(false);
+  const [greetingOverflows, setGreetingOverflows] = useState(false);
+  const greetingRef = useRef<HTMLParagraphElement>(null);
+  const greetingClamped =
+    !!stats && stats.totalStarts >= 3 && !greetingExpanded;
+
+  useEffect(() => {
+    if (!greetingClamped) {
+      setGreetingOverflows(false);
+      return;
+    }
+    const measure = () => {
+      const el = greetingRef.current;
+      if (el) setGreetingOverflows(el.scrollHeight - el.clientHeight > 2);
+    };
+    measure();
+    // Рукописный Caveat на момент коммита мог ещё не примениться — высота
+    // была бы посчитана по подменному шрифту.
+    let cancelled = false;
+    document.fonts?.ready
+      .then(() => {
+        if (!cancelled) measure();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [firstWord?.greeting, greetingClamped]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+      {/* max-h + overflow-y-auto: без потолка эта секция на невысоком
+          экране (проверено на 700px) толкала композер и нав-бар за
+          пределы вьюпорта — та же причина, по которой в исходной ветке
+          voспроизводится наложение элементов. Сам scroll-cap — минимально
+          необходимая правка, не откат остальной структуры. */}
+      <section className="max-h-[60svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
         {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
             блоками — визуальная теснота = когнитивная теснота для СДВГ */}
         <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
@@ -389,13 +434,31 @@ export function HomeScreen() {
                 <motion.div
                   key="greeting"
                   className="flex flex-col gap-1 pt-1"
-                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+                  initial={{ opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 400, damping: 30 }
+                  }
                 >
-                  <p className="font-hand text-xl leading-snug">
+                  <p
+                    ref={greetingRef}
+                    className={`font-hand text-xl leading-snug ${
+                      greetingClamped ? "line-clamp-3" : ""
+                    }`}
+                  >
                     {firstWord.greeting}
                   </p>
+                  {greetingClamped && greetingOverflows && (
+                    <button
+                      type="button"
+                      onClick={() => setGreetingExpanded(true)}
+                      className="inline-flex min-h-11 w-fit items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Дочитать
+                    </button>
+                  )}
                   {/* Инструкция — системным шрифтом: голос кота и указание
                       интерфейса разделены типографически */}
                   {firstWord.hint && (
@@ -407,84 +470,6 @@ export function HomeScreen() {
               ) : null}
             </AnimatePresence>
           </div>
-
-          {firstWord?.actionStep && (
-            <div className="flex flex-col gap-1">
-              <Button
-                size="lg"
-                className="cta-sheen w-full gap-2 font-semibold"
-                onClick={() => startNow(firstWord.actionStep as string)}
-              >
-                <Play className="size-4 shrink-0" aria-hidden="true" />
-                {/* Задача — в лейбле (как в проде было «Повторить: …»):
-                    кнопка с конкретикой снимает последнюю микро-неопределённость
-                    «а что именно начнётся?» — labeled CTA конвертит лучше
-                    generic (исследования NN/g по link labels). trimLabel
-                    защищает от длинных задач. */}
-                <span className="truncate">
-                  Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
-                </span>
-              </Button>
-              {/* Выход «Другое дело» (пакет Клода): явный второй путь —
-                  для СДВГ отсутствие альтернативы у единственного CTA
-                  читается как ловушка и подталкивает к избеганию */}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-10 self-center text-muted-foreground"
-                onClick={() => router.push("/app/session")}
-              >
-                Другое дело
-              </Button>
-            </div>
-          )}
-
-          {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
-              опытный пользователь получал больше трения, чем новичок
-              (3 тапа против 1). Очередь дробления приоритетнее повтора:
-              «следующий шаг» продолжает начатую задачу; без очереди —
-              повтор последнего шага; «Другое дело» — сетап для нового */}
-          {stats &&
-            stats.totalStarts > 0 &&
-            !firstWord?.actionStep &&
-            !firstWord?.showStarterChips && (
-              <div className="flex flex-col gap-2">
-                <Button
-                  size="lg"
-                  className="w-full gap-2 font-semibold"
-                  onClick={() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    return quick
-                      ? router.push(
-                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                        )
-                      : router.push("/app/session");
-                  }}
-                >
-                  <Play className="size-4" aria-hidden="true" />
-                  {(() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    if (!quick) return "Начать сессию";
-                    // Обрезка по границе слова: рваное «созда…» на
-                    // кнопке-герое читается как брак
-                    const short = trimLabel(quick, 22);
-                    return queuedStep
-                      ? `Следующий шаг: «${short}»`
-                      : `Повторить: «${short}»`;
-                  })()}
-                </Button>
-                {lastStepLabel && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-10 self-center text-muted-foreground"
-                    onClick={() => router.push("/app/session")}
-                  >
-                    Другое дело
-                  </Button>
-                )}
-              </div>
-            )}
 
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">
@@ -507,7 +492,13 @@ export function HomeScreen() {
 
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». */}
+              Ни спама, ни давления — «один тихий раз в день».
+              НЕ гейчу через milestoneShowing: companionName появляется
+              только после totalStarts >= 1, а тогда milestoneShowing уже
+              всегда true (пересекающиеся, а не взаимоисключающие условия) —
+              такой гейт молча убил бы этот блок навсегда. Совместное
+              появление с карточкой сдерживает scroll-cap секции, не
+              взаимное исключение. */}
           {checkinState === "available" && !!companionName && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
@@ -549,27 +540,22 @@ export function HomeScreen() {
             </p>
           )}
 
-          {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
-              Дома (раньше — только в Мире). Показывается и новичку с нуля
-              стартов — призрачный силуэт первой находки работает сильнее,
-              чем голая строка «Каждый старт растит остров»: конкретное
-              обещание вместо абстракции. До 10-го старта — следующий
-              ориентир с силуэтом; дальше — счёт редких находок */}
+          {/* М2 · Goal gradient: слитая карточка — действие и его награда в
+              одной рамке (по прямой просьбе — взять карточку той ветки
+              как есть, но объединить с кнопкой в одну табличку вместо двух
+              соседних блоков). Раньше здесь стояли два раздельных объекта
+              (кнопка сверху, карточка awards снизу) — при слиянии карточка
+              перестала быть отдельной ссылкой (Link целиком), потому что
+              внутри неё теперь живёт кнопка со своим переходом: кнопка
+              внутри <a> кликалась бы одновременно с переходом самой
+              ссылки — невалидно и запутанно. Вместо этого — свой
+              «Весь остров →» как отдельная маленькая ссылка внизу карточки,
+              как было в проде до этой правки. */}
           {stats && (
-            <Link
-              href="/app/world"
-              // relative + overflow-hidden: внутри живёт лунная аура.
-              // Тонкая тёплая кромка сверху — свет костра касается карты
-              className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
-            >
+            <div className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  {/* Аура за силуэтом: холодный лунный свет из угла карты.
-                      Средняя дозировка (0.16): v3 с 0.22 читался
-                      «затмением», финальный откат до 0.1 гасил награду
-                      в чёрный блин — обещание обязано манить (reward
-                      anticipation, Schultz), холодный оттенок оправдан
-                      сюжетно: луна — единственный холодный свет сцены */}
+                  {/* Аура за силуэтом: холодный лунный свет из угла карты. */}
                   <span
                     aria-hidden="true"
                     className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
@@ -577,11 +563,6 @@ export function HomeScreen() {
                   <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // brightness-150: SVG-ассеты ориентиров нарисованы
-                      // под тёмную сцену Мира — в карточке без осветления
-                      // тёмный диск читался «чёрным блином-затмением», а
-                      // не наградой. Осветляем именно пиксели силуэта +
-                      // умеренное контурное свечение 7px/0.4
                       className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
                       aria-hidden="true"
                     >
@@ -596,9 +577,6 @@ export function HomeScreen() {
                       </span>
                     </span>
                   </span>
-                  {/* Endowed progress (Nunes & Drèze, 2006): видим��я
-                      заполненная часть пути к находке. Только при
-                      totalStarts > 0 — пустой бар у новичка демотивирует */}
                   {stats.totalStarts > 0 && (
                     <span
                       className="flex flex-col gap-1.5"
@@ -608,13 +586,6 @@ export function HomeScreen() {
                       aria-valuemax={LANDMARK_COUNT}
                       aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
                     >
-                      {/* Сегменты-фишки (unit bias): каждый тик = один
-                          реальный старт. h-1.5 + gap-1 — деления читаются
-                          раздельно, не сливаются в полоску. Полный bg-primary
-                          с мягким глоу: приглушение до /65 давало грязный
-                          оливковый (полупрозрачный зелёный на тёмном стекле
-                          мутнеет) — заработанный прогресс обязан выглядеть
-                          живым; CTA сохраняет главенство размером массы */}
                       <span className="flex gap-1">
                         {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
                           <span
@@ -628,9 +599,6 @@ export function HomeScreen() {
                         ))}
                       </span>
                       <span className="flex items-baseline justify-between gap-2">
-                        {/* Вербальный фрейминг близости (goal-gradient,
-                            Kivetz 2006): «остался последний» сильнее голого
-                            счёта */}
                         <span className="font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
                           {stats.totalStarts} из {LANDMARK_COUNT}
                           {LANDMARK_COUNT - stats.totalStarts === 1
@@ -639,44 +607,148 @@ export function HomeScreen() {
                               ? ' · вырос сегодня'
                               : ''}
                         </span>
-                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                        <Link
+                          href="/app/world"
+                          className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                        >
                           весь остров →
-                        </span>
+                        </Link>
                       </span>
                     </span>
                   )}
                   {stats.totalStarts === 0 && (
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+                    <Link
+                      href="/app/world"
+                      className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    >
                       весь остров →
-                    </span>
+                    </Link>
                   )}
+                  {/* Вариативный слой награды — в проде-источнике этот
+                      текст жил только в ветке "totalStarts >= LANDMARK_COUNT"
+                      ниже, то есть впервые появлялся ПОСЛЕ десятого старта —
+                      мимо всего окна раннего удержания, при том что в
+                      продукте drawFind (island-elements.ts) уже считает
+                      находку на КАЖДЫЙ старт. Предсказанная награда
+                      (ориентир назван поимённо) даёт нулевую ошибку
+                      предсказания (Schultz); настоящий всплеск даёт только
+                      неизвестный исход. Перенесено сюда, к моменту
+                      нажатия. */}
+                  <span
+                    className={`flex items-center gap-1.5 text-xs leading-snug ${
+                      pityRipe ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
+                    {pityRipe
+                      ? "Следующая находка будет необычной — или лучше"
+                      : "И одна находка на остров — какая, не знаю сам"}
+                  </span>
                 </>
               ) : pityRipe ? (
-                <span className="text-sm leading-snug text-muted-foreground">
-                  Следующая находка будет{" "}
-                  <span className="font-semibold text-reward">
-                    необычной — или лучше
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    Следующая находка будет{" "}
+                    <span className="font-semibold text-reward">
+                      необычной — или лучше
+                    </span>
+                    .
                   </span>
-                  . Она уже ждёт →
-                </span>
+                  <Link
+                    href="/app/world"
+                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                  >
+                    она уже ждёт →
+                  </Link>
+                </div>
               ) : (
-                <span className="text-sm leading-snug text-muted-foreground">
-                  Редких находок:{" "}
-                  <span className="font-semibold text-reward">
-                    {rareFound} из{" "}
-                    {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
-                  </span>{" "}
-                  — полная сессия повышает шанс →
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    Редких находок:{" "}
+                    <span className="font-semibold text-reward">
+                      {rareFound} из{" "}
+                      {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
+                    </span>{" "}
+                    — полная сессия повышает шанс.
+                  </span>
+                  <Link
+                    href="/app/world"
+                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                  >
+                    весь остров →
+                  </Link>
+                </div>
               )}
-            </Link>
+
+              {/* Действие — теперь внутри той же рамки, что и его награда. */}
+              {firstWord?.actionStep ? (
+                <div className="flex flex-col gap-1">
+                  <Button
+                    size="lg"
+                    className="cta-sheen w-full gap-2 font-semibold"
+                    onClick={() => startNow(firstWord.actionStep as string)}
+                  >
+                    <Play className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">
+                      Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
+                    </span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 self-center text-muted-foreground"
+                    onClick={() => router.push("/app/session")}
+                  >
+                    Другое дело
+                  </Button>
+                </div>
+              ) : (
+                stats.totalStarts > 0 &&
+                !firstWord?.showStarterChips && (
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="lg"
+                      className="cta-sheen w-full gap-2 font-semibold"
+                      onClick={() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        return quick
+                          ? router.push(
+                              `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                            )
+                          : router.push("/app/session");
+                      }}
+                    >
+                      <Play className="size-4" aria-hidden="true" />
+                      {(() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        if (!quick) return "Начать сессию";
+                        const short = trimLabel(quick, 22);
+                        return queuedStep
+                          ? `Следующий шаг: «${short}»`
+                          : `Повторить: «${short}»`;
+                      })()}
+                    </Button>
+                    {lastStepLabel && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-10 self-center text-muted-foreground"
+                        onClick={() => router.push("/app/session")}
+                      >
+                        Другое дело
+                      </Button>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
           )}
 
-          {/* Порядок сверху вниз = приоритет: действие (CTA) → награда
-              (goal-карта) → отношения (имя). Карточка имени, стоявшая
-              МЕЖДУ действием и наградой, разрывала связку «сделай — и
-              вырастет» лишним социальным решением (serial position +
-              минимизация числа решений до действия) */}
+          {/* Порядок сверху вниз = приоритет: действие+награда (одна
+              карточка) → отношения (имя). Карточка имени, стоявшая МЕЖДУ
+              действием и наградой, разрывала связку «сделай — и вырастет»
+              лишним социальным решением (serial position + минимизация
+              числа решений до действия) */}
           {nameLoaded &&
             !companionName &&
             stats !== null &&

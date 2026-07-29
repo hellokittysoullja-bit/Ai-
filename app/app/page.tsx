@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function AppHomePage() {
   return (
-    <main className="app-page-enter flex min-h-dvh flex-col pb-20">
+    <main className="app-page-enter flex h-dvh flex-col pb-20">
       <HomeScreen />
     </main>
   );

@@ -164,48 +164,66 @@
   }
 }
 
-/* Новый элемент острова: мягкая пульсация, 3 цикла, затем покой */
-@keyframes island-new-pulse {
-  0%,
-  100% {
-    opacity: 1;
+/* Новый элемент острова: одна тёплая вспышка света, оседающая — не
+   мигание прозрачностью. Мигание — визуальный язык уведомлений/ошибок,
+   не награды (глаз читает «что-то не так» там, где смысл «ты молодец»).
+   Три цикла opacity 1→0.45→1 за 4.8с — источник отвлечения и сенсорной
+   перегрузки для СДВГ-аудитории. Один цикл drop-shadow: яркость приходит
+   и оседает, opacity элемента не трогается вообще — не мерцает. */
+@keyframes island-new-bloom {
+  0% {
+    filter: drop-shadow(0 0 0 transparent);
   }
-  50% {
-    opacity: 0.45;
+  35% {
+    filter: drop-shadow(0 0 10px oklch(0.86 0.22 130 / 0.55));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 transparent);
   }
 }
 
 .island-new-element {
-  animation: island-new-pulse 1.6s ease-in-out 3;
+  animation: island-new-bloom 1.8s ease-out 1;
 }
 
-/* Прорастание элемента острова: пружинный вход снизу с overshoot */
+/* Прорастание элемента острова: пружинный вход снизу с overshoot.
+   Стартовый масштаб 0.4, а НЕ 0: в реальном мире ничто не появляется из
+   ничего, и рост из точки читается как дешёвый эффект — а это главная
+   наградная анимация продукта, ей быть дешёвой нельзя. Плюс opacity,
+   чтобы малый стартовый масштаб не мелькал сплошным пятном.
+   Overshoot живёт ТОЛЬКО в кейфреймах: прежняя кривая (0.34, 1.2, ...)
+   сама выбрасывала за единицу, накладываясь на выброс 1.12 в кадрах —
+   два источника упругости дают дрожание, а не пружину. Кривая заменена
+   на ease-out без выброса, origin остаётся у основания (растёт из земли). */
 @keyframes island-grow {
   0% {
-    transform: scale(0);
+    transform: scale(0.4);
+    opacity: 0;
   }
-  62% {
-    transform: scale(1.12);
+  60% {
+    transform: scale(1.1);
+    opacity: 1;
   }
   82% {
-    transform: scale(0.96);
+    transform: scale(0.97);
   }
   100% {
     transform: scale(1);
+    opacity: 1;
   }
 }
 
 .island-grow {
   transform-box: fill-box;
   transform-origin: 50% 100%;
-  animation: island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards;
+  animation: island-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards;
 }
 
-/* Новый элемент: и прорастает, и пульсирует (оба класса задают animation) */
+/* Новый элемент: и прорастает, и вспыхивает (оба класса задают animation) */
 .island-grow.island-new-element {
   animation:
-    island-grow 0.7s cubic-bezier(0.34, 1.2, 0.64, 1) backwards,
-    island-new-pulse 1.6s ease-in-out 0.7s 3;
+    island-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) backwards,
+    island-new-bloom 1.8s ease-out 0.7s 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -218,14 +236,18 @@
 
 /* Первый кадр «статика прежде скрипта»: весь контент уже в серверном HTML,
    появление хореографирует чистый CSS — работает даже с выключенным JS */
+/* Только opacity и transform: filter — это paint на каждый кадр, а этот
+   класс висит одновременно на каждом слове фразы (14+ элементов) ровно
+   в момент замера LCP. Подъём на 0.14em заменяет расфокус тем же
+   ощущением «проявилось», не трогая paint. */
 @keyframes hero-word-in {
   from {
     opacity: 0;
-    filter: blur(2px);
+    transform: translateY(0.14em);
   }
   to {
     opacity: 1;
-    filter: blur(0);
+    transform: translateY(0);
   }
 }
 
@@ -358,7 +380,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    unlayered box-shadow, который молча перекрыл бы layered ring-утилиту
    (та же ловушка каскада, что и с border-primary/50 в дневнике острова).
    outline — отдельный слой рендера, .glass его никак не задевает. */
-:where(a, button, [role="button"], [data-slot="button"], input):focus-visible {
+:where(a, button, [role="button"], [data-slot="button"], input, textarea):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
@@ -367,12 +389,41 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 /* Микро-отклик нажатия — OPT-IN класс .press.
    НАВЕШИВАЕТСЯ ТОЛЬКО на CTA без собственного active-transform
    («Попробовать», «Пойдём попробуем», «Начать» в шапке).
-   Не конфликтует с таб-баром, отправкой в чате, motion/react и т.д. */
-.press {
-  transition: transform 120ms ease;
+   Не конфликтует с таб-баром, отправкой в чате, motion/react и т.д.
+   В @layer utilities: .press не обязан побеждать Tailwind-утилиты
+   там, где он больше не единственный, кто трогает transition, — см.
+   .press-warm/.press-fade ниже для случаев, где на одном элементе
+   нужен ещё один анимируемый property помимо transform. */
+@layer utilities {
+  .press {
+    transition: transform 160ms ease-out;
+  }
+  .press:active {
+    transform: scale(0.97);
+  }
 }
-.press:active {
-  transform: scale(0.97);
+
+/* .press-warm/.press-fade: transition-property не складывается из двух
+   классов на одном элементе — побеждает только один (unlayered/layered
+   тут ни при чём, это просто как работает свойство). Кнопка hero после
+   ответа в диалоге должна ОДНОВРЕМЕННО быстро проседать по тапу (120мс)
+   И медленно «нагреваться» тенью (700мс) — единственный способ дать
+   обоим свойствам собственную длительность в одном элементе — одно
+   составное transition-объявление, а не .press + transition-shadow
+   раздельно. */
+@layer utilities {
+  .press-warm {
+    transition: transform 160ms ease-out, box-shadow 700ms ease-out;
+  }
+  .press-warm:active {
+    transform: scale(0.97);
+  }
+  .press-fade {
+    transition: transform 160ms ease-out, opacity 300ms ease-out;
+  }
+  .press-fade:active {
+    transform: scale(0.97);
+  }
 }
 
 /* Плавный скролл к якорям («Как это работает») — только если motion разрешён.
@@ -384,10 +435,14 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .press {
+  .press,
+  .press-warm,
+  .press-fade {
     transition: none;
   }
-  .press:active {
+  .press:active,
+  .press-warm:active,
+  .press-fade:active {
     transform: none;
   }
 }
@@ -567,22 +622,29 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     border-color 220ms ease,
     background 220ms ease;
 }
-.glass-interactive:hover {
-  /* Закон света: UI не светится — светится мир. Подъём отыгрывается
-     светлотой поверхности и чёрной тенью; лайм остаётся только тонкой
-     кромкой бордера (свет, пойманный на грани, — материал, не glow). */
-  border-color: oklch(0.86 0.22 130 / 0.45);
-  background: linear-gradient(
-    155deg,
-    oklch(1 0 0 / 0.19) 0%,
-    oklch(1 0 0 / 0.08) 55%,
-    oklch(1 0 0 / 0.03) 100%
-  );
-  transform: translateY(-2px);
-  box-shadow:
-    inset 0 1px 0 oklch(1 0 0 / 0.28),
-    inset 0 0 24px oklch(1 0 0 / 0.03),
-    0 16px 32px -18px oklch(0 0 0 / 0.55);
+/* Гейт только на устройствах с настоящим hover (мышь/трекпад): на тач-
+   экранах WebKit/Chromium эмулируют :hover после тапа и НЕ снимают его
+   до следующего касания — приподнятая карточка со светящейся кромкой
+   залипает до тапа в другое место. Продукт целиком мобильный (max-w-md
+   везде), значит без гейта это происходит почти при каждом тапе. */
+@media (hover: hover) and (pointer: fine) {
+  .glass-interactive:hover {
+    /* Закон света: UI не светится — светится мир. Подъём отыгрывается
+       светлотой поверхности и чёрной тенью; лайм остаётся только тонкой
+       кромкой бордера (свет, пойманный на грани, — материал, не glow). */
+    border-color: oklch(0.86 0.22 130 / 0.45);
+    background: linear-gradient(
+      155deg,
+      oklch(1 0 0 / 0.19) 0%,
+      oklch(1 0 0 / 0.08) 55%,
+      oklch(1 0 0 / 0.03) 100%
+    );
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.28),
+      inset 0 0 24px oklch(1 0 0 / 0.03),
+      0 16px 32px -18px oklch(0 0 0 / 0.55);
+  }
 }
 .glass-interactive:active {
   transform: translateY(0) scale(0.97);
@@ -775,4 +837,120 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     inset 0 -12px 26px -20px oklch(0.72 0.17 55 / 0.5),
     inset 0 0 24px oklch(1 0 0 / 0.025),
     0 10px 28px -14px oklch(0 0 0 / 0.5);
+}
+
+/* ==========================================================================
+   ПУЗЫРИ ЧАТА — тот же .glass, плюс плотная тёмная подложка ПОД
+   преломлением. Обычный .glass берёт контраст текста от того, что под ним
+   (сцена/фон), и держит AA/AAA случайно — измерено 6.63:1 на текущем фоне,
+   но это свойство фона, не пузыря. Подложка делает контраст гарантией
+   конструкции, а не совпадением: пузырь остаётся читаемым, на каком бы
+   участке сцены ни оказался (тёплое пятно очага, звёзды, что угодно).
+   ========================================================================== */
+.chat-bubble-cat {
+  background:
+    radial-gradient(120% 90% at 20% 100%, oklch(0.72 0.17 55 / 0.1) 0%, transparent 55%),
+    linear-gradient(
+      155deg,
+      oklch(1 0 0 / 0.11) 0%,
+      oklch(1 0 0 / 0.045) 55%,
+      oklch(1 0 0 / 0.02) 100%
+    ),
+    linear-gradient(oklch(0.16 0.02 150 / 0.62), oklch(0.16 0.02 150 / 0.62));
+  backdrop-filter: blur(16px) saturate(150%);
+  border: 1px solid oklch(1 0 0 / 0.14);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.16),
+    0 8px 22px -14px oklch(0 0 0 / 0.55);
+}
+
+.chat-bubble-user {
+  /* Вертикальный градиент вместо плоской заливки: свет сверху, масса
+     снизу — тот же приём, что у кнопок Stripe/Linear; плоская заливка на
+     OLED читалась как наклейка, а не как объект с толщиной. */
+  background: linear-gradient(
+    to bottom,
+    oklch(0.9 0.21 130) 0%,
+    var(--primary) 55%,
+    oklch(0.8 0.2 132) 100%
+  );
+  color: var(--primary-foreground);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.4),
+    inset 0 -1px 0 oklch(0 0 0 / 0.12),
+    0 4px 18px -6px oklch(0.86 0.22 130 / 0.4);
+}
+
+/* Проблеск по CTA: короткий диагональный блик, приём премиальных кнопок
+   (Apple Pay, AAA-геймдев). НЕ бесконечный — это кнопка, которую видят
+   десятки раз в день (категория Эмиля Ковальски «убрать или радикально
+   сократить»); бесконечная петля здесь = привыкание = фон, который
+   мозг перестаёт замечать через несколько визитов, тот же класс проблемы,
+   что раньше был у мигания острова. Две волны на появление (кнопка
+   позвала — и умолкла), не вечный тик. animation-fill-mode: both держит
+   финальное состояние (блик за краем), а не отскакивает в начало.
+   Тайминг НЕ ноль в reduced-motion: только при доступности используется
+   as-is через .cta-sheen-in при появлении, но количество ограничено. */
+@keyframes cta-sheen-sweep {
+  0% { transform: translateX(-140%) skewX(-18deg); }
+  100% { transform: translateX(300%) skewX(-18deg); }
+}
+.cta-sheen {
+  position: relative;
+  overflow: hidden;
+}
+.cta-sheen::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  pointer-events: none;
+  background: linear-gradient(
+    105deg,
+    transparent 0%,
+    oklch(1 0 0 / 0.38) 50%,
+    transparent 100%
+  );
+  transform: translateX(-140%) skewX(-18deg);
+  animation: cta-sheen-sweep 1.1s ease-in-out 2;
+  animation-delay: 0.5s;
+  animation-fill-mode: both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cta-sheen::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Дыхание карточки «готов к старту»: зовёт телом при появлении, а не
+   миганием всё время, пока человек читает и решает — три коротких вздоха
+   и покой на тёплом статичном свечении, не бесконечная петля поверх
+   момента чтения/решения. */
+@keyframes start-card-breathe {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.2),
+      0 0 0 0 oklch(0.86 0.22 130 / 0),
+      0 10px 28px -14px oklch(0 0 0 / 0.5);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 oklch(1 0 0 / 0.2),
+      0 0 18px -6px oklch(0.86 0.22 130 / 0.2),
+      0 10px 28px -14px oklch(0 0 0 / 0.5);
+  }
+}
+.start-card-breathe {
+  animation: start-card-breathe 1.4s ease-in-out 3;
+  animation-fill-mode: forwards;
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.2),
+    0 0 12px -6px oklch(0.86 0.22 130 / 0.12),
+    0 10px 28px -14px oklch(0 0 0 / 0.5);
+}
+@media (prefers-reduced-motion: reduce) {
+  .start-card-breathe {
+    animation: none;
+  }
 }
