@@ -121,19 +121,8 @@ function buildFirstWord(
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
-    // Zeigarnik + implementation intention: если назначенное время уже
-    // прошло, напарник это ЗАМЕЧАЕТ — без вины, как факт присутствия.
-    // Игнорирование прошедшего времени читается как фальшь скрипта.
-    const timePassed = plan.startTime
-      ? (() => {
-          const [h, m] = plan.startTime.split(":").map(Number);
-          return hour > h || (hour === h && now.getMinutes() >= m);
-        })()
-      : false;
     return {
-      // Формулировка с фото (v7): «Не думай про всё дело — просто X» —
-      // без повтора «Сейчас… Сейчас» при склейке с hourLine
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${timePassed ? " Время подошло — я уже тут." : ""}${hourLine} Я рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
       actionStep: plan.firstStep,
     };
   }
@@ -154,7 +143,7 @@ function buildFirstWord(
   }
 
   // Первый визит — ВСЕГДА раньше общей вечерней ветки, вне зависимости от
-  // часа. Баг, который чинит эта строка: план физи��ески не может
+  // часа. Баг, который чинит эта строка: план физически не может
   // существовать на первом визите, поэтому раньше isEvening-проверка ниже
   // перехватывала любого новичка, зашедшего вечером/ночью — он не видел
   // ни приветствия, ни стартер-чипов, а сразу получал «давай распланируем
@@ -290,7 +279,7 @@ export function HomeScreen() {
     stats.daysAway !== null && stats.daysAway >= 1;
 
   // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
-  // есть шаг — собран, поздний вечер — сон��ый, и��аче спокоен
+  // есть шаг — собран, поздний вечер — сонный, иначе спокоен
   const hour = new Date().getHours();
   const mascotExpression: MascotExpression =
     stats?.daysAway !== null && stats !== null && stats.daysAway >= 2
@@ -306,7 +295,7 @@ export function HomeScreen() {
   // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
   const [queuedStep, setQueuedStep] = useState<string | null>(null);
   const [rareFound, setRareFound] = useState(0);
-  // Pity дозрел (5+ обычных находок подряд): следую��ая гарантированно
+  // Pity дозрел (5+ обычных находок подряд): следующая гарантированно
   // необычная+ (см. drawFind) — утренний триггер вправе это знать
   const [pityRipe, setPityRipe] = useState(false);
 
@@ -345,7 +334,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, д����ступны ли весточки
+    // Тихо ставим service worker и узнаём, д��ступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -354,17 +343,12 @@ export function HomeScreen() {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
   }
 
-  // Карточки Дома собираются в переменную и уходят в CompanionChat как
-  // шапка ЕДИНОЙ скролл-ленты: раньше секция и чат были соседями по
-  // документному скроллу, и sticky-композер, зажатый верхом своего
-  // родителя, нырял под док (срезанное поле ввода на первом экране)
-  const cardsHeader = (
-    <section className="border-b border-white/[0.06] bg-card/20">
-        {/* gap-4/py-5: паузы между блоками сохранены, но вертикаль ужата
-            настолько, чтобы первая реплика чата выглядывала из-под сгиба —
-            живой напарник должен быть виден на первом кадре (вердикт
-            дебатов: v1–v7 показывали реплику, v10 её прятал) */}
-        <div className="mx-auto flex max-w-md flex-col gap-4 px-4 py-5">
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+        {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
+            блоками — визуальная теснота = когнитивная теснота для СДВГ */}
+        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
           <div className="flex items-start gap-3">
             {/*
               Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
@@ -376,19 +360,25 @@ export function HomeScreen() {
               статичный: существо живёт в своём мире и на этом экране, не в
               списке иконок. Continuity без анимационной цены.
             */}
-            <motion.div
-              className="shrink-0"
-              animate={
-                shouldAnimateMascot ? { scale: [1, 1.07, 0.98, 1] } : {}
-              }
-              transition={{ duration: 0.4, ease: "easeOut", delay: 0.2 }}
-            >
-              <MascotSvg
-                expression={mascotExpression}
-                label={companionName ?? "Напарник"}
-                size={48}
+            <div className="relative shrink-0">
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.16)_0%,transparent_70%)]"
               />
-            </motion.div>
+              <motion.div
+                className="relative"
+                animate={
+                  shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
+                }
+                transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
+              >
+                <MascotSvg
+                  expression={mascotExpression}
+                  label={companionName ?? "Напарник"}
+                  size={52}
+                />
+              </motion.div>
+            </div>
             {/*
               Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
               Не на mount (иначе «…» fade-in = jank = negative prediction error).
@@ -422,27 +412,30 @@ export function HomeScreen() {
             <div className="flex flex-col gap-1">
               <Button
                 size="lg"
-                className="home-primary-action press h-auto min-h-12 w-full gap-2 whitespace-normal py-3 font-semibold"
+                className="cta-sheen w-full gap-2 font-semibold"
                 onClick={() => startNow(firstWord.actionStep as string)}
               >
                 <Play className="size-4 shrink-0" aria-hidden="true" />
-                {/* Лейбл главного действия НИКОГДА не обрезается: кнопка
-                    растёт на вторую строку (whitespace-normal + h-auto),
-                    а trimLabel страхует от экстремально длинных задач */}
-                <span className="text-pretty text-left">
+                {/* Задача — в лейбле (как в проде было «Повторить: …»):
+                    кнопка с конкретикой снимает последнюю микро-неопределённость
+                    «а что именно начнётся?» — labeled CTA конвертит лучше
+                    generic (исследования NN/g по link labels). trimLabel
+                    защищает от длинных задач. */}
+                <span className="truncate">
                   Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
                 </span>
               </Button>
               {/* Выход «Другое дело» (пакет Клода): явный второй путь —
                   для СДВГ отсутствие альтернативы у единственного CTA
                   читается как ловушка и подталкивает к избеганию */}
-              <button
-                type="button"
-                className="press inline-flex min-h-11 items-center justify-center gap-1 self-center px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-10 self-center text-muted-foreground"
                 onClick={() => router.push("/app/session")}
               >
-                Другое дело <span aria-hidden="true">→</span>
-              </button>
+                Другое дело
+              </Button>
             </div>
           )}
 
@@ -450,18 +443,15 @@ export function HomeScreen() {
               опытный пользователь получал больше трения, чем новичок
               (3 тапа против 1). Очередь дробления приоритетнее повтора:
               «следующий шаг» продолжает начатую задачу; без очереди —
-              повтор посл��днего шага; «Другое дело» — сетап для нового */}
+              повтор последнего шага; «Другое дело» — сетап для нового */}
           {stats &&
             stats.totalStarts > 0 &&
             !firstWord?.actionStep &&
             !firstWord?.showStarterChips && (
               <div className="flex flex-col gap-2">
-                {/* Тот же материал, что у планового CTA: роль «главное
-                    действие экрана» одна — и материал один (Gestalt
-                    similarity, консистентный game feel) */}
                 <Button
                   size="lg"
-                  className="home-primary-action press h-auto min-h-12 w-full gap-2 whitespace-normal py-3 font-semibold"
+                  className="w-full gap-2 font-semibold"
                   onClick={() => {
                     const quick = queuedStep ?? lastStepLabel;
                     return quick
@@ -483,16 +473,15 @@ export function HomeScreen() {
                       : `Повторить: «${short}»`;
                   })()}
                 </Button>
-                {/* Идентичен выходу у планового CTA: один паттерн
-                    «второй путь» на весь экран */}
                 {lastStepLabel && (
-                  <button
-                    type="button"
-                    className="press inline-flex min-h-11 items-center justify-center gap-1 self-center px-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 self-center text-muted-foreground"
                     onClick={() => router.push("/app/session")}
                   >
-                    Другое дело <span aria-hidden="true">→</span>
-                  </button>
+                    Другое дело
+                  </Button>
                 )}
               </div>
             )}
@@ -507,7 +496,7 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="action-chip press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {chip}
                   </Link>
@@ -520,7 +509,7 @@ export function HomeScreen() {
               человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
           {checkinState === "available" && !!companionName && (
-            <div className="surface-card flex flex-col gap-2 rounded-2xl p-3.5">
+            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
                 <Bell
                   className="mt-0.5 size-4 shrink-0 text-primary"
@@ -571,26 +560,29 @@ export function HomeScreen() {
               href="/app/world"
               // relative + overflow-hidden: внутри живёт лунная аура.
               // Тонкая тёплая кромка сверху — свет костра касается карты
-              className="surface-card press relative flex min-h-28 flex-col gap-2 overflow-hidden rounded-2xl px-4 py-3"
+              className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
             >
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
-                  {/* Аура за силуэтом: широкое пятно НИЗКОЙ яркости —
-                      заметность издалека берём площадью (плюс v3), а не
-                      интенсивностью (минус v3). Нейтрально-тёплый оттенок,
-                      не голубой: в сцене два света — костёр и неон, третий
-                      цветовой голос не вводим (дисциплина v4) */}
-                  <span className="relative flex items-center gap-3">
+                  {/* Аура за силуэтом: холодный лунный свет из угла карты.
+                      Средняя дозировка (0.16): v3 с 0.22 читался
+                      «затмением», финальный откат до 0.1 гасил награду
+                      в чёрный блин — обещание обязано манить (reward
+                      anticipation, Schultz), холодный оттенок оправдан
+                      сюжетно: луна — единственный холодный свет сцены */}
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
+                  />
+                  <span className="relative flex items-center gap-3.5">
                     <svg
                       viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // БЕЗ фильтров (плюс v6: авторский цвет ассета).
-                      // «Чёрный блин» создавали мои же приглушающие фильтры
-                      // (opacity-85/saturate-0.55), а не сам ассет: луна в
-                      // спрайте — тёплый диск 0.85, яркий сам по себе.
-                      // brightness-150 был костылём поверх и ломал тона
-                      // остальных девяти ориентиров. Лёгкая тень-подсветка
-                      // по контуру — единственная добавка
-                      className="h-12 w-12 shrink-0"
+                      // brightness-150: SVG-ассеты ориентиров нарисованы
+                      // под тёмную сцену Мира — в карточке без осветления
+                      // тёмный диск читался «чёрным блином-затмением», а
+                      // не наградой. Осветляем именно пиксели силуэта +
+                      // умеренное контурное свечение 7px/0.4
+                      className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
                       aria-hidden="true"
                     >
                       {landmarkNodes[stats.totalStarts]}
@@ -629,8 +621,8 @@ export function HomeScreen() {
                             key={i}
                             className={`h-1.5 flex-1 rounded-full ${
                               i < stats.totalStarts
-                                ? 'bg-primary'
-                                : 'bg-white/[0.13]'
+                                ? 'bg-primary shadow-[0_0_5px_oklch(0.86_0.22_130/0.35)]'
+                                : 'bg-white/[0.08]'
                             }`}
                           />
                         ))}
@@ -653,30 +645,9 @@ export function HomeScreen() {
                       </span>
                     </span>
                   )}
-                  {/* Goal gradient для новичка: трек виден и на нуле,
-                      но первое деление подсвечено как ЦЕЛЬ (primary/30),
-                      а не как заработанное — честный якорь «один старт =
-                      одно деление» без фальшивого прогресса */}
                   {stats.totalStarts === 0 && (
-                    <span className="flex flex-col gap-1.5">
-                      <span className="flex gap-1" aria-hidden="true">
-                        {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
-                          <span
-                            key={i}
-                            className={`h-1.5 flex-1 rounded-full ${
-                              i === 0 ? "bg-primary/30" : "bg-white/[0.13]"
-                            }`}
-                          />
-                        ))}
-                      </span>
-                      <span className="flex items-baseline justify-between gap-2">
-                        <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
-                          первый старт = первое деление
-                        </span>
-                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
-                          весь остров →
-                        </span>
-                      </span>
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
+                      весь остров →
                     </span>
                   )}
                 </>
@@ -711,27 +682,24 @@ export function HomeScreen() {
             stats !== null &&
             stats.totalStarts >= 1 && (
               <form
-className="surface-card flex flex-col gap-2 rounded-2xl p-3.5"
+                className="glass flex flex-col gap-2 rounded-2xl p-3"
                 onSubmit={(e) => {
                   e.preventDefault();
                   giveName(nameDraft);
                 }}
               >
                 <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня до сих пор нет имени. Дашь мне его?
+                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+                  откликаться.
                 </p>
-                <label className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground" htmlFor="companion-name">
-                  Имя напарника
-                </label>
                 <div className="flex gap-2">
                   <input
-                    id="companion-name"
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
                     placeholder="Как меня зовут?"
                     maxLength={24}
                     aria-label="Имя для напарника"
-                    className="h-10 min-w-0 flex-1 rounded-xl border border-white/12 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-primary/70 focus-visible:outline-none"
+                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
                   />
                   <Button
                     type="submit"
@@ -746,17 +714,15 @@ className="surface-card flex flex-col gap-2 rounded-2xl p-3.5"
             )}
         </div>
       </section>
-  );
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <CompanionChat
-        mode="companion"
-        greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
-        header={cardsHeader}
-        onPlanSaved={refresh}
-        showSuggestions={!firstWord?.showStarterChips}
-      />
+      <div className="flex min-h-0 flex-1 flex-col">
+        <CompanionChat
+          mode="companion"
+          greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
+          onPlanSaved={refresh}
+          showSuggestions={!firstWord?.showStarterChips}
+        />
+      </div>
     </div>
   );
 }

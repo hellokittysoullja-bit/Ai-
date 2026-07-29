@@ -32,10 +32,6 @@ type CompanionChatProps = {
   mode: 'companion' | 'focus'
   greeting: string
   placeholder?: string
-  /** Контент, который скроллится ВМЕСТЕ с лентой над сообщениями
-      (карточки Дома). Один скролл-контейнер = композер всегда виден
-      над доком — лечит «поле ввода срезано доком» на Доме */
-  header?: React.ReactNode
   onPlanSaved?: () => void
   /** Скрыть чипы-подсказки пустого чата. Нужно, когда над чатом уже показан
       свой набор чипов (стартер-чипы новичка на HomeScreen) — два визуально
@@ -49,21 +45,107 @@ function CompanionAvatar({
 }: {
   expression?: MascotExpression
 }) {
+  // Существо ВЕЗДЕ живёт в свете своего очага. Кольцо — тонкий тёплый
+  // градиент (сильнее снизу, откуда в сцене бьёт свет костра из
+  // AppBackdrop): аватар перестаёт быть «иконкой в кружке» и становится
+  // персонажем, сидящим у огня. Свет в сцене един.
   return (
-    <div className="flex size-9 shrink-0 items-center justify-center">
-      <MascotSvg expression={expression} size={34} />
+    <div className="relative flex size-9 shrink-0 items-center justify-center">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -inset-2 rounded-full bg-[radial-gradient(circle_at_center,oklch(0.72_0.17_55/0.32)_0%,transparent_70%)]"
+      />
+      {/* Кольцо очага: conic с тёплым максимумом внизу. Непрозрачность
+          поднята (0.85 в пике) и кольцо утолщено до 2px — на скриншотах
+          прежнее кольцо при 0.55/1.5px растворялось в тёмной сцене,
+          персонаж терял связь с костром */}
+      <div
+        aria-hidden="true"
+        className="absolute -inset-0.5 rounded-full"
+        style={{
+          background:
+            'conic-gradient(from 200deg, oklch(0.75 0.17 55 / 0.85), oklch(0.72 0.17 55 / 0.25) 40%, oklch(1 0 0 / 0.12) 65%, oklch(0.75 0.17 55 / 0.85))',
+          mask: 'radial-gradient(circle, transparent calc(50% - 2.5px), black calc(50% - 0.5px))',
+          WebkitMask:
+            'radial-gradient(circle, transparent calc(50% - 2.5px), black calc(50% - 0.5px))',
+        }}
+      />
+      <div className="relative flex size-9 items-center justify-center rounded-full bg-secondary/80">
+        <MascotSvg expression={expression} size={30} />
+      </div>
     </div>
   )
 }
 
-/** Выражение меняется только из семантического состояния интерфейса.
-    Пунктуация и отдельные слова не должны случайно дёргать лицо персонажа. */
-function inferExpression(hasStartCard: boolean): MascotExpression {
-  return hasStartCard ? 'excited' : 'calm'
+/** Выражение существа живёт вместе с тем, что оно говорит, — как у героя
+    лендинга. Вопрос — заинтересованный прищур (focused), приглашение к
+    старту / радость — happy, остальное — спокойствие. Считается по тексту
+    реплики: ноль лишнего состояния. */
+function inferExpression(
+  text: string,
+  hasStartCard: boolean,
+): MascotExpression {
+  if (hasStartCard) return 'excited'
+  if (/(!|отлично|получилось|горжусь|ура|красота|засчитан)/i.test(text))
+    return 'happy'
+  if (/\?\s*$/.test(text)) return 'focused'
+  return 'calm'
 }
 
-function HandwrittenInk({ text }: { text: string; animate?: boolean; onInk?: () => void }) {
-  return <span>{text}</span>
+/** Реплика кота ПИШЕТСЯ рукой — то же ремесло, что OPENING_LINE в hero:
+    посимвольное проявление с чернильным курсором. Работает и для стрима
+    (текст догоняет растущий target), и для мгновенных скриптовых ответов.
+    Тап по пузырю — дописать сразу. Reduced-motion — сразу весь текст. */
+function HandwrittenInk({
+  text,
+  animate,
+  onInk,
+}: {
+  text: string
+  animate: boolean
+  /** Пинг на каждый тик пера — родитель подскролливает ленту */
+  onInk?: () => void
+}) {
+  const reduceMotion = useReducedMotion()
+  const [shown, setShown] = useState(animate && !reduceMotion ? 0 : text.length)
+  const doneRef = useRef(!animate || reduceMotion)
+
+  useEffect(() => {
+    if (doneRef.current) {
+      setShown(text.length)
+      return
+    }
+    if (shown >= text.length) return
+    const id = setInterval(() => {
+      setShown((s) => {
+        const next = Math.min(s + 2, text.length)
+        if (next >= text.length) doneRef.current = true
+        return next
+      })
+      onInk?.()
+    }, 24)
+    return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, shown])
+
+  return (
+    <span
+      onClick={() => {
+        doneRef.current = true
+        setShown(text.length)
+      }}
+    >
+      {text.slice(0, shown)}
+      {shown < text.length && (
+        <span
+          aria-hidden="true"
+          className="ml-0.5 inline-block h-[0.85em] w-0.5 animate-pulse rounded bg-primary align-middle"
+        />
+      )}
+      {/* Полный текст сразу — скринридеру, не глазам */}
+      <span className="sr-only">{text.slice(shown)}</span>
+    </span>
+  )
 }
 
 /** Держит выравнивание пузыря в сгруппированной серии сообщений кота —
@@ -77,7 +159,6 @@ export function CompanionChat({
   mode,
   greeting,
   placeholder,
-  header,
   onPlanSaved,
   showSuggestions = true,
 }: CompanionChatProps) {
@@ -212,16 +293,6 @@ export function CompanionChat({
   // вслепую
   const [showJump, setShowJump] = useState(false)
   useEffect(() => {
-    // На Доме карточки (CTA, цель) — шапка той же ленты: восстановленная
-    // история НЕ должна проматывать их при загрузке (CTA обязан быть
-    // первым, что видит человек). Скроллим только к живым сообщениям
-    // этой сессии; в режиме фокуса поведение прежнее.
-    if (mode === 'companion') {
-      const hasLive = messages.some(
-        (m) => !(bornBeforeRef.current?.has(m.id) ?? false),
-      )
-      if (!hasLive) return
-    }
     const lastRole = messages[messages.length - 1]?.role
     if (nearBottomRef.current || lastRole === 'user') {
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -231,6 +302,9 @@ export function CompanionChat({
 
   // После скриптового ответа ста��ус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
+
+  // Счётчик отправок — ключ для анимации «стрелка выстреливает вверх»
+  const [sendCount, setSendCount] = useState(0)
 
   // Рукописная анимация — только для реплик, родившихся в ЭТОЙ сессии.
   // Восстановленная история пишется мгновенно: перечитывать вчерашний
@@ -249,6 +323,7 @@ export function CompanionChat({
     if (!input.trim() || !canSend) return
     sendMessage({ text: input })
     setInput('')
+    setSendCount((n) => n + 1)
   }
 
   return (
@@ -259,7 +334,7 @@ export function CompanionChat({
           реплика улетала к низу, а между ней и приветствием-шапкой зияла
           пропасть, читавшаяся как «не прогрузилось». Сверху вниз реплики
           примыкают к шапке, а свободное место уходит вниз к полю ввода — это
-          нор��альный «пустой чат в ожидании», а не раз��ыв. Overflow и autoscroll
+          нормальный «пустой чат в ожидании», а не раз��ыв. Overflow и autoscroll
           на bottomRef не затронуты. */}
       {/* U3: сообщения растут сверху, инпут прижат к таб-бару (sticky) —
           прежний justify-end на мобиле прижимал одинокий гритинг к низу и
@@ -277,16 +352,22 @@ export function CompanionChat({
         // всю страницу (iOS scroll chaining)
         className="relative flex flex-1 flex-col overflow-y-auto overscroll-contain"
       >
-        {/* Карточки Дома — шапка ленты: один скролл на всё, композер
-            никогда не ныряет под док (архитектура Telegram: контент
-            и сообщения в одном контейнере, инпут — вне его) */}
-        {header}
         {/* mt-auto: лента растёт от дока ввода вверх (паттерн Telegram) —
-            короткий чат обжит и примыкает к рукам, а не висит наве����ху,
+            короткий чат обжит и примыкает к рукам, а не висит наверху,
             оставляя мёртвую чёрную дыру между собой и инпутом */}
         {/* pb-10: нижний зазор под градиент растворения дока — прежний
             py-4 позволял чипам заезжать под градиент и полусрезаться */}
-        <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 pb-6 pt-4">
+        <div className="mx-auto mt-auto flex w-full max-w-md flex-col gap-3 px-4 pb-10 pt-4">
+          {/* Разделитель дня — якорь времени, как в настоящих мессенджерах.
+              Только при живой истории: над одиноким приветствием «СЕГОДНЯ» —
+              шум, а не якорь */}
+          {messages.length > 0 && (
+            <div className="flex justify-center pb-1">
+              <span className="rounded-full bg-white/[0.06] px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                сегодня
+              </span>
+            </div>
+          )}
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
@@ -297,7 +378,7 @@ export function CompanionChat({
             {/* px-3.5 py-2: у Caveat высокие выносные — при py-1.5 буквы
                 упирались в кромку пузыря. Приветствие пишется рукой —
                 первый контакт с существом, то же ремесло, что в hero. */}
-            <div className="chat-bubble-cat max-w-[82%] rounded-2xl rounded-tl-md px-3.5 py-2 font-hand text-[17px] leading-snug">
+            <div className="chat-bubble-cat max-w-[85%] rounded-2xl rounded-tl-sm px-3.5 py-2 font-hand text-lg leading-snug">
               <HandwrittenInk text={greeting} animate={messages.length === 0} />
             </div>
           </motion.div>
@@ -317,15 +398,20 @@ export function CompanionChat({
                   'Не могу заставить себя начать',
                   'Раздроби мне задачу',
                   'Просто тяжело сегодня',
-                ].map((chip) => (
-                  <button
+                ].map((chip, ci) => (
+                  <motion.button
                     key={chip}
                     type="button"
                     onClick={() => sendMessage({ text: chip })}
-                    className="action-chip press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm text-foreground hover:border-white/20"
+                    // Стаггер 60ms: чипы «раскладываются» один за другим —
+                    // рука сама тянется к первому
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.45 + ci * 0.06 }}
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm text-foreground hover:text-primary"
                   >
                     {chip}
-                  </button>
+                  </motion.button>
                 ))}
               </div>
               <Link
@@ -348,13 +434,17 @@ export function CompanionChat({
               mi > 0 &&
               messages[mi - 1].role === 'assistant'
             const firstTextIdx = message.parts.findIndex((p) => p.type === 'text')
-            // Выражение меняется только у настоящей карточки старта
+            // Живое выражение существа: считается из содержимого реплики
+            const fullText = message.parts
+              .filter((p) => p.type === 'text')
+              .map((p) => (p.type === 'text' ? p.text : ''))
+              .join(' ')
             const hasStartCard = message.parts.some(
               (p) => p.type === 'tool-startFocus',
             )
             const expression =
               message.role === 'assistant'
-                ? inferExpression(hasStartCard)
+                ? inferExpression(fullText, hasStartCard)
                 : 'calm'
             const bornNow = !(bornBeforeRef.current?.has(message.id) ?? false)
             if (bornNow && !bornAtRef.current.has(message.id)) {
@@ -367,12 +457,12 @@ export function CompanionChat({
               )
             }
             const bornAt = bornAtRef.current.get(message.id)
-            // Метка времени — ТОЛЬКО у самого свежего сообщения ленты
-            // (паттерн iMessage «Delivered»): подтверждение живёт на
-            // фронте разговора и уступает место следующему. Петля
-            // «отправил → дошло» закрыта (v7), лента остаётся чистой
-            // от постоянных метаданных (v1/v2) — оба плюса без цены
-            const lastOfSeries = mi === messages.length - 1
+            // Метка времени — на последней реплике серии (паттерн
+            // iMessage/Telegram): под каждым пузырём — шум, в конце серии —
+            // якорь. Для пользователя — галочка доставки: микро-отклик
+            // «сообщение дошло», закрывающий петлю действия
+            const lastOfSeries =
+              mi === messages.length - 1 || messages[mi + 1].role !== message.role
             return (
             <div
               key={message.id}
@@ -388,9 +478,9 @@ export function CompanionChat({
                     <motion.div
                       key={i}
                       className="flex w-full items-start gap-2"
-                      initial={{ opacity: 0, y: 6, scale: 0.98 }}
+                      initial={{ opacity: 0, y: 12, scale: 0.9 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ duration: 0.18, ease: 'easeOut' }}
+                      transition={{ type: 'spring', stiffness: 340, damping: 26 }}
                       // Пузырь распускается из своего угла (как в iMessage),
                       // а не всплывает целиком из ниоткуда
                       style={{
@@ -404,11 +494,11 @@ export function CompanionChat({
                           <AvatarSpacer />
                         ))}
                       <div
-                        className={`max-w-[82%] whitespace-pre-wrap rounded-2xl ${
+                        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
                           isUser
-                            ? 'chat-bubble-user ml-auto rounded-tr-md px-3.5 py-2 text-sm leading-relaxed'
-                            : `chat-bubble-cat px-3.5 py-2 font-hand text-[17px] leading-snug text-secondary-foreground ${
-                                showAvatar ? 'rounded-tl-md' : ''
+                            ? 'chat-bubble-user ml-auto rounded-tr-sm px-3.5 py-2 text-sm leading-relaxed'
+                            : `chat-bubble-cat px-3.5 py-2 font-hand text-lg leading-snug text-secondary-foreground ${
+                                showAvatar ? 'rounded-tl-sm' : ''
                               }`
                         }`}
                       >
@@ -447,7 +537,7 @@ export function CompanionChat({
                       <span className="text-sm font-semibold">{plan.task}</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         Первый шаг: {plan.firstStep}
-                        {plan.startTime ? ` · ${plan.startTime}` : ''}
+                        {plan.startTime ? ` ��� ${plan.startTime}` : ''}
                       </span>
                     </div>
                   )
@@ -462,7 +552,7 @@ export function CompanionChat({
                   return (
                     // Единственный настоящий CTA в ленте — обязан отличаться
                     // от обычных пузырей: primary-кромка стекла (через
-                    // --glass-border, каскад-безопасно) + полноразме����ная
+                    // --glass-border, каскад-безопасно) + полноразмерная
                     // кнопка 44px. Раньше карточка сливалась с репликами.
                     <motion.div
                       key={i}
@@ -474,10 +564,14 @@ export function CompanionChat({
                         damping: 22,
                         delay: 0.15,
                       }}
-                      // Квестовая карточка отличается полной primary-кромкой,
-                      // структурой и CTA — без внешнего свечения.
-                      className="surface-card ml-11 flex w-full max-w-[82%] flex-col gap-2.5 rounded-2xl border-primary/45 px-4 py-3.5"
-                      style={{ transformOrigin: 'bottom left' }}
+                      className="glass start-card-breathe ml-11 flex w-full max-w-[85%] flex-col gap-2.5 rounded-2xl px-4 py-3.5"
+                      style={
+                        {
+                          transformOrigin: 'bottom left',
+                          '--glass-border':
+                            'color-mix(in oklab, var(--primary) 45%, transparent)',
+                        } as React.CSSProperties
+                      }
                     >
                       <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
                         готов к старту · {d} мин
@@ -486,7 +580,7 @@ export function CompanionChat({
                         {firstStep}
                       </span>
                       <Button
-                        className="home-primary-action press h-12 w-full gap-2 text-base font-semibold"
+                        className="press cta-sheen h-12 w-full gap-2 text-base font-semibold"
                         onClick={() =>
                           router.push(
                             `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,
@@ -524,7 +618,7 @@ export function CompanionChat({
 
                 return null
               })}
-              {bornAt && lastOfSeries && message.role === 'user' && (
+              {bornAt && lastOfSeries && (
                 <motion.span
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
@@ -561,9 +655,15 @@ export function CompanionChat({
                 className="chat-bubble-cat flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-3"
                 aria-label="Напарник печатает"
               >
-                <span className="size-1.5 rounded-full bg-muted-foreground/45" />
-                <span className="size-1.5 rounded-full bg-muted-foreground/65" />
-                <span className="size-1.5 rounded-full bg-muted-foreground/85" />
+                <span
+                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                  style={{ animationDelay: '-0.3s' }}
+                />
+                <span
+                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                  style={{ animationDelay: '-0.15s' }}
+                />
+                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
               </span>
             </motion.div>
           )}
@@ -586,7 +686,7 @@ export function CompanionChat({
               onClick={() =>
                 bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
               }
-              className="surface-card press absolute -top-14 right-4 flex size-11 items-center justify-center rounded-full text-foreground"
+              className="glass press absolute -top-12 right-4 flex size-9 items-center justify-center rounded-full text-foreground"
             >
               <ArrowDown className="size-4" aria-hidden="true" />
             </motion.button>
@@ -603,15 +703,11 @@ export function CompanionChat({
           // границе панели, свет и фон едины, как у очага)
           className="relative bg-background/92 px-4 py-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8 before:bg-gradient-to-t before:from-background/80 before:to-transparent"
         >
-          {/* ЕДИНАЯ капсула (паттерн iMessage/Telegram): поле и кнопка
-              отправки — один материал, а не поле + оторванный круг,
-              читавшийся как «скролл наверх». Свечение фокуса — на капсуле
-              через :focus-within */}
-          <div className="chat-input-dock mx-auto flex min-h-13 max-w-md items-end gap-2 rounded-2xl p-1 pl-4 transition-colors duration-150">
+          <div className="mx-auto flex max-w-md items-end gap-2">
             {/* textarea вместо input: длинная мысль не прячется за одной
-                строкой (станд��рт Telegram/iMessage). Растёт до ~4 строк
-                через авто-высоту; Enter — отправить, Shift+Enter — новая
-                строка */}
+                строкой (стандарт Telegram/iMessage). Растёт до ~4 строк
+                через field-sizing / авто-высоту; Enter — отправить,
+                Shift+Enter — новая ст��ока */}
             <textarea
               ref={(el) => {
                 // Схлопываем высоту после отправки (submit чистит input в
@@ -642,21 +738,30 @@ export function CompanionChat({
               aria-label="Сообщение напарнику"
               // text-base (16px) обязателен: при font-size < 16px iOS Safari
               // принудительно зумит страницу на фокусе — главный «дешёвый»
-              // тик мобильных сайтов
-              className="max-h-27 min-h-9 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed outline-none placeholder:text-muted-foreground"
+              // тик мобильных сайтов. .chat-input-dock — тёплое свечение
+              // кромки на фокусе: «напарник заметил, что ты пишешь»
+              className="glass chat-input-dock max-h-27 min-h-11 min-w-0 flex-1 resize-none rounded-xl px-4 py-2.5 text-base leading-relaxed transition-shadow duration-300"
             />
             <Button
               type="submit"
               size="icon"
               disabled={!canSend || !input.trim()}
               aria-label="Отправить"
-              className={`press size-11 shrink-0 rounded-xl border-0 shadow-none transition-colors duration-150 ${
-                input.trim()
-                  ? 'bg-primary text-primary-foreground hover:bg-primary/90'
-                  : 'bg-transparent text-muted-foreground'
-              }`}
+              className="press size-11 shrink-0 rounded-xl transition-opacity duration-200"
             >
-              <ArrowUp className="size-4" />
+              {/* Стрелка «выстреливает» вверх при каждой отправке — жест
+                  подтверждён телом, сообщение реально улетело */}
+              <motion.span
+                key={sendCount}
+                initial={
+                  sendCount > 0 ? { y: 14, opacity: 0 } : false
+                }
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                className="flex"
+              >
+                <ArrowUp className="size-5" />
+              </motion.span>
             </Button>
           </div>
         </form>

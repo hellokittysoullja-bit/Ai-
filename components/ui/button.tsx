@@ -9,8 +9,8 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground [a]:hover:bg-primary/80",
-        outline: "action-chip text-foreground",
-        secondary: "action-chip text-foreground",
+        outline: "glass glass-interactive text-foreground",
+        secondary: "glass glass-interactive text-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
         destructive:
