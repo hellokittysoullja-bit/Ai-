@@ -484,7 +484,7 @@ export function CompanionChat({
                   return (
                     // Единственный настоящий CTA в ленте — обязан отличаться
                     // от обычных пузырей: primary-кромка стекла (через
-                    // --glass-border, каскад-безопасно) + полноразмерная
+                    // --glass-border, каскад-безопасно) + полноразме��ная
                     // кнопка 44px. Раньше карточка сливалась с репликами.
                     <motion.div
                       key={i}
@@ -496,12 +496,17 @@ export function CompanionChat({
                         damping: 22,
                         delay: 0.15,
                       }}
-                      className="surface-card ml-11 flex w-full max-w-[82%] flex-col gap-2.5 rounded-2xl border-l-2 border-l-primary px-4 py-3.5"
+                      // Полная зелёная рамка (как рамка квеста в игре, v7):
+                      // функциональный сигнал «главное на экране», а не
+                      // декор. Один мягкий внешний свет — не каскад глоу
+                      className="surface-card ml-11 flex w-full max-w-[82%] flex-col gap-2.5 rounded-2xl px-4 py-3.5"
                       style={
                         {
                           transformOrigin: 'bottom left',
-                          '--glass-border':
-                            'color-mix(in oklab, var(--primary) 45%, transparent)',
+                          borderColor:
+                            'color-mix(in oklab, var(--primary) 55%, transparent)',
+                          boxShadow:
+                            '0 0 20px -8px color-mix(in oklab, var(--primary) 45%, transparent)',
                         } as React.CSSProperties
                       }
                     >

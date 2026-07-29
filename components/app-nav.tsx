@@ -71,17 +71,24 @@ export function AppNav() {
               key={tab.href}
               href={tab.href}
               aria-current={active ? "page" : undefined}
-              className={`press relative flex min-h-12 min-w-20 flex-col items-center gap-1 rounded-xl px-5 py-1.5 text-xs font-medium transition-colors ${
+              className={`press relative flex min-h-12 min-w-20 flex-col items-center gap-1 rounded-2xl px-5 py-1.5 text-xs font-medium transition-colors ${
                 active
-                  ? "bg-white/[0.05] text-primary"
+                  ? "text-primary"
                   : "text-muted-foreground hover:bg-white/[0.03] hover:text-foreground"
               }`}
             >
+              {/* Светящаяся пилюля активного таба (характер v7, фото
+                  пользователя): игровое «ты здесь» светом очага, перетекает
+                  между табами пружиной. Один слой света, без каскада */}
               {active && (
                 <motion.span
                   layoutId="nav-mark"
                   transition={{ type: "spring", stiffness: 400, damping: 32 }}
-                  className="absolute inset-x-5 top-0 h-px rounded-full bg-primary"
+                  className="absolute inset-0 rounded-2xl bg-primary/10"
+                  style={{
+                    boxShadow:
+                      "0 0 16px -4px oklch(0.86 0.22 130 / 0.3)",
+                  }}
                   aria-hidden="true"
                 />
               )}
