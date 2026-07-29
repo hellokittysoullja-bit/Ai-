@@ -295,7 +295,7 @@ export function HomeScreen() {
   // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
   const [queuedStep, setQueuedStep] = useState<string | null>(null);
   const [rareFound, setRareFound] = useState(0);
-  // Pity дозрел (5+ обычных находок подряд): следующая гарантированно
+  // Pity дозрел (5+ обычных находок подряд): следую��ая гарантированно
   // необычная+ (см. drawFind) — утренний триггер вправе это знать
   const [pityRipe, setPityRipe] = useState(false);
 
@@ -409,16 +409,14 @@ export function HomeScreen() {
             <div className="flex flex-col gap-1">
               <Button
                 size="lg"
-                className="home-primary-action w-full gap-2 font-semibold"
+                className="home-primary-action h-auto min-h-12 w-full gap-2 whitespace-normal py-3 font-semibold"
                 onClick={() => startNow(firstWord.actionStep as string)}
               >
                 <Play className="size-4 shrink-0" aria-hidden="true" />
-                {/* Задача — в лейбле (как в проде было «Повторить: …»):
-                    кнопка с конкретикой снимает последнюю микро-неопределённость
-                    «а что именно начнётся?» — labeled CTA конвертит лучше
-                    generic (исследования NN/g по link labels). trimLabel
-                    защищает от длинных задач. */}
-                <span className="truncate">
+                {/* Лейбл главного действия НИКОГДА не обрезается: кнопка
+                    растёт на вторую строку (whitespace-normal + h-auto),
+                    а trimLabel страхует от экстремально длинных задач */}
+                <span className="text-pretty text-left">
                   Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
                 </span>
               </Button>
@@ -492,7 +490,7 @@ export function HomeScreen() {
                   <Link
                     key={chip}
                     href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
+                    className="action-chip press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
                   >
                     {chip}
                   </Link>
@@ -505,7 +503,7 @@ export function HomeScreen() {
               человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
           {checkinState === "available" && !!companionName && (
-            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
+            <div className="surface-card flex flex-col gap-2 rounded-2xl p-3.5">
               <div className="flex items-start gap-2">
                 <Bell
                   className="mt-0.5 size-4 shrink-0 text-primary"
@@ -696,7 +694,7 @@ className="surface-card flex flex-col gap-2 rounded-2xl p-3.5"
                     placeholder="Как меня зовут?"
                     maxLength={24}
                     aria-label="Имя для напарника"
-                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-white/12 bg-white/[0.04] px-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-primary/70 focus-visible:outline-none"
                   />
                   <Button
                     type="submit"

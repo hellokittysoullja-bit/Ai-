@@ -469,7 +469,7 @@ export function CompanionChat({
                       <span className="text-sm font-semibold">{plan.task}</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         Первый шаг: {plan.firstStep}
-                        {plan.startTime ? ` ��� ${plan.startTime}` : ''}
+                        {plan.startTime ? ` · ${plan.startTime}` : ''}
                       </span>
                     </div>
                   )
@@ -641,7 +641,7 @@ export function CompanionChat({
               через :focus-within */}
           <div className="chat-input-dock mx-auto flex min-h-13 max-w-md items-end gap-2 rounded-2xl p-1 pl-4 transition-colors duration-150">
             {/* textarea вместо input: длинная мысль не прячется за одной
-                строкой (стандарт Telegram/iMessage). Растёт до ~4 строк
+                строкой (станд��рт Telegram/iMessage). Растёт до ~4 строк
                 через авто-высоту; Enter — отправить, Shift+Enter — новая
                 строка */}
             <textarea
