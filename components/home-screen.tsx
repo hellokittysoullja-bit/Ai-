@@ -9,6 +9,7 @@ import { CalendarCheck, Play } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
+  clearPlan,
   getCompanionName,
   getFinds,
   getPatterns,
@@ -58,6 +59,10 @@ type FirstWord = {
       экране: здесь продукт осознанно ПОВЫШАЕТ трение до старта, потому
       что в этот час вредное действие — именно старт. */
   nightMode?: boolean;
+  /** Днём при плане на завтра: договор показывается осязаемой карточкой
+      с честной отменой — контракт, который можно потрогать и расторгнуть
+      (implementation intentions работают, когда артефакт видим) */
+  showPlanCard?: boolean;
 };
 
 /**
@@ -192,11 +197,16 @@ function buildFirstWord(
     };
   }
 
-  // План на завтра уже положен, сейчас день — подтверждение
+  // План на завтра уже положен, сейчас день — подтверждение.
+  // Задачу называет КАРТОЧКА-контракт (showPlanCard), не реплика: раньше
+  // текст кота называл задачу А, а кнопка-герой ниже — задачу Б, и это
+  // были два конкурирующих дела в одном кадре без визуальной связи.
+  // Голос — про состояние, артефакт — про содержание договора.
   if (plan && !isLate) {
     return {
-      greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
+      greeting: `На завтра у нас уже всё положено — сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
       actionStep: null,
+      showPlanCard: true,
     };
   }
 
@@ -257,7 +267,7 @@ function buildFirstWord(
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или ��апиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или ����апиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -359,6 +369,9 @@ export function HomeScreen() {
           : "calm";
 
   const [lastStepLabel, setLastStepLabel] = useState<string | null>(null);
+  // Договор на завтра как объект интерфейса (карточка-контракт S1)
+  const [planPreview, setPlanPreview] = useState<Plan | null>(null);
+  const [planClearing, setPlanClearing] = useState(false);
   // Очередь дробления приоритетнее повтора: «следующий шаг той же задачи» —
   // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
   const [queuedStep, setQueuedStep] = useState<string | null>(null);
@@ -382,6 +395,7 @@ export function HomeScreen() {
     ]);
     const lastStart = starts.length > 0 ? starts[starts.length - 1] : null;
     setLastStepLabel(lastStart?.label ?? null);
+    setPlanPreview(plan);
     setQueuedStep(queue?.steps[0] ?? null);
     setQueuedTask(queue?.task ?? null);
     setRareFound(finds.filter((f) => f.rarity === "rare").length);
@@ -533,6 +547,44 @@ export function HomeScreen() {
               >
                 Другое дело
               </Button>
+            </div>
+          )}
+
+          {/* S1 · Осязаемый контракт (уникальная механика Дома): договор на
+              завтра — не строка в реплике, а карточка-артефакт с задачей,
+              первым шагом и честной отменой. Implementation intentions
+              (Gollwitzer) держат, когда контракт видим; «передумал» — не
+              дыра в удержании, а доверие: расторжимый договор подписывают
+              охотнее, чем капкан (reactance). Реплика кота больше не
+              называет задачу — голос про состояние, артефакт про содержание. */}
+          {firstWord?.showPlanCard && planPreview && (
+            <div className="glass flex flex-col gap-2 rounded-2xl px-4 py-3">
+              <span className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+                  <CalendarCheck className="size-3.5" aria-hidden="true" />
+                  договор на завтра
+                </span>
+                <button
+                  type="button"
+                  disabled={planClearing}
+                  onClick={async () => {
+                    setPlanClearing(true);
+                    await clearPlan();
+                    await refresh();
+                    setPlanClearing(false);
+                  }}
+                  className="min-h-8 rounded-md px-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
+                >
+                  {planClearing ? "убираю…" : "передумал"}
+                </button>
+              </span>
+              <span className="text-sm font-semibold leading-snug text-balance">
+                «{trimLabel(planPreview.task, 60)}»
+              </span>
+              <span className="text-sm leading-relaxed text-muted-foreground">
+                Первый шаг: {planPreview.firstStep}
+                {planPreview.startTime ? ` · ${planPreview.startTime}` : ""}
+              </span>
             </div>
           )}
 

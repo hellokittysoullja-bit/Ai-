@@ -326,6 +326,25 @@ export function CompanionChat({
     setSendCount((n) => n + 1)
   }
 
+  // Тап-ответы под вопросом кота (S2: «Да»/«Какое»/«Хз» человек печатал
+  // руками). Когда последняя реплика — вопрос ассистента без карточки
+  // старта, даём два тапа: передать выбор боту или согласиться. Закон
+  // Фиттса + Fogg ability: ответ за один тап вместо клавиатуры. Чипы
+  // исчезают, как только человек начал печатать сам — не спорим с рукой.
+  const lastMsg = messages[messages.length - 1]
+  const lastAssistantAsks =
+    lastMsg?.role === 'assistant' &&
+    !lastMsg.parts.some((p) => p.type === 'tool-startFocus') &&
+    /\?\s*$/.test(
+      lastMsg.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p.type === 'text' ? p.text : ''))
+        .join(' ')
+        .trim(),
+    )
+  const showQuickReplies =
+    lastAssistantAsks && canSend && messages.length > 0 && input === ''
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* justify-end на мобильн��м: сообщения примыкают к полю ввода, короткий
@@ -353,7 +372,7 @@ export function CompanionChat({
         className="relative flex flex-1 flex-col overflow-y-auto overscroll-contain"
       >
         {/* mt-auto: лента растёт от дока ввода вверх (паттерн Telegram) —
-            короткий чат обжит и примыкает к рукам, а не висит наверху,
+            короткий чат обжит и примыкает к рукам, а не висит наве��ху,
             оставляя мёртвую чёрную дыру между собой и инпутом */}
         {/* pb-10: нижний зазор под градиент растворения дока — прежний
             py-4 позволял чипам заезжать под градиент и полусрезаться */}
@@ -537,7 +556,7 @@ export function CompanionChat({
                       <span className="text-sm font-semibold">{plan.task}</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         Первый шаг: {plan.firstStep}
-                        {plan.startTime ? ` ��� ${plan.startTime}` : ''}
+                        {plan.startTime ? ` · ${plan.startTime}` : ''}
                       </span>
                     </div>
                   )
@@ -639,6 +658,33 @@ export function CompanionChat({
             </div>
             )
           })}
+
+          <AnimatePresence>
+            {showQuickReplies && (
+              <motion.div
+                key="quick-replies"
+                className="ml-11 flex flex-wrap gap-2"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ delay: 0.5, type: 'spring', stiffness: 300, damping: 24 }}
+              >
+                {['Предложи сам', 'Давай'].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => {
+                      sendMessage({ text: chip })
+                      setSendCount((n) => n + 1)
+                    }}
+                    className="glass glass-interactive press inline-flex min-h-10 items-center rounded-full px-4 py-1.5 text-sm text-foreground hover:text-primary"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {status === 'submitted' && (
             <motion.div
