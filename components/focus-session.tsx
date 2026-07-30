@@ -7,7 +7,7 @@ import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
 import { RevealIsland, type RevealNewItem } from '@/components/reveal-island'
-import { ChevronRight } from 'lucide-react'
+import { ChevronRight, Sparkles } from 'lucide-react'
 import {
   addFind,
   clearActiveSession,
@@ -566,20 +566,39 @@ export function FocusSession() {
                 setTask(e.target.value)
                 setBrokenSteps(null)
               }}
+              // Enter замыкает петлю «ввёл шаг → начал» без поиска кнопки.
+              // isComposing/229 — защита от CJK IME (Enter подтверждает
+              // набор, а не отправляет)
+              onKeyDown={(e) => {
+                if (
+                  e.key === 'Enter' &&
+                  !e.nativeEvent.isComposing &&
+                  e.keyCode !== 229 &&
+                  task.trim()
+                ) {
+                  start()
+                }
+              }}
+              enterKeyHint="go"
               placeholder="Открыть файл презентации"
               className="glass h-12 rounded-xl px-4 text-sm"
             />
           </label>
 
           {/* Дробление своей задачи: написал большое — получил 3 крошечных */}
+          {/* Дробилка — ядро продукта для СДВГ, а была ссылкой 11px с
+              тап-зоной ~20px (нарушение Фиттса ровно на ключевой фиче).
+              Теперь — полноценная кнопка 44px с иконкой: видима на
+              периферии, попадаема большим пальцем. */}
           {task.trim().length >= 8 && !stepChips.includes(task) && !brokenSteps && (
             <button
               type="button"
               onClick={breakDown}
               disabled={breaking}
-              className="self-start font-mono text-[11px] uppercase tracking-widest text-primary underline-offset-4 hover:underline disabled:opacity-50"
+              className="glass glass-interactive press inline-flex min-h-11 items-center gap-2 self-start rounded-full px-4 py-2 text-sm font-semibold text-foreground disabled:opacity-60"
             >
-              {breaking ? 'дроблю…' : 'звучит крупно? раздробить на микрошаги'}
+              <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
+              {breaking ? 'Дроблю…' : 'Звучит крупно? Раздробить'}
             </button>
           )}
           {brokenSteps && (

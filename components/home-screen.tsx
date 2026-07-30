@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { CalendarCheck, Play } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -16,6 +16,7 @@ import {
   getStarts,
   getStepQueue,
   saveCompanionName,
+  savePlan,
   todayKey,
   type Patterns,
   type Plan,
@@ -47,7 +48,26 @@ type FirstWord = {
   actionStep: string | null;
   /** Новичок без стартов — показываем чипы мгновенного первого старта */
   showStarterChips?: boolean;
+  /** Вечер без плана у опытного: предлагаем однотаповый договор на завтра.
+      Печатать план в 23:00 — стена (Fogg: ability на нуле в момент
+      максимальной мотивации). Один тап из уже известного шага — мост. */
+  offerEveningPlan?: boolean;
+  /** Глубокая ночь (0:00–4:59). Инвертирует целевое действие экрана:
+      единственный акцент — «положить план и лечь», старт уходит в тихую
+      второстепенную ссылку. Механика, которой нет ни на одном другом
+      экране: здесь продукт осознанно ПОВЫШАЕТ трение до старта, потому
+      что в этот час вредное действие — именно старт. */
+  nightMode?: boolean;
 };
+
+/**
+ * Единая граница ночи. Раньше порогов было два — `hour < 4` для реплики
+ * (buildFirstWord) и `hour < 5` для выражения маскота. Расхождение в один
+ * час создавало зону 4:00–4:59, где кот УЖЕ спал глазами, но текст всё
+ * ещё требовал «начни прямо сейчас» — два канала интерфейса
+ * противоречили друг другу. Одна константа делает это невозможным.
+ */
+const NIGHT_UNTIL_HOUR = 5;
 
 /** Готовые крошечные шаги: ноль решений до первого старта */
 const starterChips = [
@@ -79,7 +99,14 @@ function buildFirstWord(
   lastFindName: string | null = null,
 ): FirstWord {
   const hour = now.getHours();
-  const isEvening = hour >= 18 || hour < 4;
+  // Ночь отделена от вечера. Прежнее `hour >= 18 || hour < 4` называло
+  // 2 часа ночи «вечером» (интерфейс врал) и оставляло 4:00–4:59 вообще
+  // без ветки — этот час падал в дневную реплику «начни прямо сейчас».
+  const isNight = hour < NIGHT_UNTIL_HOUR;
+  const isEvening = hour >= 18;
+  // Поздние ветки «план уже лежит» одинаковы для вечера и ночи: в 23:00 и
+  // в 4:00 верный ответ один — «можешь спать спокойно».
+  const isLate = isEvening || isNight;
   const today = todayKey(now);
 
   // М3 · Ночная весточка: новый день должен приносить новизну (R1).
@@ -118,6 +145,44 @@ function buildFirstWord(
       ? ` Сейчас ${hour}:00 — обычно именно в это время ты реально начинаешь.`
       : "";
 
+  // ГЛУБОКАЯ НОЧЬ (0:00–4:59) — ветка, которой раньше не существовало.
+  // Что было: в 04:14 (реальный скриншот с прода) продукт говорил
+  // «Выбери одно крошечное действие ПРЯМО СЕЙЧАС». Для СДВГ-аудитории это
+  // прицельный удар в revenge bedtime procrastination — самый дорогой
+  // паттерн этой группы: недосып → исполнительные функции ещё слабее →
+  // больше прокрастинации завтра. Приложение, обещавшее разорвать цикл,
+  // становилось его соучастником.
+  //
+  // ПОЧЕМУ ЭТА ВЕТКА СТОИТ ВЫШЕ ПРОВЕРКИ ПЛАНА. Ночной договор кладёт план
+  // на СЕГОДНЯШНЮЮ дату (человек ляжет и встанет в тот же календарный день,
+  // см. sealEveningPlan). Пока эта ветка стояла ниже, сразу после тапа
+  // срабатывала ветка «план на сегодня» — и экран, только что сказавший
+  // «иди спать», подсовывал лаймовую кнопку «Начинаю». Тап по собственному
+  // договору отменял его смысл; порядок ветвей здесь и есть механика.
+  //
+  // Новичок (totalStarts === 0) сюда не попадает намеренно: он пришёл с
+  // лендинга попробовать, привычку защищать ещё нечего, а нулевое трение до
+  // первого старта — само обещание продукта. Осознанная жертва один раз.
+  if (isNight && patterns.totalStarts > 0) {
+    const clock = `${hour}:${String(now.getMinutes()).padStart(2, "0")}`;
+    // Договор уже лежит (только что тапнул или положил вечером) — ночью
+    // остаётся только подтвердить и отпустить. Никакого призыва к старту.
+    if (plan) {
+      return {
+        greeting: `Договорились: когда встанешь — ${plan.firstStep.toLowerCase()}. Больше от тебя сейчас ничего не нужно. Спи, я посторожу остров.`,
+        actionStep: null,
+        nightMode: true,
+      };
+    }
+    return {
+      greeting: `Сейчас ${clock}. Ночь — не время начинать: с недосыпом завтра будет вдвое тяжелее. Давай положим один шаг на утро и разойдёмся.`,
+      hint: "Один тап — и всё. Начать всё равно можно, но я бы не советовал.",
+      actionStep: null,
+      offerEveningPlan: true,
+      nightMode: true,
+    };
+  }
+
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
@@ -128,14 +193,14 @@ function buildFirstWord(
   }
 
   // План на завтра уже положен, сейчас день — подтверждение
-  if (plan && !isEvening) {
+  if (plan && !isLate) {
     return {
       greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
       actionStep: null,
     };
   }
 
-  if (plan && isEvening) {
+  if (plan && isLate) {
     return {
       greeting: `План на завтра уже готов: «${plan.task}», первый шаг — ${plan.firstStep.toLowerCase()}. Утром ${companionName ?? "я"} напишу первым. Можешь спать спокойно.`,
       actionStep: null,
@@ -182,14 +247,17 @@ function buildFirstWord(
 
   if (isEvening) {
     return {
+      // Короче прежней реплики: рядом появляется однотаповая карточка
+      // договора — 4 строки рукописного текста + карточка = перегруз
       greeting:
-        "Вечер — лучшее время договориться с завтрашним собой. Давай за три минуты решим: одно дело, один первый шаг, одно время. Напиши, что завтра важно.",
+        "Вечер — время договориться с завтрашним собой. Один тап ниже — и можно спать спокойно. Или напиши своё.",
       actionStep: null,
+      offerEveningPlan: true,
     };
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или ��апиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -286,7 +354,7 @@ export function HomeScreen() {
       ? "happy"
       : firstWord?.actionStep
         ? "focused"
-        : hour >= 22 || hour < 5
+        : hour >= 22 || hour < NIGHT_UNTIL_HOUR
           ? "sleepy"
           : "calm";
 
@@ -294,6 +362,10 @@ export function HomeScreen() {
   // Очередь дробления приоритетнее повтора: «следующий шаг той же задачи» —
   // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
   const [queuedStep, setQueuedStep] = useState<string | null>(null);
+  // Задача, из которой раздроблен queuedStep, — для честного заголовка плана
+  const [queuedTask, setQueuedTask] = useState<string | null>(null);
+  // Однотаповый вечерний договор: мгновенный оптимистичный отклик до refresh
+  const [eveningPlanBusy, setEveningPlanBusy] = useState(false);
   const [rareFound, setRareFound] = useState(0);
   // Pity дозрел (5+ обычных находок подряд): следующая гарантированно
   // необычная+ (см. drawFind) — утренний триггер вправе это знать
@@ -311,6 +383,7 @@ export function HomeScreen() {
     const lastStart = starts.length > 0 ? starts[starts.length - 1] : null;
     setLastStepLabel(lastStart?.label ?? null);
     setQueuedStep(queue?.steps[0] ?? null);
+    setQueuedTask(queue?.task ?? null);
     setRareFound(finds.filter((f) => f.rarity === "rare").length);
     let pity = 0;
     for (let i = finds.length - 1; i >= 0 && finds[i].rarity === "common"; i--)
@@ -341,6 +414,30 @@ export function HomeScreen() {
 
   function startNow(step: string) {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
+  }
+
+  // Однотаповый вечерний договор (implementation intentions, Gollwitzer):
+  // решение принимается сейчас, на пике вечернего намерения, действие —
+  // завтра. Ноль печати: шаг берётся из очереди дробления или последнего
+  // старта. После сохранения refresh() сам переключает приветствие на
+  // «План на завтра уже готов … можешь спать спокойно» — петля замыкается
+  // видимым откликом кота, не тостом.
+  async function sealEveningPlan() {
+    const step = queuedStep ?? lastStepLabel;
+    if (!step || eveningPlanBusy) return;
+    setEveningPlanBusy(true);
+    // Ночью «завтра» календарное и человеческое расходятся на целые сутки.
+    // savePlan по умолчанию ставит tomorrowKey(): в 4:14 30-го числа это
+    // 31-е — а человек ляжет и встанет всё ещё 30-го. План оказался бы
+    // невидим весь предстоящий день (проверка `plan.forDate === today` не
+    // сработала бы), и однотаповый договор молча промахнулся бы на сутки.
+    await savePlan({
+      task: queuedTask ?? step,
+      firstStep: step,
+      ...(firstWord?.nightMode ? { forDate: todayKey() } : {}),
+    });
+    await refresh();
+    setEveningPlanBusy(false);
   }
 
   return (
@@ -448,10 +545,39 @@ export function HomeScreen() {
             stats.totalStarts > 0 &&
             !firstWord?.actionStep &&
             !firstWord?.showStarterChips && (
-              <div className="flex flex-col gap-2">
+              <div
+                className={
+                  firstWord?.nightMode
+                    ? // Ночная инверсия порядка: договор на утро выше, старт
+                      // ниже. order работает, потому что оба блока — сиблинги
+                      // одной flex-колонки.
+                      "order-2 flex flex-col gap-2"
+                    : "flex flex-col gap-2"
+                }
+              >
+                {/*
+                  НОЧНАЯ ИНВЕРСИЯ АКЦЕНТА (уникальная механика этого экрана).
+                  Днём это кнопка-герой: лаймовая заливка, size lg, полная
+                  ширина — намеренно самый тяжёлый объект экрана.
+                  В 4:14 та же кнопка кричала «Повторить: «…»» ровно поверх
+                  реплики «ночь — не время начинать»: два взаимоисключающих
+                  приказа в одном кадре, и побеждал более контрастный —
+                  визуальный вес важнее текста.
+                  Ночью она становится тихой ghost-строкой: путь к старту
+                  сохранён полностью (никакой блокировки — запрет породил бы
+                  реактивное сопротивление), но перестаёт быть точкой
+                  притяжения взгляда. Закон Фиттса, применённый наоборот:
+                  трение до действия повышается осознанно, потому что
+                  вредное в этот час действие — именно старт.
+                */}
                 <Button
-                  size="lg"
-                  className="w-full gap-2 font-semibold"
+                  size={firstWord?.nightMode ? "sm" : "lg"}
+                  variant={firstWord?.nightMode ? "ghost" : "default"}
+                  className={
+                    firstWord?.nightMode
+                      ? "h-10 gap-2 self-center text-muted-foreground"
+                      : "w-full gap-2 font-semibold"
+                  }
                   onClick={() => {
                     const quick = queuedStep ?? lastStepLabel;
                     return quick
@@ -461,19 +587,26 @@ export function HomeScreen() {
                       : router.push("/app/session");
                   }}
                 >
-                  <Play className="size-4" aria-hidden="true" />
+                  {!firstWord?.nightMode && (
+                    <Play className="size-4" aria-hidden="true" />
+                  )}
                   {(() => {
                     const quick = queuedStep ?? lastStepLabel;
                     if (!quick) return "Начать сессию";
                     // Обрезка по границе слова: рваное «созда…» на
                     // кнопке-герое читается как брак
                     const short = trimLabel(quick, 22);
+                    // Ночью — честная формулировка выбора, а не приглашение
+                    if (firstWord?.nightMode) return "Всё равно начать сейчас";
                     return queuedStep
                       ? `Следующий шаг: «${short}»`
                       : `Повторить: «${short}»`;
                   })()}
                 </Button>
-                {lastStepLabel && (
+                {/* «Другое дело» ночью убрано: в 4 утра лишняя ветка выбора
+                    (закон Хика) работает против единственной верной цели —
+                    закрыть день одним тапом */}
+                {lastStepLabel && !firstWord?.nightMode && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -485,6 +618,54 @@ export function HomeScreen() {
                 )}
               </div>
             )}
+
+          {/* Вечерний договор в один тап: шаг уже известен продукту
+              (очередь дробления или последний старт) — человеку остаётся
+              только согласиться. Приоритет очереди: продолжение начатой
+              задачи (Zeigarnik) сильнее повтора. */}
+          {firstWord?.offerEveningPlan && (queuedStep ?? lastStepLabel) && (
+            <button
+              type="button"
+              onClick={sealEveningPlan}
+              disabled={eveningPlanBusy}
+              className={
+                firstWord?.nightMode
+                  ? // Ночью карточка — единственный акцент экрана, поэтому
+                    // поднята выше кнопки старта (order-1) и получает
+                    // кольцо primary: тот же вес, что днём у кнопки-героя
+                    "glass glass-interactive press order-1 flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left ring-1 ring-primary/30 disabled:opacity-60"
+                  : "glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left disabled:opacity-60"
+              }
+            >
+              <span className="flex min-w-0 items-start gap-2.5">
+                <CalendarCheck
+                  className="mt-0.5 size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <span className="flex min-w-0 flex-col">
+                    <span className="text-sm font-semibold">
+                      {/* Ночью «завтра» звучит как «через сутки» — человек
+                          ляжет и встанет в тот же календарный день.
+                          «Когда встанешь» совпадает с его моделью времени
+                          и с forDate, который кладёт sealEveningPlan. */}
+                      {firstWord?.nightMode
+                        ? queuedStep
+                          ? "Когда встанешь — следующий шаг"
+                          : "Когда встанешь — это же дело"
+                        : queuedStep
+                          ? "Завтра — следующий шаг"
+                          : "Завтра — это же дело"}
+                    </span>
+                  <span className="truncate text-sm text-muted-foreground">
+                    «{queuedStep ?? lastStepLabel}»
+                  </span>
+                </span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-primary">
+                {eveningPlanBusy ? "кладу…" : "один тап"}
+              </span>
+            </button>
+          )}
 
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">
@@ -506,7 +687,7 @@ export function HomeScreen() {
           )}
 
           {/* Весточки от напарника: предлагаем один раз, после того как
-              человек уже назвал существо. Только там, где браузер их умеет.
+              человек уже назвал суще��тво. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
           {checkinState === "available" && !!companionName && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
@@ -645,9 +826,41 @@ export function HomeScreen() {
                       </span>
                     </span>
                   )}
+                  {/*
+                    ПУСТОЕ СОСТОЯНИЕ КАРТОЧКИ (0 стартов) — было спроектировано
+                    как «просто убрать блок», и это ломало анатомию.
+                    Что видно на реальном скриншоте: у новичка под иконкой h-14
+                    и двумя строками текста оставалась одинокая мелкая ссылка,
+                    прижатая влево — карточка теряла нижний ряд целиком и
+                    читалась как недогруженная, а не как «пустая, но целая».
+                    Хуже: это первый экран после лендинга, где доверие ещё не
+                    заработано, и «сломанная вёрстка» стоит дороже всего.
+
+                    Бар остаётся скрытым намеренно: 10 серых пустых сегментов у
+                    человека с нулём стартов — это визуализация нуля, она
+                    демотивирует (и врать зажжённым сегментом нельзя — данные
+                    обязаны быть честными). Вместо бара тот же самый
+                    двухколоночный baseline-ряд, что и у прогресса: слева счёт
+                    ориентиров, справа «весь остров →». Анатомия карточки
+                    идентична во всех состояниях, разница только в содержании.
+
+                    Копия ужата до «10 ориентиров ждут» по замеру: на 390px
+                    левой колонке достаётся 223px, и вариант «10 ориентиров ·
+                    первый в одном старте» переносился на вторую строку —
+                    ровно тот сиротский перенос, который я считаю браком.
+                    «В одном старте» вырезано не ради длины, а потому что это
+                    дублировало заголовок карточки («Следующий старт вырастит
+                    «Первый росток»»): заголовок говорит ЧТО дальше, нижний
+                    ряд — насколько велик мир целиком (endowment всего набора).
+                  */}
                   {stats.totalStarts === 0 && (
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-primary">
-                      весь остров →
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                        {LANDMARK_COUNT} ориентиров ждут
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                        весь остров →
+                      </span>
                     </span>
                   )}
                 </>

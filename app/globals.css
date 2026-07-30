@@ -208,11 +208,34 @@
     island-new-pulse 1.6s ease-in-out 0.7s 3;
 }
 
+/* Следующий призрак-ориентир «дышит»: единственный живой элемент среди
+   спящих силуэтов — пространственный якорь предвкушения следующей награды.
+   Медленный ритм (4.2s) — дыхание, не мигание: манит, не дёргает. */
+@keyframes island-ghost-breathe {
+  0%,
+  100% {
+    opacity: 0.13;
+  }
+  50% {
+    opacity: 0.34;
+  }
+}
+
+.island-next-ghost {
+  animation: island-ghost-breathe 4.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .island-new-element,
   .island-grow,
   .island-grow.island-new-element {
     animation: none;
+  }
+  /* Без движения — статично чуть ярче остальных призраков: сигнал
+     «этот следующий» сохраняется без анимации */
+  .island-next-ghost {
+    animation: none;
+    opacity: 0.24;
   }
 }
 
@@ -358,10 +381,22 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    unlayered box-shadow, который молча перекрыл бы layered ring-утилиту
    (та же ловушка каскада, что и с border-primary/50 в дневнике острова).
    outline — отдельный слой рендера, .glass его никак не задевает. */
-:where(a, button, [role="button"], [data-slot="button"], input):focus-visible {
+/* textarea и select обязаны быть в списке: текстовые поля матчат
+   :focus-visible даже при тапе (не только с клавиатуры), и непокрытый
+   textarea — поле чата! — получал синее дефолтное кольцо iOS. Голый
+   дефолт браузера ровно на самом частом действии продукта. */
+:where(a, button, [role="button"], [data-slot="button"], input, textarea, select):focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
   border-radius: var(--radius-sm);
+}
+
+/* У дока чата свой фокус-сигнал — тёплое свечение кромки (:focus-within
+   ниже). Системное кольцо поверх свечения — двойной индикатор, шум.
+   Прячем кольцо только здесь: свечение остаётся видимым индикатором
+   фокуса (WCAG 2.4.7 требует индикатор, но не именно outline). */
+.chat-input-dock:focus-visible {
+  outline-color: transparent;
 }
 
 /* Микро-отклик нажатия — OPT-IN класс .press.
@@ -414,7 +449,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     ),
     /* Тёмная подложка (пакет Клода): стеклянный пузырь на светлеющих
        участках сцены терял контраст текста — плотное тёмное основание
-       под преломлением держит белый текст в зоне AAA-читаемости */
+       под преломлением держит белый текст в зоне AAA-читаемост�� */
     linear-gradient(oklch(0.16 0.02 150 / 0.62), oklch(0.16 0.02 150 / 0.62));
   backdrop-filter: blur(16px) saturate(150%);
   border: 1px solid oklch(1 0 0 / 0.14);
@@ -441,7 +476,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 }
 
 /* Проблеск по CTA: раз в 5s по кнопке пробегает быстрый диагональный блик —
-   приём премиальных кнопок (Apple Pay, AAA-геймдев). Свет ЛОВИТСЯ на
+   приём пре��иальных кнопок (Apple Pay, AAA-геймдев). Свет ЛОВИТСЯ на
    поверхности, а не излучается ею — консистентно закону «светится мир».
    Один короткий проход + долгая пауза: выше порога заметности, ниже
    порога раздражения. */
