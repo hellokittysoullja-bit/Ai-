@@ -52,7 +52,22 @@ type FirstWord = {
       Печатать план в 23:00 — стена (Fogg: ability на нуле в момент
       максимальной мотивации). Один тап из уже известного шага — мост. */
   offerEveningPlan?: boolean;
+  /** Глубокая ночь (0:00–4:59). Инвертирует целевое действие экрана:
+      единственный акцент — «положить план и лечь», старт уходит в тихую
+      второстепенную ссылку. Механика, которой нет ни на одном другом
+      экране: здесь продукт осознанно ПОВЫШАЕТ трение до старта, потому
+      что в этот час вредное действие — именно старт. */
+  nightMode?: boolean;
 };
+
+/**
+ * Единая граница ночи. Раньше порогов было два — `hour < 4` для реплики
+ * (buildFirstWord) и `hour < 5` для выражения маскота. Расхождение в один
+ * час создавало зону 4:00–4:59, где кот УЖЕ спал глазами, но текст всё
+ * ещё требовал «начни прямо сейчас» — два канала интерфейса
+ * противоречили друг другу. Одна константа делает это невозможным.
+ */
+const NIGHT_UNTIL_HOUR = 5;
 
 /** Готовые крошечные шаги: ноль решений до первого старта */
 const starterChips = [
@@ -84,7 +99,14 @@ function buildFirstWord(
   lastFindName: string | null = null,
 ): FirstWord {
   const hour = now.getHours();
-  const isEvening = hour >= 18 || hour < 4;
+  // Ночь отделена от вечера. Прежнее `hour >= 18 || hour < 4` называло
+  // 2 часа ночи «вечером» (интерфейс врал) и оставляло 4:00–4:59 вообще
+  // без ветки — этот час падал в дневную реплику «начни прямо сейчас».
+  const isNight = hour < NIGHT_UNTIL_HOUR;
+  const isEvening = hour >= 18;
+  // Поздние ветки «план уже лежит» одинаковы для вечера и ночи: в 23:00 и
+  // в 4:00 верный ответ один — «можешь спать спокойно».
+  const isLate = isEvening || isNight;
   const today = todayKey(now);
 
   // М3 · Ночная весточка: новый день должен приносить новизну (R1).
@@ -123,6 +145,44 @@ function buildFirstWord(
       ? ` Сейчас ${hour}:00 — обычно именно в это время ты реально начинаешь.`
       : "";
 
+  // ГЛУБОКАЯ НОЧЬ (0:00–4:59) — ветка, которой раньше не существовало.
+  // Что было: в 04:14 (реальный скриншот с прода) продукт говорил
+  // «Выбери одно крошечное действие ПРЯМО СЕЙЧАС». Для СДВГ-аудитории это
+  // прицельный удар в revenge bedtime procrastination — самый дорогой
+  // паттерн этой группы: недосып → исполнительные функции ещё слабее →
+  // больше прокрастинации завтра. Приложение, обещавшее разорвать цикл,
+  // становилось его соучастником.
+  //
+  // ПОЧЕМУ ЭТА ВЕТКА СТОИТ ВЫШЕ ПРОВЕРКИ ПЛАНА. Ночной договор кладёт план
+  // на СЕГОДНЯШНЮЮ дату (человек ляжет и встанет в тот же календарный день,
+  // см. sealEveningPlan). Пока эта ветка стояла ниже, сразу после тапа
+  // срабатывала ветка «план на сегодня» — и экран, только что сказавший
+  // «иди спать», подсовывал лаймовую кнопку «Начинаю». Тап по собственному
+  // договору отменял его смысл; порядок ветвей здесь и есть механика.
+  //
+  // Новичок (totalStarts === 0) сюда не попадает намеренно: он пришёл с
+  // лендинга попробовать, привычку защищать ещё нечего, а нулевое трение до
+  // первого старта — само обещание продукта. Осознанная жертва один раз.
+  if (isNight && patterns.totalStarts > 0) {
+    const clock = `${hour}:${String(now.getMinutes()).padStart(2, "0")}`;
+    // Договор уже лежит (только что тапнул или положил вечером) — ночью
+    // остаётся только подтвердить и отпустить. Никакого призыва к старту.
+    if (plan) {
+      return {
+        greeting: `Договорились: когда встанешь — ${plan.firstStep.toLowerCase()}. Больше от тебя сейчас ничего не нужно. Спи, я посторожу остров.`,
+        actionStep: null,
+        nightMode: true,
+      };
+    }
+    return {
+      greeting: `Сейчас ${clock}. Ночь — не время начинать: с недосыпом завтра будет вдвое тяжелее. Давай положим один шаг на утро и разойдёмся.`,
+      hint: "Один тап — и всё. Начать всё равно можно, но я бы не советовал.",
+      actionStep: null,
+      offerEveningPlan: true,
+      nightMode: true,
+    };
+  }
+
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
@@ -133,14 +193,14 @@ function buildFirstWord(
   }
 
   // План на завтра уже положен, сейчас день — подтверждение
-  if (plan && !isEvening) {
+  if (plan && !isLate) {
     return {
       greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
       actionStep: null,
     };
   }
 
-  if (plan && isEvening) {
+  if (plan && isLate) {
     return {
       greeting: `План на завтра уже готов: «${plan.task}», первый шаг — ${plan.firstStep.toLowerCase()}. Утром ${companionName ?? "я"} напишу первым. Можешь спать спокойно.`,
       actionStep: null,
@@ -294,7 +354,7 @@ export function HomeScreen() {
       ? "happy"
       : firstWord?.actionStep
         ? "focused"
-        : hour >= 22 || hour < 5
+        : hour >= 22 || hour < NIGHT_UNTIL_HOUR
           ? "sleepy"
           : "calm";
 
@@ -366,7 +426,16 @@ export function HomeScreen() {
     const step = queuedStep ?? lastStepLabel;
     if (!step || eveningPlanBusy) return;
     setEveningPlanBusy(true);
-    await savePlan({ task: queuedTask ?? step, firstStep: step });
+    // Ночью «завтра» календарное и человеческое расходятся на целые сутки.
+    // savePlan по умолчанию ставит tomorrowKey(): в 4:14 30-го числа это
+    // 31-е — а человек ляжет и встанет всё ещё 30-го. План оказался бы
+    // невидим весь предстоящий день (проверка `plan.forDate === today` не
+    // сработала бы), и однотаповый договор молча промахнулся бы на сутки.
+    await savePlan({
+      task: queuedTask ?? step,
+      firstStep: step,
+      ...(firstWord?.nightMode ? { forDate: todayKey() } : {}),
+    });
     await refresh();
     setEveningPlanBusy(false);
   }
@@ -476,10 +545,39 @@ export function HomeScreen() {
             stats.totalStarts > 0 &&
             !firstWord?.actionStep &&
             !firstWord?.showStarterChips && (
-              <div className="flex flex-col gap-2">
+              <div
+                className={
+                  firstWord?.nightMode
+                    ? // Ночная инверсия порядка: договор на утро выше, старт
+                      // ниже. order работает, потому что оба блока — сиблинги
+                      // одной flex-колонки.
+                      "order-2 flex flex-col gap-2"
+                    : "flex flex-col gap-2"
+                }
+              >
+                {/*
+                  НОЧНАЯ ИНВЕРСИЯ АКЦЕНТА (уникальная механика этого экрана).
+                  Днём это кнопка-герой: лаймовая заливка, size lg, полная
+                  ширина — намеренно самый тяжёлый объект экрана.
+                  В 4:14 та же кнопка кричала «Повторить: «…»» ровно поверх
+                  реплики «ночь — не время начинать»: два взаимоисключающих
+                  приказа в одном кадре, и побеждал более контрастный —
+                  визуальный вес важнее текста.
+                  Ночью она становится тихой ghost-строкой: путь к старту
+                  сохранён полностью (никакой блокировки — запрет породил бы
+                  реактивное сопротивление), но перестаёт быть точкой
+                  притяжения взгляда. Закон Фиттса, применённый наоборот:
+                  трение до действия повышается осознанно, потому что
+                  вредное в этот час действие — именно старт.
+                */}
                 <Button
-                  size="lg"
-                  className="w-full gap-2 font-semibold"
+                  size={firstWord?.nightMode ? "sm" : "lg"}
+                  variant={firstWord?.nightMode ? "ghost" : "default"}
+                  className={
+                    firstWord?.nightMode
+                      ? "h-10 gap-2 self-center text-muted-foreground"
+                      : "w-full gap-2 font-semibold"
+                  }
                   onClick={() => {
                     const quick = queuedStep ?? lastStepLabel;
                     return quick
@@ -489,19 +587,26 @@ export function HomeScreen() {
                       : router.push("/app/session");
                   }}
                 >
-                  <Play className="size-4" aria-hidden="true" />
+                  {!firstWord?.nightMode && (
+                    <Play className="size-4" aria-hidden="true" />
+                  )}
                   {(() => {
                     const quick = queuedStep ?? lastStepLabel;
                     if (!quick) return "Начать сессию";
                     // Обрезка по границе слова: рваное «созда…» на
                     // кнопке-герое читается как брак
                     const short = trimLabel(quick, 22);
+                    // Ночью — честная формулировка выбора, а не приглашение
+                    if (firstWord?.nightMode) return "Всё равно начать сейчас";
                     return queuedStep
                       ? `Следующий шаг: «${short}»`
                       : `Повторить: «${short}»`;
                   })()}
                 </Button>
-                {lastStepLabel && (
+                {/* «Другое дело» ночью убрано: в 4 утра лишняя ветка выбора
+                    (закон Хика) работает против единственной верной цели —
+                    закрыть день одним тапом */}
+                {lastStepLabel && !firstWord?.nightMode && (
                   <Button
                     size="sm"
                     variant="ghost"
@@ -523,7 +628,14 @@ export function HomeScreen() {
               type="button"
               onClick={sealEveningPlan}
               disabled={eveningPlanBusy}
-              className="glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left disabled:opacity-60"
+              className={
+                firstWord?.nightMode
+                  ? // Ночью карточка — единственный акцент экрана, поэтому
+                    // поднята выше кнопки старта (order-1) и получает
+                    // кольцо primary: тот же вес, что днём у кнопки-героя
+                    "glass glass-interactive press order-1 flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left ring-1 ring-primary/30 disabled:opacity-60"
+                  : "glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left disabled:opacity-60"
+              }
             >
               <span className="flex min-w-0 items-start gap-2.5">
                 <CalendarCheck
@@ -531,11 +643,19 @@ export function HomeScreen() {
                   aria-hidden="true"
                 />
                 <span className="flex min-w-0 flex-col">
-                  <span className="text-sm font-semibold">
-                    {queuedStep
-                      ? "Завтра — следующий шаг"
-                      : "Завтра — это же дело"}
-                  </span>
+                    <span className="text-sm font-semibold">
+                      {/* Ночью «завтра» звучит как «через сутки» — человек
+                          ляжет и встанет в тот же календарный день.
+                          «Когда встанешь» совпадает с его моделью времени
+                          и с forDate, который кладёт sealEveningPlan. */}
+                      {firstWord?.nightMode
+                        ? queuedStep
+                          ? "Когда встанешь — следующий шаг"
+                          : "Когда встанешь — это же дело"
+                        : queuedStep
+                          ? "Завтра — следующий шаг"
+                          : "Завтра — это же дело"}
+                    </span>
                   <span className="truncate text-sm text-muted-foreground">
                     «{queuedStep ?? lastStepLabel}»
                   </span>
