@@ -56,9 +56,7 @@ const KEYS = {
   worldSeen: 'naparnik:worldSeen',
   activeSession: 'naparnik:activeSession',
   chat: 'naparnik:chat',
-  chatTimes: 'naparnik:chatTimes',
   companionName: 'naparnik:companionName',
-  stepQueue: 'naparnik:stepQueue',
 } as const
 
 function isBrowser() {
@@ -205,31 +203,33 @@ export async function clearActiveSession(): Promise<void> {
   write(KEYS.activeSession, null)
 }
 
-// ---------- Очередь дробления (раздробил крупную задачу — остаток не теряется) ----------
+// ---------- Очередь дробления (продукт помнит невыполненные шаги) ----------
 
 export type StepQueue = {
-  /** Исходная задача, из которой раздроблены шаги */
+  /** Задача, которую дробили */
   task: string
-  /** Оставшиеся шаги, следующий — steps[0] */
+  /** Оставшиеся шаги в исходном порядке */
   steps: string[]
 }
 
+const STEP_QUEUE_KEY = 'naparnik:stepQueue'
+
 export async function getStepQueue(): Promise<StepQueue | null> {
-  const q = read<StepQueue | null>(KEYS.stepQueue, null)
+  const q = read<StepQueue | null>(STEP_QUEUE_KEY, null)
   return q && q.steps.length > 0 ? q : null
 }
 
 export async function saveStepQueue(task: string, steps: string[]): Promise<void> {
   const clean = steps.map((s) => s.trim()).filter(Boolean)
-  write(KEYS.stepQueue, clean.length > 0 ? { task, steps: clean } : null)
+  write(STEP_QUEUE_KEY, clean.length > 0 ? { task, steps: clean } : null)
 }
 
-/** Шаг исполнен (начат) — убираем его из очереди; пустая очередь очищается целиком */
+/** Шаг исполнен — очередь короче; пустая очередь очищается целиком */
 export async function consumeQueueStep(step: string): Promise<void> {
-  const queue = await getStepQueue()
-  if (!queue) return
-  const steps = queue.steps.filter((s) => s !== step)
-  write(KEYS.stepQueue, steps.length > 0 ? { task: queue.task, steps } : null)
+  const q = await getStepQueue()
+  if (!q) return
+  const rest = q.steps.filter((s) => s !== step)
+  write(STEP_QUEUE_KEY, rest.length > 0 ? { task: q.task, steps: rest } : null)
 }
 
 // ---------- Имя существа (endowment: названное — становится своим) ----------
@@ -258,19 +258,6 @@ export async function getChatMessages<T>(): Promise<T[]> {
 
 export async function saveChatMessages<T>(messages: T[]): Promise<void> {
   write(KEYS.chat, messages.slice(-MAX_CHAT_MESSAGES))
-}
-
-/**
- * Момент первого появления каждой реплики (ISO), по id сообщения.
- * Отдельная карта, а не поле на сообщении: тип UIMessage приходит из
- * useChat и не резервирует место под свои метки времени.
- */
-export async function getChatTimestamps(): Promise<Record<string, string>> {
-  return read<Record<string, string>>(KEYS.chatTimes, {})
-}
-
-export async function saveChatTimestamps(map: Record<string, string>): Promise<void> {
-  write(KEYS.chatTimes, map)
 }
 
 // ---------- Непросмотренное на острове (триггер возврата к награде) ----------

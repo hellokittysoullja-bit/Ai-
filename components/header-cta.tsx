@@ -43,11 +43,7 @@ export function HeaderCta() {
       }
       nativeButton={false}
       size="sm"
-      // .press-fade, не .press: тот же конфликт transition-property, что и
-      // в hero — .press (только transform) и transition-opacity (только
-      // opacity) взаимно исключали друг друга, кнопка выскакивала рывком
-      // вместо плавного проявления за 300мс.
-      className={`press-fade font-semibold ${
+      className={`press font-semibold transition-opacity duration-300 ${
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >
