@@ -186,8 +186,21 @@ function buildFirstWord(
   // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
+    // Однотаповый договор кладёт task === firstStep (повтор последнего
+    // шага) — и шаблон «Ты решил: «X»… просто x» произносил одну фразу
+    // дважды в одном предложении. Подтверждено вживую: «Ты решил: «Убрать
+    // одну вещь со стола». Не думай про всё дело — просто убрать одну вещь
+    // со стола». Утренняя выплата — момент, ради которого договор
+    // существует («утром я напишу первым» — это обещание из вечерней
+    // реплики); заикающийся шаблон именно здесь ломает персонажа сильнее,
+    // чем где-либо. Когда дело и шаг совпадают, дело не повторяем —
+    // говорим про сам договор.
+    const stutter =
+      plan.task.trim().toLowerCase() === plan.firstStep.trim().toLowerCase();
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
+      greeting: stutter
+        ? `${awayLine}Мы договорились: сегодня — «${plan.task}»${time}. Одно дело, один старт, больше ничего.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`
+        : `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
       actionStep: plan.firstStep,
     };
   }
@@ -257,7 +270,7 @@ function buildFirstWord(
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или ��апиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -407,7 +420,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, д��ступны ли весточки
+    // Тихо ставим service worker и узнаём, доступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -687,7 +700,7 @@ export function HomeScreen() {
           )}
 
           {/* Весточки от напарника: предлагаем один раз, после того как
-              человек уже назвал суще��тво. Только там, где браузер их умеет.
+              человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
           {checkinState === "available" && !!companionName && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
@@ -777,7 +790,7 @@ export function HomeScreen() {
                       </span>
                     </span>
                   </span>
-                  {/* Endowed progress (Nunes & Drèze, 2006): видим��я
+                  {/* Endowed progress (Nunes & Drèze, 2006): видимая
                       заполненная часть пути к находке. Только при
                       totalStarts > 0 — пустой бар у новичка демотивирует */}
                   {stats.totalStarts > 0 && (
