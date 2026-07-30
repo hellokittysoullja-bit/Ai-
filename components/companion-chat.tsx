@@ -300,7 +300,7 @@ export function CompanionChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
-  // После скриптового ответа ста��ус может быть 'error' — чат должен жить дальше
+  // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
   // Счётчик отправок — ключ для анимации «стрелка выстреливает вверх»
@@ -328,13 +328,13 @@ export function CompanionChat({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      {/* justify-end на мобильн��м: сообщения примыкают к полю ввода, короткий
+      {/* justify-end на мобильном: сообщения примыкают к полю ввода, короткий
           чат (1-2 реплики) выглядит обжитым, а не оборванным. На десктопе
           (md:justify-start) высота вьюпорта велика — при justify-end единственная
           реплика улетала к низу, а между ней и приветствием-шапкой зияла
           пропасть, читавшаяся как «не прогрузилось». Сверху вниз реплики
           примыкают к шапке, а свободное место уходит вниз к полю ввода — это
-          нормальный «пустой чат в ожидании», а не раз��ыв. Overflow и autoscroll
+          нормальный «пустой чат в ожидании», а не разрыв. Overflow и autoscroll
           на bottomRef не затронуты. */}
       {/* U3: сообщения растут сверху, инпут прижат к таб-бару (sticky) —
           прежний justify-end на мобиле прижимал одинокий гритинг к низу и
@@ -537,7 +537,7 @@ export function CompanionChat({
                       <span className="text-sm font-semibold">{plan.task}</span>
                       <span className="text-sm leading-relaxed text-muted-foreground">
                         Первый шаг: {plan.firstStep}
-                        {plan.startTime ? ` ��� ${plan.startTime}` : ''}
+                        {plan.startTime ? ` в ${plan.startTime}` : ''}
                       </span>
                     </div>
                   )
@@ -707,7 +707,7 @@ export function CompanionChat({
             {/* textarea вместо input: длинная мысль не прячется за одной
                 строкой (стандарт Telegram/iMessage). Растёт до ~4 строк
                 через field-sizing / авто-высоту; Enter — отправить,
-                Shift+Enter — новая ст��ока */}
+                Shift+Enter — новая строка */}
             <textarea
               ref={(el) => {
                 // Схлопываем высоту после отправки (submit чистит input в
