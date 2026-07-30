@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Play } from "lucide-react";
+import { CalendarCheck, Play } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -16,6 +16,7 @@ import {
   getStarts,
   getStepQueue,
   saveCompanionName,
+  savePlan,
   todayKey,
   type Patterns,
   type Plan,
@@ -47,6 +48,10 @@ type FirstWord = {
   actionStep: string | null;
   /** Новичок без стартов — показываем чипы мгновенного первого старта */
   showStarterChips?: boolean;
+  /** Вечер без плана у опытного: предлагаем однотаповый договор на завтра.
+      Печатать план в 23:00 — стена (Fogg: ability на нуле в момент
+      максимальной мотивации). Один тап из уже известного шага — мост. */
+  offerEveningPlan?: boolean;
 };
 
 /** Готовые крошечные шаги: ноль решений до первого старта */
@@ -182,9 +187,12 @@ function buildFirstWord(
 
   if (isEvening) {
     return {
+      // Короче прежней реплики: рядом появляется однотаповая карточка
+      // договора — 4 строки рукописного текста + карточка = перегруз
       greeting:
-        "Вечер — лучшее время договориться с завтрашним собой. Давай за три минуты решим: одно дело, один первый шаг, одно время. Напиши, что завтра важно.",
+        "Вечер — время договориться с завтрашним собой. Один тап ниже — и можно спать спокойно. Или напиши своё.",
       actionStep: null,
+      offerEveningPlan: true,
     };
   }
 
@@ -294,6 +302,10 @@ export function HomeScreen() {
   // Очередь дробления приоритетнее повтора: «следующий шаг той же задачи» —
   // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
   const [queuedStep, setQueuedStep] = useState<string | null>(null);
+  // Задача, из которой раздроблен queuedStep, — для честного заголовка плана
+  const [queuedTask, setQueuedTask] = useState<string | null>(null);
+  // Однотаповый вечерний договор: мгновенный оптимистичный отклик до refresh
+  const [eveningPlanBusy, setEveningPlanBusy] = useState(false);
   const [rareFound, setRareFound] = useState(0);
   // Pity дозрел (5+ обычных находок подряд): следующая гарантированно
   // необычная+ (см. drawFind) — утренний триггер вправе это знать
@@ -311,6 +323,7 @@ export function HomeScreen() {
     const lastStart = starts.length > 0 ? starts[starts.length - 1] : null;
     setLastStepLabel(lastStart?.label ?? null);
     setQueuedStep(queue?.steps[0] ?? null);
+    setQueuedTask(queue?.task ?? null);
     setRareFound(finds.filter((f) => f.rarity === "rare").length);
     let pity = 0;
     for (let i = finds.length - 1; i >= 0 && finds[i].rarity === "common"; i--)
@@ -341,6 +354,21 @@ export function HomeScreen() {
 
   function startNow(step: string) {
     router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
+  }
+
+  // Однотаповый вечерний договор (implementation intentions, Gollwitzer):
+  // решение принимается сейчас, на пике вечернего намерения, действие —
+  // завтра. Ноль печати: шаг берётся из очереди дробления или последнего
+  // старта. После сохранения refresh() сам переключает приветствие на
+  // «План на завтра уже готов … можешь спать спокойно» — петля замыкается
+  // видимым откликом кота, не тостом.
+  async function sealEveningPlan() {
+    const step = queuedStep ?? lastStepLabel;
+    if (!step || eveningPlanBusy) return;
+    setEveningPlanBusy(true);
+    await savePlan({ task: queuedTask ?? step, firstStep: step });
+    await refresh();
+    setEveningPlanBusy(false);
   }
 
   return (
@@ -485,6 +513,39 @@ export function HomeScreen() {
                 )}
               </div>
             )}
+
+          {/* Вечерний договор в один тап: шаг уже известен продукту
+              (очередь дробления или последний старт) — человеку остаётся
+              только согласиться. Приоритет очереди: продолжение начатой
+              задачи (Zeigarnik) сильнее повтора. */}
+          {firstWord?.offerEveningPlan && (queuedStep ?? lastStepLabel) && (
+            <button
+              type="button"
+              onClick={sealEveningPlan}
+              disabled={eveningPlanBusy}
+              className="glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left disabled:opacity-60"
+            >
+              <span className="flex min-w-0 items-start gap-2.5">
+                <CalendarCheck
+                  className="mt-0.5 size-4 shrink-0 text-primary"
+                  aria-hidden="true"
+                />
+                <span className="flex min-w-0 flex-col">
+                  <span className="text-sm font-semibold">
+                    {queuedStep
+                      ? "Завтра — следующий шаг"
+                      : "Завтра — это же дело"}
+                  </span>
+                  <span className="truncate text-sm text-muted-foreground">
+                    «{queuedStep ?? lastStepLabel}»
+                  </span>
+                </span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-primary">
+                {eveningPlanBusy ? "кладу…" : "один тап"}
+              </span>
+            </button>
+          )}
 
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">

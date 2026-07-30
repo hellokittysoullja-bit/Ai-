@@ -38,10 +38,25 @@ import {
  * чтобы находка прорастала на настоящем острове, а не на отдельной карточке.
  */
 
-function el(unlocked: boolean, children: React.ReactNode) {
+function el(unlocked: boolean, children: React.ReactNode, isNext = false) {
   // Закрытое — не невидимое, а призрачное: остров показывает своё будущее.
   // Мозг видит, куда ведут старты (Зейгарник), без фальшивого прогресса —
   // силуэт обесцвечен и полупрозрачен, «наградой» он ещё не притворяется.
+  // Следующий по очереди призрак «дышит» (медленная пульсация прозрачности):
+  // предвкушение конкретной награды заякорено пространственно — дофамин
+  // живёт в ожидании (Schultz, RPE), а не только в получении. Ровно один
+  // дышащий элемент — иначе сигнал растворяется в шуме.
+  if (!unlocked && isNext) {
+    return (
+      <g
+        className="island-next-ghost"
+        style={{ filter: 'saturate(0)' }}
+        aria-hidden="true"
+      >
+        {children}
+      </g>
+    )
+  }
   return (
     <g
       opacity={unlocked ? 1 : 0.13}
@@ -59,13 +74,13 @@ function el(unlocked: boolean, children: React.ReactNode) {
 type Landmark = {
   key: string
   name: (typeof ISLAND_ELEMENT_NAMES)[number]
-  render: (unlocked: boolean) => React.ReactNode
+  render: (unlocked: boolean, isNext?: boolean) => React.ReactNode
 }
 
 const landmarks: Landmark[] = ISLAND_ELEMENT_NAMES.map((name, i) => ({
   key: `landmark-${i}`,
   name,
-  render: (u: boolean) => el(u, landmarkNodes[i]),
+  render: (u: boolean, isNext?: boolean) => el(u, landmarkNodes[i], isNext),
 }))
 
 // ---------- Дневник ----------
@@ -303,7 +318,7 @@ export function Island() {
               }
               style={i < count ? { animationDelay: `${Math.min(i, 11) * 0.06}s` } : undefined}
             >
-              {landmark.render(i < count)}
+              {landmark.render(i < count, i === count)}
             </g>
           ))}
           {finds.map((find, i) => {
@@ -357,8 +372,10 @@ export function Island() {
 
       {starts !== null && count > 0 && count < LANDMARK_COUNT && (
         <p className="text-center text-xs leading-relaxed text-muted-foreground">
-          Призрачные очертания — то, что вырастет за следующие старты. Всё уже
-          ждёт тебя. Коснись острова — вспомню, как что появилось.
+          {/* Именной тизер: конкретное «что дышит» сильнее абстрактных
+              «очертаний» — предвкушение получает имя (goal gradient) */}
+          Видишь, что дышит? Это «{ISLAND_ELEMENT_NAMES[count]}» — оно вырастет
+          от следующего старта. Коснись острова — вспомню, как что появилось.
         </p>
       )}
 
