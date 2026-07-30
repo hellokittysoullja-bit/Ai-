@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
@@ -22,10 +22,12 @@ import {
   addNote,
   buildMemoryContext,
   getChatMessages,
+  getStarts,
   saveChatMessages,
   savePlan,
   type MemoryContext,
 } from '@/lib/memory'
+import { ISLAND_ELEMENT_NAMES, LANDMARK_COUNT } from '@/lib/island-elements'
 import { scriptedReply } from '@/lib/scripted-companion'
 
 type CompanionChatProps = {
@@ -326,11 +328,14 @@ export function CompanionChat({
     setSendCount((n) => n + 1)
   }
 
-  // Тап-ответы под вопросом кота (S2: «Да»/«Какое»/«Хз» человек печатал
-  // руками). Когда последняя реплика — вопрос ассистента без карточки
-  // старта, даём два тапа: передать выбор боту или согласиться. Закон
-  // Фиттса + Fogg ability: ответ за один тап вместо клавиатуры. Чипы
-  // исчезают, как только человек начал печатать сам — не спорим с рукой.
+  // S2 · «Кот раздаёт карты» (уникальная механика чата). Каждый вопрос
+  // бота — требование решения при ability≈0 (Fogg): на скриншотах человек
+  // трижды печатал «Да»/«Какое»/«Хз» руками, а бот отвечал новым вопросом.
+  // Выход из петли — не текст, а колода: под вопросом кот раскладывает
+  // веером три готовые карты-шага. Тап по карте = мгновенный старт сессии,
+  // клавиатура не нужна вообще. Хик: выбор из 3 конкретных карт на порядок
+  // легче открытого вопроса «назови дело». Карты исчезают, как только
+  // человек начал печатать сам — колода не спорит с рукой.
   const lastMsg = messages[messages.length - 1]
   const lastAssistantAsks =
     lastMsg?.role === 'assistant' &&
@@ -344,6 +349,42 @@ export function CompanionChat({
     )
   const showQuickReplies =
     lastAssistantAsks && canSend && messages.length > 0 && input === ''
+
+  // Раздача стабильна по id последней реплики: карты не перетасовываются
+  // на каждый рендер (мерцающая колода = negative prediction error)
+  const dealtCards = useMemo(() => {
+    const pool = [
+      'убрать одну вещь со стола',
+      'открыть файл, который давно висит',
+      'написать одно кривое предложение',
+      'разобрать пять писем сверху',
+      'вернуть одну вещь на её место',
+      'выписать всё из головы на бумагу',
+    ]
+    let seed = 0
+    const id = lastMsg?.id ?? ''
+    for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) | 0
+    const arr = [...pool]
+    for (let i = arr.length - 1; i > 0; i--) {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff
+      const j = seed % (i + 1)
+      ;[arr[i], arr[j]] = [arr[j], arr[i]]
+    }
+    return arr.slice(0, 3)
+  }, [lastMsg?.id])
+
+  // S3 · прогноз награды на карточке старта: сколько стартов уже сделано —
+  // столько элементов выросло; следующий известен по имени
+  const [startsCount, setStartsCount] = useState<number | null>(null)
+  useEffect(() => {
+    let alive = true
+    getStarts().then((s) => {
+      if (alive) setStartsCount(s.length)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -609,15 +650,55 @@ export function CompanionChat({
                         <Play className="size-4" aria-hidden="true" />
                         Начинаю
                       </Button>
-                      {/* Мостик к петле прогрессии: старт — не абстрактная
-                          «продуктивность», а конкретный рост твоего острова */}
-                      <span className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
-                        <Sprout
-                          className="size-3.5 shrink-0 text-primary"
-                          aria-hidden="true"
-                        />
-                        этот старт вырастит что-то на острове
-                      </span>
+                      {/* S3 · Прогноз награды (уникальная механика карточки
+                          старта): не абстрактное «что-то вырастет», а
+                          конкретное имя следующего элемента острова + живая
+                          полоска прогресса. RPE: дофамин пикует в момент
+                          предвкушения конкретной награды, размытое обещание
+                          не создаёт предсказания вообще. Goal gradient:
+                          у последнего элемента усилие субъективно дешевле —
+                          «остался последний» проговаривается явно. */}
+                      {startsCount !== null && (
+                        <span className="flex flex-col gap-1.5 pt-0.5">
+                          <span
+                            className="flex items-center gap-1"
+                            aria-hidden="true"
+                          >
+                            {Array.from({ length: LANDMARK_COUNT }).map(
+                              (_, di) => (
+                                <span
+                                  key={di}
+                                  className={`h-1 flex-1 rounded-full ${
+                                    di < startsCount
+                                      ? 'bg-primary/80'
+                                      : di === startsCount
+                                        ? 'animate-pulse bg-primary/45 motion-reduce:animate-none'
+                                        : 'bg-white/10'
+                                  }`}
+                                />
+                              ),
+                            )}
+                          </span>
+                          <span className="flex items-start gap-1.5 text-xs leading-relaxed text-muted-foreground">
+                            <Sprout
+                              className="mt-0.5 size-3.5 shrink-0 text-primary"
+                              aria-hidden="true"
+                            />
+                            {startsCount < LANDMARK_COUNT ? (
+                              <span>
+                                вырастит «{ISLAND_ELEMENT_NAMES[startsCount]}»
+                                {startsCount === LANDMARK_COUNT - 1 && (
+                                  <span className="font-semibold text-primary">
+                                    {' — остался последний'}
+                                  </span>
+                                )}
+                              </span>
+                            ) : (
+                              'вырастит новую находку на острове'
+                            )}
+                          </span>
+                        </span>
+                      )}
                     </motion.div>
                   )
                 }
@@ -662,26 +743,66 @@ export function CompanionChat({
           <AnimatePresence>
             {showQuickReplies && (
               <motion.div
-                key="quick-replies"
-                className="ml-11 flex flex-wrap gap-2"
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 4 }}
-                transition={{ delay: 0.5, type: 'spring', stiffness: 300, damping: 24 }}
+                key={`deck-${lastMsg?.id}`}
+                className="ml-11 flex flex-col gap-2"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0, y: 6, transition: { duration: 0.15 } }}
               >
-                {['Предложи сам', 'Давай'].map((chip) => (
-                  <button
-                    key={chip}
-                    type="button"
-                    onClick={() => {
-                      sendMessage({ text: chip })
-                      setSendCount((n) => n + 1)
-                    }}
-                    className="glass glass-interactive press inline-flex min-h-10 items-center rounded-full px-4 py-1.5 text-sm text-foreground hover:text-primary"
-                  >
-                    {chip}
-                  </button>
-                ))}
+                <motion.span
+                  className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.45 }}
+                >
+                  или просто потяни карту — печатать не нужно
+                </motion.span>
+                <div className="flex items-stretch gap-2">
+                  {dealtCards.map((step, ci) => (
+                    <motion.button
+                      key={step}
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          `/app/session?step=${encodeURIComponent(step)}&d=15`,
+                        )
+                      }
+                      // Раздача из колоды: карты вылетают снизу веером,
+                      // каждая со своим наклоном — рука кота, а не грид.
+                      // Стаггер 90мс, spring без linear.
+                      initial={{ opacity: 0, y: 26, rotate: 0, scale: 0.86 }}
+                      animate={{
+                        opacity: 1,
+                        y: 0,
+                        rotate: ci === 0 ? -2.5 : ci === 1 ? 0.5 : 2.5,
+                        scale: 1,
+                      }}
+                      whileHover={{ y: -4, rotate: 0 }}
+                      whileTap={{ scale: 0.96 }}
+                      transition={{
+                        delay: 0.55 + ci * 0.09,
+                        type: 'spring',
+                        stiffness: 320,
+                        damping: 22,
+                      }}
+                      className="glass flex min-h-[104px] flex-1 flex-col justify-between gap-2 rounded-xl px-3 py-2.5 text-left"
+                      style={
+                        {
+                          '--glass-border':
+                            'color-mix(in oklab, var(--primary) 30%, transparent)',
+                        } as React.CSSProperties
+                      }
+                    >
+                      <span className="font-hand text-base leading-tight text-secondary-foreground">
+                        {step}
+                      </span>
+                      <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                        <Play className="size-3" aria-hidden="true" />
+                        15 мин
+                      </span>
+                    </motion.button>
+                  ))}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>

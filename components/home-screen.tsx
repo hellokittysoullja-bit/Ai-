@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, Play } from "lucide-react";
+import { CalendarCheck, PawPrint, Play } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -152,7 +152,7 @@ function buildFirstWord(
 
   // ГЛУБОКАЯ НОЧЬ (0:00–4:59) — ветка, которой раньше не существовало.
   // Что было: в 04:14 (реальный скриншот с прода) продукт говорил
-  // «Выбери одно крошечное действие ПРЯМО СЕЙЧАС». Для СДВГ-аудитории это
+  // «Выбери одно крошечное действие ПРЯМО СЕЙЧА��». Для СДВГ-аудитории это
   // прицельный удар в revenge bedtime procrastination — самый дорогой
   // паттерн этой группы: недосып → исполнительные функции ещё слабее →
   // больше прокрастинации завтра. Приложение, обещавшее разорвать цикл,
@@ -249,7 +249,7 @@ function buildFirstWord(
     return {
       greeting:
         "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать.",
-      hint: "Выбери крошечный шаг ниже — или напи��и, что висит.",
+      hint: "Выбери крошечный шаг ниже — или напи����и, что висит.",
       actionStep: null,
       showStarterChips: true,
     };
@@ -545,7 +545,7 @@ export function HomeScreen() {
                 className="h-10 self-center text-muted-foreground"
                 onClick={() => router.push("/app/session")}
               >
-                Дру��ое дело
+                Другое дело
               </Button>
             </div>
           )}
@@ -558,7 +558,17 @@ export function HomeScreen() {
               охотнее, чем капкан (reactance). Реплика кота больше не
               называет задачу — голос про состояние, артефакт про содержание. */}
           {firstWord?.showPlanCard && planPreview && (
-            <div className="glass flex flex-col gap-2 rounded-2xl px-4 py-3">
+            // Артефакт-пакт: пунктирная кромка билета, задача рукой кота,
+            // печать лапой штампуется с пружиной (scale 2.2 → 1, rotate).
+            // Endowment effect: подписанный осязаемый договор — вещь,
+            // которой владеешь, а не строка настройки. «Передумал» остаётся
+            // честным (reactance): расторжимый пакт подписывают охотнее.
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ type: "spring", stiffness: 300, damping: 26 }}
+              className="relative flex flex-col gap-2 rounded-2xl border border-dashed border-primary/40 bg-primary/[0.05] px-4 py-3.5"
+            >
               <span className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
                   <CalendarCheck className="size-3.5" aria-hidden="true" />
@@ -575,17 +585,41 @@ export function HomeScreen() {
                   }}
                   className="min-h-8 rounded-md px-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground transition-colors hover:text-foreground disabled:opacity-60"
                 >
-                  {planClearing ? "убираю…" : "передумал"}
+                  {planClearing ? "рву…" : "передумал"}
                 </button>
               </span>
-              <span className="text-sm font-semibold leading-snug text-balance">
+              {/* Задача — рукой: договор писало существо, не система */}
+              <span className="font-hand text-2xl leading-snug text-balance">
                 «{trimLabel(planPreview.task, 60)}»
               </span>
               <span className="text-sm leading-relaxed text-muted-foreground">
                 Первый шаг: {planPreview.firstStep}
                 {planPreview.startTime ? ` · ${planPreview.startTime}` : ""}
               </span>
-            </div>
+              <span className="mt-1 flex items-center justify-between border-t border-dashed border-primary/25 pt-2.5">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  скреплено лапой · сегодня
+                </span>
+                <motion.span
+                  initial={
+                    reduceMotion
+                      ? false
+                      : { scale: 2.2, opacity: 0, rotate: 10 }
+                  }
+                  animate={{ scale: 1, opacity: 1, rotate: -8 }}
+                  transition={{
+                    delay: 0.45,
+                    type: "spring",
+                    stiffness: 380,
+                    damping: 18,
+                  }}
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full border-2 border-primary/50 text-primary"
+                  aria-hidden="true"
+                >
+                  <PawPrint className="size-4" />
+                </motion.span>
+              </span>
+            </motion.div>
           )}
 
           {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
