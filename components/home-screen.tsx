@@ -444,7 +444,7 @@ export function HomeScreen() {
     // savePlan по умолчанию ставит tomorrowKey(): в 4:14 30-го числа это
     // 31-е — а человек ляжет и встанет всё ещё 30-го. План оказался бы
     // невидим весь предстоящий день (проверка `plan.forDate === today` не
-    // сработала бы), и однотаповый договор молча промахнулся бы на сутки.
+    // сработа��а бы), и однотаповый договор молча промахнулся бы на сутки.
     await savePlan({
       task: queuedTask ?? step,
       firstStep: step,
@@ -453,6 +453,17 @@ export function HomeScreen() {
     await refresh();
     setEveningPlanBusy(false);
   }
+
+  // Герой с впаянной наградой виден → большая карточка острова ниже
+  // дублировала бы ту же полосу и то же имя награды в одном кадре.
+  // Один прогноз на экран: дубль сжимается до тихой строки-входа в Мир.
+  const heroFused = Boolean(
+    stats &&
+      stats.totalStarts > 0 &&
+      !firstWord?.actionStep &&
+      !firstWord?.nightMode &&
+      !firstWord?.showStarterChips,
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -656,39 +667,90 @@ export function HomeScreen() {
                   трение до действия повышается осознанно, потому что
                   вредное в этот час действие — именно старт.
                 */}
-                <Button
-                  size={firstWord?.nightMode ? "sm" : "lg"}
-                  variant={firstWord?.nightMode ? "ghost" : "default"}
-                  className={
-                    firstWord?.nightMode
-                      ? "h-10 gap-2 self-center text-muted-foreground"
-                      : "w-full gap-2 font-semibold"
-                  }
-                  onClick={() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    return quick
-                      ? router.push(
-                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                        )
-                      : router.push("/app/session");
-                  }}
-                >
-                  {!firstWord?.nightMode && (
-                    <Play className="size-4" aria-hidden="true" />
-                  )}
-                  {(() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    if (!quick) return "Начать сессию";
-                    // Обрезка по границе слова: рваное «созда…» на
-                    // кнопке-герое читается как брак
-                    const short = trimLabel(quick, 22);
-                    // Ночью — честная формулировка выбора, а не приглашение
-                    if (firstWord?.nightMode) return "Всё равно начать сейчас";
-                    return queuedStep
-                      ? `Следующий шаг: «${short}»`
-                      : `Повторить: «${short}»`;
-                  })()}
-                </Button>
+                {firstWord?.nightMode ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 gap-2 self-center text-muted-foreground"
+                    onClick={() => {
+                      const quick = queuedStep ?? lastStepLabel;
+                      return quick
+                        ? router.push(
+                            `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                          )
+                        : router.push("/app/session");
+                    }}
+                  >
+                    Всё равно начать сейчас
+                  </Button>
+                ) : (
+                  /* S1 · Reward-fused герой (уникальная механика Дома,
+                     раунд 3). Раньше награда (полоса 9/10, «Луна над
+                     островом») жила в отдельной карточке в ~200px ниже
+                     кнопки — петля «действие → награда» была разорвана на
+                     два блока, и глазу приходилось СКЛЕИВАТЬ их самому.
+                     Теперь прогноз награды впаян в саму кнопку старта:
+                     дистанция действие→награда = 0px, RPE-предвкушение
+                     возникает прямо в момент решения нажать. Кнопка стала
+                     двухэтажной (72px) — это осознанная жертва: больше
+                     вертикали ради нулевого разрыва петли (Fitts только
+                     выигрывает — мишень крупнее). */
+                  <motion.button
+                    type="button"
+                    whileTap={reduceMotion ? undefined : { scale: 0.98 }}
+                    onClick={() => {
+                      const quick = queuedStep ?? lastStepLabel;
+                      return quick
+                        ? router.push(
+                            `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                          )
+                        : router.push("/app/session");
+                    }}
+                    className="press cta-sheen flex w-full flex-col gap-2 rounded-2xl bg-primary px-4 py-3.5 text-left text-primary-foreground"
+                  >
+                    <span className="flex items-center gap-2 text-base font-semibold">
+                      <Play className="size-4 shrink-0" aria-hidden="true" />
+                      {(() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        if (!quick) return "Начать сессию";
+                        const short = trimLabel(quick, 22);
+                        return queuedStep
+                          ? `Следующий шаг: «${short}»`
+                          : `Повторить: «${short}»`;
+                      })()}
+                    </span>
+                    {/* Награда внутри мишени: мини-полоса прогресса тем же
+                        языком, что на острове, + имя следующего элемента */}
+                    <span className="flex items-center gap-2.5">
+                      <span
+                        className="flex flex-1 items-center gap-0.5"
+                        aria-hidden="true"
+                      >
+                        {Array.from({ length: LANDMARK_COUNT }).map((_, di) => (
+                          <span
+                            key={di}
+                            className={`h-1 flex-1 rounded-full ${
+                              di < (stats?.totalStarts ?? 0)
+                                ? "bg-primary-foreground/85"
+                                : "bg-primary-foreground/25"
+                            }`}
+                          />
+                        ))}
+                      </span>
+                      {/* Разделение носителей с карточкой острова ниже:
+                          герой несёт БЛИЗОСТЬ (сколько осталось), карточка —
+                          ОБРАЗ награды (силуэт + имя). Ни один прогноз не
+                          дублируется в кадре. */}
+                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest tabular-nums text-primary-foreground/80">
+                        {(stats?.totalStarts ?? 0) < LANDMARK_COUNT
+                          ? LANDMARK_COUNT - (stats?.totalStarts ?? 0) === 1
+                            ? "остался последний"
+                            : `${stats?.totalStarts ?? 0} из ${LANDMARK_COUNT}`
+                          : "вырастит находку"}
+                      </span>
+                    </span>
+                  </motion.button>
+                )}
                 {/* «Другое дело» ночью убрано: в 4 утра лишняя ветка выбора
                     (закон Хика) работает против единственной верной цели —
                     закрыть день одним тапом */}
@@ -816,7 +878,7 @@ export function HomeScreen() {
             </p>
           )}
 
-          {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
+          {/* М2 · Goal gradient: ближайшая цель прогрессии ви��на прямо с
               Дома (раньше — только в Мире). Показывается и новичку с нуля
               стартов — призрачный силуэт первой находки работает сильнее,
               чем голая строка «Каждый старт растит остров»: конкретное
@@ -866,7 +928,9 @@ export function HomeScreen() {
                   {/* Endowed progress (Nunes & Drèze, 2006): видим��я
                       заполненная часть пути к находке. Только при
                       totalStarts > 0 — пустой бар у новичка демотивирует */}
-                  {stats.totalStarts > 0 && (
+                  {/* Полоса-прогресс скрыта, когда её несёт герой выше:
+                      два одинаковых тик-бара в одном кадре = шум */}
+                  {stats.totalStarts > 0 && !heroFused && (
                     <span
                       className="flex flex-col gap-1.5"
                       role="progressbar"
@@ -943,6 +1007,21 @@ export function HomeScreen() {
                     <span className="flex items-baseline justify-between gap-2">
                       <span className="min-w-0 font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
                         {LANDMARK_COUNT} ориентиров ждут
+                      </span>
+                      <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                        весь остров →
+                      </span>
+                    </span>
+                  )}
+                  {/* Нижний ряд при героe-с-полосой: анатомия карточки
+                      сохранена (двухколоночный baseline-ряд), но без
+                      дублирующего счёта — только вход в Мир */}
+                  {stats.totalStarts > 0 && heroFused && (
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="min-w-0 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+                        {stats.lastStartDate === todayKey(new Date())
+                          ? "вырос сегодня"
+                          : "ждёт следующего старта"}
                       </span>
                       <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
                         весь остров →

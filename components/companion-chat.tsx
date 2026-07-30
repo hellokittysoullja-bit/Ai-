@@ -153,6 +153,114 @@ function HandwrittenInk({
 /** Держит выравнивание пузыря в сгруппированной серии сообщений кота —
     аватар показываем только на первой реплике серии (паттерн iMessage/
     Telegram: повторяющийся столбик одинаковых котов — шум, не сигнал) */
+/**
+ * S3 · Hold-to-start (уникальная механика карточки старта, раунд 3).
+ * Обычный тап на «Начинаю» ничего не «весил»: момент максимального
+ * сопротивления проходился случайным касанием. Удержание 700мс — это
+ * RPE-рампа (предвкушение растёт, пока заливка ползёт к краю) плюс
+ * телесное обязательство (commitment & consistency: микро-усилие,
+ * вложенное телом, повышает доведение до конца). Осознанный компромисс:
+ * жертвуем 700мс трения на целевом действии ради невозможности
+ * случайного старта и ритуала зажигания. Пороги приемлемости держим:
+ * клавиатура (Enter/Space) стартует МГНОВЕННО — a11y без деградации;
+ * reduced-motion получает мгновенный старт по обычному тапу.
+ */
+function HoldToStartButton({ onStart }: { onStart: () => void }) {
+  const reduceMotion = useReducedMotion()
+  const [holding, setHolding] = useState(false)
+  const [hint, setHint] = useState(false)
+  const firedRef = useRef(false)
+
+  if (reduceMotion) {
+    return (
+      <Button
+        className="press cta-sheen h-12 w-full gap-2 text-base font-semibold"
+        onClick={onStart}
+      >
+        <Play className="size-4" aria-hidden="true" />
+        Начинаю
+      </Button>
+    )
+  }
+
+  return (
+    <span className="flex flex-col gap-1">
+      <button
+        type="button"
+        aria-label="Начинаю — удерживай, чтобы стартовать; с клавиатуры — Enter"
+        onPointerDown={(e) => {
+          // Только основная кнопка мыши / палец
+          if (e.button !== 0) return
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId)
+          } catch {
+            // недоступный pointerId (синтетика/тесты) — удержание всё
+            // равно работает через pointerup/cancel на самой кнопке
+          }
+          setHint(false)
+          setHolding(true)
+        }}
+        onPointerUp={() => {
+          if (!firedRef.current) {
+            setHolding(false)
+            setHint(true)
+          }
+        }}
+        onPointerCancel={() => {
+          if (!firedRef.current) setHolding(false)
+        }}
+        onKeyDown={(e) => {
+          // Клавиатура — без удержания: мгновенный старт
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            firedRef.current = true
+            onStart()
+          }
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+        className="press relative h-12 w-full touch-none select-none overflow-hidden rounded-lg bg-primary text-base font-semibold text-primary-foreground"
+      >
+        {/* Заливка-зарядка: scaleX 0→1 за 700мс с easeOut (быстрый разгон,
+            замедление у края — предвкушение тянется). Отпустил раньше —
+            откат пружиной за 180мс. */}
+        <motion.span
+          aria-hidden="true"
+          className="absolute inset-0 origin-left bg-primary-foreground/25"
+          initial={false}
+          animate={{ scaleX: holding ? 1 : 0 }}
+          transition={
+            holding
+              ? { duration: 0.7, ease: [0.3, 0.1, 0.3, 1] }
+              : { duration: 0.18, ease: 'easeOut' }
+          }
+          onAnimationComplete={() => {
+            if (holding && !firedRef.current) {
+              firedRef.current = true
+              onStart()
+            }
+          }}
+        />
+        <span className="relative flex items-center justify-center gap-2">
+          <Play className="size-4" aria-hidden="true" />
+          {holding ? 'зажигаю…' : 'Начинаю — держи'}
+        </span>
+      </button>
+      <AnimatePresence>
+        {hint && (
+          <motion.span
+            initial={{ opacity: 0, y: -2 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+          >
+            подержи чуть дольше — почти зажглось
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </span>
+  )
+}
+
 function AvatarSpacer() {
   return <div aria-hidden="true" className="w-9 shrink-0" />
 }
@@ -185,7 +293,7 @@ export function CompanionChat({
     }),
     sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithToolCalls,
     // Graceful degradation: LLM недоступен (нет ключа, лимит, сеть) —
-    // напарник отвечает скриптовым мозгом из своей памяти. Никогда не молчит.
+    // напарник отвечает скриптовым мозгом из свое�� памяти. Никогда не молчит.
     onError() {
       setMessages((prev) => {
         const lastUser = [...prev].reverse().find((m) => m.role === 'user')
@@ -340,7 +448,10 @@ export function CompanionChat({
   const lastAssistantAsks =
     lastMsg?.role === 'assistant' &&
     !lastMsg.parts.some((p) => p.type === 'tool-startFocus') &&
-    /\?\s*$/.test(
+    // Не только «?» в конце: «Назови одно дело…» — тоже требование
+    // решения без вопросительного знака (Red Team р.3 поймал, что
+    // деколонизированная формулировка оставляла человека без колоды)
+    /\?|назови|что висит|какое дело|одно дело/i.test(
       lastMsg.parts
         .filter((p) => p.type === 'text')
         .map((p) => (p.type === 'text' ? p.text : ''))
@@ -639,17 +750,13 @@ export function CompanionChat({
                       <span className="text-base font-semibold leading-snug text-foreground">
                         {firstStep}
                       </span>
-                      <Button
-                        className="press cta-sheen h-12 w-full gap-2 text-base font-semibold"
-                        onClick={() =>
+                      <HoldToStartButton
+                        onStart={() =>
                           router.push(
                             `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,
                           )
                         }
-                      >
-                        <Play className="size-4" aria-hidden="true" />
-                        Начинаю
-                      </Button>
+                      />
                       {/* S3 · Прогноз награды (уникальная механика карточки
                           старта): не абстрактное «что-то вырастет», а
                           конкретное имя следующего элемента острова + живая
@@ -755,9 +862,21 @@ export function CompanionChat({
                   animate={{ opacity: 1 }}
                   transition={{ delay: 0.45 }}
                 >
-                  или просто потяни карту — печатать не нужно
+                  потяни колоду — печатать не нужно
                 </motion.span>
-                <div className="flex items-stretch gap-2">
+                {/* Раунд 3: веер 3-в-ряд убит Red Team — на 390px карта
+                    сжималась до ~106px, текст в 3 строки, а «потяни карту»
+                    было ложью (тянуть нельзя). Теперь колода тянется
+                    по-настоящему: крупные карты 68% ширины, нативный
+                    горизонтальный скролл со snap (60fps, работает пальцем),
+                    третья карта видна краем — незакрытый край (Zeigarnik)
+                    сам просит дотянуть. Обрезка скролла компенсирует
+                    наклон карт отрицательным margin. */}
+                <div
+                  className="-mx-4 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-4 pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                  role="group"
+                  aria-label="Готовые шаги — выбери один"
+                >
                   {dealtCards.map((step, ci) => (
                     <motion.button
                       key={step}
@@ -767,25 +886,20 @@ export function CompanionChat({
                           `/app/session?step=${encodeURIComponent(step)}&d=15`,
                         )
                       }
-                      // Раздача из колоды: карты вылетают снизу веером,
-                      // каждая со своим наклоном — рука кота, а не грид.
-                      // Стаггер 90мс, spring без linear.
-                      initial={{ opacity: 0, y: 26, rotate: 0, scale: 0.86 }}
+                      initial={{ opacity: 0, x: 40, rotate: 4 }}
                       animate={{
                         opacity: 1,
-                        y: 0,
-                        rotate: ci === 0 ? -2.5 : ci === 1 ? 0.5 : 2.5,
-                        scale: 1,
+                        x: 0,
+                        rotate: ci % 2 === 0 ? -1.2 : 1.2,
                       }}
-                      whileHover={{ y: -4, rotate: 0 }}
-                      whileTap={{ scale: 0.96 }}
+                      whileTap={{ scale: 0.97, rotate: 0 }}
                       transition={{
-                        delay: 0.55 + ci * 0.09,
+                        delay: 0.55 + ci * 0.1,
                         type: 'spring',
-                        stiffness: 320,
-                        damping: 22,
+                        stiffness: 300,
+                        damping: 24,
                       }}
-                      className="glass flex min-h-[104px] flex-1 flex-col justify-between gap-2 rounded-xl px-3 py-2.5 text-left"
+                      className="glass flex min-h-[96px] w-[68%] shrink-0 snap-start flex-col justify-between gap-3 rounded-2xl px-4 py-3 text-left sm:w-[46%]"
                       style={
                         {
                           '--glass-border':
@@ -793,12 +907,12 @@ export function CompanionChat({
                         } as React.CSSProperties
                       }
                     >
-                      <span className="font-hand text-base leading-tight text-secondary-foreground">
+                      <span className="font-hand text-xl leading-snug text-secondary-foreground">
                         {step}
                       </span>
-                      <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
                         <Play className="size-3" aria-hidden="true" />
-                        15 мин
+                        старт · 15 мин
                       </span>
                     </motion.button>
                   ))}
