@@ -151,7 +151,7 @@ function buildFirstWord(
       : "";
 
   // ГЛУБОКАЯ НОЧЬ (0:00–4:59) — ветка, которой раньше не существовало.
-  // Что было: в 04:14 (реальный скриншот с прода) продукт говорил
+  // Что было: в 04:14 (ре��льный скриншот с прода) продукт говорил
   // «Выбери одно крошечное действие ПРЯМО СЕЙЧА��». Для СДВГ-аудитории это
   // прицельный удар в revenge bedtime procrastination — самый дорогой
   // паттерн этой группы: недосып → исполнительные функции ещё слабее →
@@ -684,17 +684,17 @@ export function HomeScreen() {
                     Всё равно начать сейчас
                   </Button>
                 ) : (
-                  /* S1 · Reward-fused герой (уникальная механика Дома,
-                     раунд 3). Раньше награда (полоса 9/10, «Луна над
-                     островом») жила в отдельной карточке в ~200px ниже
-                     кнопки — петля «действие → награда» была разорвана на
-                     два блока, и глазу приходилось СКЛЕИВАТЬ их самому.
-                     Теперь прогноз награды впаян в саму кнопку старта:
-                     дистанция действие→награда = 0px, RPE-предвкушение
-                     возникает прямо в момент решения нажать. Кнопка стала
-                     двухэтажной (72px) — это осознанная жертва: больше
-                     вертикали ради нулевого разрыва петли (Fitts только
-                     выигрывает — мишень крупнее). */
+                  /* S1 · «Остров в кнопке» (уникальная механика Дома,
+                     раунд 4). Red Team убил полосу-тиков: «9 из 10» —
+                     абстрактный счётчик, а не место. Мозг не предвкушает
+                     то, чего не видит. Теперь в кнопке живёт миниатюрный
+                     остров (SVG, 44px): уже выращенные ориентиры стоят
+                     на своих местах, а СЛЕДУЮЩИЙ дышит призраком там,
+                     где он реально появится. Награда видна, а не
+                     посчитана — RPE-предвкушение получает образ, а не
+                     цифру. Кнопка стала трёхэтажной (96px) — осознанная
+                     жертва вертикали ради нулевого разрыва петли
+                     «действие → видимая награда». */
                   <motion.button
                     type="button"
                     whileTap={reduceMotion ? undefined : { scale: 0.98 }}
@@ -706,7 +706,7 @@ export function HomeScreen() {
                           )
                         : router.push("/app/session");
                     }}
-                    className="press cta-sheen flex w-full flex-col gap-2 rounded-2xl bg-primary px-4 py-3.5 text-left text-primary-foreground"
+                    className="press cta-sheen flex w-full flex-col gap-2.5 rounded-2xl bg-primary px-4 py-3.5 text-left text-primary-foreground"
                   >
                     <span className="flex items-center gap-2 text-base font-semibold">
                       <Play className="size-4 shrink-0" aria-hidden="true" />
@@ -719,34 +719,60 @@ export function HomeScreen() {
                           : `Повторить: «${short}»`;
                       })()}
                     </span>
-                    {/* Награда внутри мишени: мини-полоса прогресса тем же
-                        языком, что на острове, + имя следующего элемента */}
-                    <span className="flex items-center gap-2.5">
-                      <span
-                        className="flex flex-1 items-center gap-0.5"
+                    {/* Мини-остров: выращенное — в цвете, следующее — дышащий
+                        призрак на своём реальном месте. Тот же язык, что на
+                        странице «Мир», но в миниатюре 44px — награда видна
+                        прямо в момент решения нажать. */}
+                    <span className="flex items-center gap-3">
+                      <svg
+                        viewBox="0 0 380 216"
+                        className="h-11 w-auto shrink-0"
                         aria-hidden="true"
                       >
-                        {Array.from({ length: LANDMARK_COUNT }).map((_, di) => (
-                          <span
-                            key={di}
-                            className={`h-1 flex-1 rounded-full ${
-                              di < (stats?.totalStarts ?? 0)
-                                ? "bg-primary-foreground/85"
-                                : "bg-primary-foreground/25"
-                            }`}
-                          />
-                        ))}
-                      </span>
-                      {/* Разделение носителей с карточкой острова ниже:
-                          герой несёт БЛИЗОСТЬ (сколько осталось), карточка —
-                          ОБРАЗ награды (силуэт + имя). Ни один прогноз не
-                          дублируется в кадре. */}
-                      <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest tabular-nums text-primary-foreground/80">
-                        {(stats?.totalStarts ?? 0) < LANDMARK_COUNT
-                          ? LANDMARK_COUNT - (stats?.totalStarts ?? 0) === 1
-                            ? "остался последний"
-                            : `${stats?.totalStarts ?? 0} из ${LANDMARK_COUNT}`
-                          : "вырастит находку"}
+                        {/* земля */}
+                        <ellipse cx="190" cy="156" rx="146" ry="26" fill="var(--color-primary-foreground)" opacity="0.2" />
+                        <path
+                          d="M50 156 Q66 132 108 136 Q128 124 160 130 Q190 118 222 130 Q254 122 276 134 Q312 130 330 156 Q300 172 190 174 Q80 172 50 156 Z"
+                          fill="var(--color-primary-foreground)"
+                          opacity="0.3"
+                        />
+                        {/* выращенные ориентиры — в цвете кнопки */}
+                        {landmarkNodes.map((node, i) => {
+                          const unlocked = i < (stats?.totalStarts ?? 0);
+                          const isNext = i === (stats?.totalStarts ?? 0);
+                          if (!unlocked && !isNext) return null;
+                          return (
+                            <g
+                              key={i}
+                              opacity={unlocked ? 0.9 : 0.35}
+                              style={
+                                isNext
+                                  ? {
+                                      animation: reduceMotion
+                                        ? undefined
+                                        : "island-ghost-breathe 2.4s ease-in-out infinite",
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {node}
+                            </g>
+                          );
+                        })}
+                      </svg>
+                      <span className="flex min-w-0 flex-col gap-0.5">
+                        <span className="truncate font-mono text-[10px] uppercase tracking-widest text-primary-foreground/80">
+                          {(stats?.totalStarts ?? 0) < LANDMARK_COUNT
+                            ? `вырастит «${ISLAND_ELEMENT_NAMES[stats?.totalStarts ?? 0]}»`
+                            : "вырастит находка"}
+                        </span>
+                        <span className="font-mono text-[10px] uppercase tracking-widest tabular-nums text-primary-foreground/60">
+                          {(stats?.totalStarts ?? 0) < LANDMARK_COUNT
+                            ? LANDMARK_COUNT - (stats?.totalStarts ?? 0) === 1
+                              ? "остался последний"
+                              : `${stats?.totalStarts ?? 0} из ${LANDMARK_COUNT}`
+                            : "остров густеет"}
+                        </span>
                       </span>
                     </span>
                   </motion.button>

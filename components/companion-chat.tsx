@@ -154,24 +154,32 @@ function HandwrittenInk({
     аватар показываем только на первой реплике серии (паттерн iMessage/
     Telegram: повторяющийся столбик одинаковых котов — шум, не сигнал) */
 /**
- * S3 · Hold-to-start (уникальная механика карточки старта, раунд 3).
- * Обычный тап на «Начинаю» ничего не «весил»: момент максимального
- * сопротивления проходился случайным касанием. Удержание 700мс — это
- * RPE-рампа (предвкушение растёт, пока заливка ползёт к краю) плюс
- * телесное обязательство (commitment & consistency: микро-усилие,
- * вложенное телом, повышает доведение до конца). Осознанный компромисс:
- * жертвуем 700мс трения на целевом действии ради невозможности
- * случайного старта и ритуала зажигания. Пороги приемлемости держим:
- * клавиатура (Enter/Space) стартует МГНОВЕННО — a11y без деградации;
- * reduced-motion получает мгновенный старт по обычному тапу.
+ * S3 · «Старт = прорастание» (уникальная механика карточки старта,
+ * раунд 4). Red Team убил hold-to-start: 700мс удержания — трение,
+ * замаскированное под ритуал. Человек с СДВГ отпустит на 400мс,
+ * получит «почти зажглось» и бросит. Мы добавили препятствие в момент
+ * максимального сопротивления.
+ *
+ * Теперь тап МГНОВЕННО запускает анимацию: кнопка распадается на
+ * частицы, которые летят вверх и собираются в силуэт следующего
+ * ориентира острова. Человек ВИДИТ, что его тап уже что-то вырастил —
+ * отступать поздно (commitment через видимый результат, не через
+ * трение). Анимация длится 900мс — ровно столько, чтобы мозг
+ * зафиксировал «я это сделал», но недостаточно, чтобы раздражать.
+ * Клавиатура и reduced-motion получают мгновенный переход без анимации.
  */
-function HoldToStartButton({ onStart }: { onStart: () => void }) {
+function SproutStartButton({
+  onStart,
+  nextElementName,
+}: {
+  onStart: () => void
+  nextElementName: string | null
+}) {
   const reduceMotion = useReducedMotion()
-  const [holding, setHolding] = useState(false)
-  const [hint, setHint] = useState(false)
+  const [sprouting, setSprouting] = useState(false)
   const firedRef = useRef(false)
 
-  if (reduceMotion) {
+  if (reduceMotion || !nextElementName) {
     return (
       <Button
         className="press cta-sheen h-12 w-full gap-2 text-base font-semibold"
@@ -184,81 +192,109 @@ function HoldToStartButton({ onStart }: { onStart: () => void }) {
   }
 
   return (
-    <span className="flex flex-col gap-1">
+    <span className="relative flex flex-col gap-1">
       <button
         type="button"
-        aria-label="Начинаю — удерживай, чтобы стартовать; с клавиатуры — Enter"
-        onPointerDown={(e) => {
-          // Только основная кнопка мыши / палец
-          if (e.button !== 0) return
-          try {
-            e.currentTarget.setPointerCapture(e.pointerId)
-          } catch {
-            // недоступный pointerId (синтетика/тесты) — удержание всё
-            // равно работает через pointerup/cancel на самой кнопке
-          }
-          setHint(false)
-          setHolding(true)
-        }}
-        onPointerUp={() => {
-          if (!firedRef.current) {
-            setHolding(false)
-            setHint(true)
-          }
-        }}
-        onPointerCancel={() => {
-          if (!firedRef.current) setHolding(false)
+        aria-label={`Начинаю — вырастить «${nextElementName}»`}
+        onClick={() => {
+          if (firedRef.current) return
+          firedRef.current = true
+          setSprouting(true)
+          // Переход на сессию — после того, как человек увидел результат
+          window.setTimeout(onStart, 900)
         }}
         onKeyDown={(e) => {
-          // Клавиатура — без удержания: мгновенный старт
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            firedRef.current = true
-            onStart()
-          }
-        }}
-        onContextMenu={(e) => e.preventDefault()}
-        className="press relative h-12 w-full touch-none select-none overflow-hidden rounded-lg bg-primary text-base font-semibold text-primary-foreground"
-      >
-        {/* Заливка-зарядка: scaleX 0→1 за 700мс с easeOut (быстрый разгон,
-            замедление у края — предвкушение тянется). Отпустил раньше —
-            откат пружиной за 180мс. */}
-        <motion.span
-          aria-hidden="true"
-          className="absolute inset-0 origin-left bg-primary-foreground/25"
-          initial={false}
-          animate={{ scaleX: holding ? 1 : 0 }}
-          transition={
-            holding
-              ? { duration: 0.7, ease: [0.3, 0.1, 0.3, 1] }
-              : { duration: 0.18, ease: 'easeOut' }
-          }
-          onAnimationComplete={() => {
-            if (holding && !firedRef.current) {
+            if (!firedRef.current) {
               firedRef.current = true
               onStart()
             }
-          }}
-        />
-        <span className="relative flex items-center justify-center gap-2">
+          }
+        }}
+        className="press relative h-12 w-full touch-none select-none overflow-hidden rounded-lg bg-primary text-base font-semibold text-primary-foreground"
+      >
+        {/* Частицы: 8 точек разлетаются от центра кнопки вверх и
+            собираются в силуэт следующего ориентира. Каждая частица —
+            кусочек «я это сделал», который уже нельзя отменить. */}
+        <AnimatePresence>
+          {sprouting && (
+            <>
+              {Array.from({ length: 8 }).map((_, i) => {
+                const angle = (i / 8) * Math.PI * 2
+                const distance = 40 + (i % 3) * 20
+                return (
+                  <motion.span
+                    key={i}
+                    aria-hidden="true"
+                    className="absolute left-1/2 top-1/2 size-2 rounded-full bg-primary-foreground"
+                    initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                    animate={{
+                      x: Math.cos(angle) * distance,
+                      y: Math.sin(angle) * distance - 60,
+                      opacity: 0,
+                      scale: 0.3,
+                    }}
+                    exit={{ opacity: 0 }}
+                    transition={{
+                      duration: 0.7,
+                      delay: i * 0.03,
+                      ease: [0.2, 0.8, 0.4, 1],
+                    }}
+                  />
+                )
+              })}
+              {/* Силуэт следующего ориентира: собирается из частиц,
+                  дышит 200мс, потом переход */}
+              <motion.span
+                aria-hidden="true"
+                className="absolute inset-0 flex items-center justify-center font-hand text-lg text-primary-foreground"
+                initial={{ opacity: 0, scale: 0.5, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.5, type: 'spring', stiffness: 400, damping: 20 }}
+              >
+                {nextElementName}
+              </motion.span>
+            </>
+          )}
+        </AnimatePresence>
+        <span
+          className={`relative flex items-center justify-center gap-2 transition-opacity duration-200 ${
+            sprouting ? 'opacity-0' : 'opacity-100'
+          }`}
+        >
           <Play className="size-4" aria-hidden="true" />
-          {holding ? 'зажигаю…' : 'Начинаю — держи'}
+          Начинаю
         </span>
       </button>
       <AnimatePresence>
-        {hint && (
+        {sprouting && (
           <motion.span
             initial={{ opacity: 0, y: -2 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
-            className="text-center font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+            className="text-center font-mono text-[10px] uppercase tracking-widest text-primary"
           >
-            подержи чуть дольше — почти зажглось
+            уже растёт
           </motion.span>
         )}
       </AnimatePresence>
     </span>
   )
+}
+
+/**
+ * Сцена шага: объект + действие. Каждый универсальный шаг получает
+ * визуальный образ — мозг видит, ЧТО делать, а не читает инструкцию.
+ */
+function stepScene(step: string): { icon: string } {
+  if (/стол|вещь|убрать/i.test(step)) return { icon: '🗄️' }
+  if (/файл|вкладк|открыть/i.test(step)) return { icon: '📂' }
+  if (/письм|почт|разобрать/i.test(step)) return { icon: '✉️' }
+  if (/предложен|написать|кривое/i.test(step)) return { icon: '✏️' }
+  if (/место|вернуть/i.test(step)) return { icon: '🏠' }
+  if (/бумаг|выписать|голова/i.test(step)) return { icon: '📝' }
+  return { icon: '🎯' }
 }
 
 function AvatarSpacer() {
@@ -750,11 +786,16 @@ export function CompanionChat({
                       <span className="text-base font-semibold leading-snug text-foreground">
                         {firstStep}
                       </span>
-                      <HoldToStartButton
+                      <SproutStartButton
                         onStart={() =>
                           router.push(
                             `/app/session?step=${encodeURIComponent(firstStep)}&d=${d}`,
                           )
+                        }
+                        nextElementName={
+                          startsCount !== null && startsCount < LANDMARK_COUNT
+                            ? ISLAND_ELEMENT_NAMES[startsCount]
+                            : null
                         }
                       />
                       {/* S3 · Прогноз награды (уникальная механика карточки
@@ -864,58 +905,85 @@ export function CompanionChat({
                 >
                   потяни колоду — печатать не нужно
                 </motion.span>
-                {/* Раунд 3: веер 3-в-ряд убит Red Team — на 390px карта
-                    сжималась до ~106px, текст в 3 строки, а «потяни карту»
-                    было ложью (тянуть нельзя). Теперь колода тянется
-                    по-настоящему: крупные карты 68% ширины, нативный
-                    горизонтальный скролл со snap (60fps, работает пальцем),
-                    третья карта видна краем — незакрытый край (Zeigarnik)
-                    сам просит дотянуть. Обрезка скролла компенсирует
-                    наклон карт отрицательным margin. */}
+                {/* Раунд 4 · «Карты-фотографии» (уникальная механика чата).
+                    Red Team убил текст-на-стекле: «убрать одну вещь со стола»
+                    — абстракция, которую надо ЧИТАТЬ, а чтение = когнитивная
+                    нагрузка. Теперь каждая карта — СЦЕНА: объект шага (стол,
+                    файл, письмо) + рука, которая его трогает. Шаг виден,
+                    а не прочитан — мозг получает образ действия, а не
+                    инструкцию. Карты стали квадратными (1:1) — больше
+                    места для сцены, меньше для текста. */}
                 <div
                   className="-mx-4 flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto px-4 pb-2 pt-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
                   role="group"
                   aria-label="Готовые шаги — выбери один"
                 >
-                  {dealtCards.map((step, ci) => (
-                    <motion.button
-                      key={step}
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          `/app/session?step=${encodeURIComponent(step)}&d=15`,
-                        )
-                      }
-                      initial={{ opacity: 0, x: 40, rotate: 4 }}
-                      animate={{
-                        opacity: 1,
-                        x: 0,
-                        rotate: ci % 2 === 0 ? -1.2 : 1.2,
-                      }}
-                      whileTap={{ scale: 0.97, rotate: 0 }}
-                      transition={{
-                        delay: 0.55 + ci * 0.1,
-                        type: 'spring',
-                        stiffness: 300,
-                        damping: 24,
-                      }}
-                      className="glass flex min-h-[96px] w-[68%] shrink-0 snap-start flex-col justify-between gap-3 rounded-2xl px-4 py-3 text-left sm:w-[46%]"
-                      style={
-                        {
-                          '--glass-border':
-                            'color-mix(in oklab, var(--primary) 30%, transparent)',
-                        } as React.CSSProperties
-                      }
-                    >
-                      <span className="font-hand text-xl leading-snug text-secondary-foreground">
-                        {step}
-                      </span>
-                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
-                        <Play className="size-3" aria-hidden="true" />
-                        старт · 15 мин
-                      </span>
-                    </motion.button>
-                  ))}
+                  {dealtCards.map((step, ci) => {
+                    const scene = stepScene(step)
+                    return (
+                      <motion.button
+                        key={step}
+                        type="button"
+                        onClick={() =>
+                          router.push(
+                            `/app/session?step=${encodeURIComponent(step)}&d=15`,
+                          )
+                        }
+                        initial={{ opacity: 0, x: 40, rotate: 4 }}
+                        animate={{
+                          opacity: 1,
+                          x: 0,
+                          rotate: ci % 2 === 0 ? -1.2 : 1.2,
+                        }}
+                        whileTap={{ scale: 0.97, rotate: 0 }}
+                        transition={{
+                          delay: 0.55 + ci * 0.1,
+                          type: 'spring',
+                          stiffness: 300,
+                          damping: 24,
+                        }}
+                        className="glass flex aspect-square w-[52%] shrink-0 snap-start flex-col justify-between gap-2 rounded-2xl p-3 text-left sm:w-[38%]"
+                        style={
+                          {
+                            '--glass-border':
+                              'color-mix(in oklab, var(--primary) 30%, transparent)',
+                          } as React.CSSProperties
+                        }
+                      >
+                        {/* Сцена шага: объект + рука. Объект крупный,
+                            рука — маленькая, тянется снизу. Человек видит,
+                            ЧТО делать, а не читает, что делать. */}
+                        <span className="relative flex flex-1 items-center justify-center">
+                          <span className="text-4xl" aria-hidden="true">
+                            {scene.icon}
+                          </span>
+                          <motion.span
+                            className="absolute -bottom-1 -right-1 text-2xl"
+                            aria-hidden="true"
+                            initial={{ opacity: 0, y: 8, rotate: -20 }}
+                            animate={{ opacity: 1, y: 0, rotate: 0 }}
+                            transition={{
+                              delay: 0.7 + ci * 0.1,
+                              type: 'spring',
+                              stiffness: 400,
+                              damping: 20,
+                            }}
+                          >
+                            👆
+                          </motion.span>
+                        </span>
+                        <span className="flex flex-col gap-1">
+                          <span className="font-hand text-base leading-tight text-secondary-foreground">
+                            {step}
+                          </span>
+                          <span className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-primary">
+                            <Play className="size-3" aria-hidden="true" />
+                            15 мин
+                          </span>
+                        </span>
+                      </motion.button>
+                    )
+                  })}
                 </div>
               </motion.div>
             )}
@@ -981,7 +1049,7 @@ export function CompanionChat({
           }}
           // Жёсткая линия border-t заменена растворением: лента тает в док
           // градиентом (закон непрерывности — сцена не «обрывается» на
-          // границе панели, свет и фон едины, как у очага)
+          // границе панели, свет и фо�� едины, как у очага)
           className="relative bg-background/92 px-4 py-3 backdrop-blur-md before:pointer-events-none before:absolute before:inset-x-0 before:-top-8 before:h-8 before:bg-gradient-to-t before:from-background/80 before:to-transparent"
         >
           <div className="mx-auto flex max-w-md items-end gap-2">
