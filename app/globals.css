@@ -484,7 +484,13 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
        под преломлением держит белый текст в зоне AAA-читаемости */
     linear-gradient(oklch(0.16 0.02 150 / 0.62), oklch(0.16 0.02 150 / 0.62));
   backdrop-filter: blur(16px) saturate(150%);
-  border: 1px solid oklch(1 0 0 / 0.14);
+  /* Кромка не одной непрозрачностью по кругу: свет очага бьёт снизу-справа
+     (см. сцену в AppBackdrop) — верхняя грань стекла ловит его ярче, нижняя
+     тонет в тени. Та же физика, что уже применена в box-shadow ниже (inset
+     сверху светлее), просто теперь и в самой границе, не только в тени. */
+  border-style: solid;
+  border-width: 1px;
+  border-color: oklch(1 0 0 / 0.22) oklch(1 0 0 / 0.13) oklch(1 0 0 / 0.08) oklch(1 0 0 / 0.13);
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.16),
     0 8px 22px -14px oklch(0 0 0 / 0.55);
