@@ -17,7 +17,7 @@ import {
   Sparkles,
   Sprout,
 } from 'lucide-react'
-import { hapticStart } from '@/lib/haptics'
+import { hapticDone, hapticStart } from '@/lib/haptics'
 import Link from 'next/link'
 import {
   addNote,
@@ -121,6 +121,27 @@ export function CompanionChat({
   // новая приходит снизу. Реальный отклик на КЛЮЧЕВОЕ редкое действие
   // (не команда с клавиатуры сотни раз в день — Эмиль здесь не запрещает).
   const [sendCount, setSendCount] = useState(0)
+
+  // Копирование по долгому нажатию — стандарт настоящих мессенджеров
+  // (iMessage/Telegram/WhatsApp), которого в этом чате не было вообще.
+  // Таймер в ref, не в state: сам факт нажатия не должен вызывать рендер.
+  const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const longPressTimer = useRef<number | null>(null)
+  function startLongPress(key: string, text: string) {
+    longPressTimer.current = window.setTimeout(() => {
+      navigator.clipboard?.writeText(text).then(() => {
+        hapticDone()
+        setCopiedKey(key)
+        window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1200)
+      }).catch(() => {
+        // буфер обмена недоступен (не https, старый браузер) — тихо молчим,
+        // как и вся остальная хаптика/фоновая синхронизация в этом файле
+      })
+    }, 450)
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
+  }
 
   // Растущее поле ввода вместо однострочного input: длинная мысль не
   // обрезается и не скроллится внутри крошечной строки — само поле
@@ -521,9 +542,22 @@ export function CompanionChat({
                     <motion.div
                       key={i}
                       className="flex w-full items-start gap-2"
-                      initial={{ opacity: 0, y: 10, scale: 0.97 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+                      // Нюанс «своей стороны» (iMessage/Telegram): реплика
+                      // едва подъезжает СО СТОРОНЫ своего отправителя (8px —
+                      // в пределах 4-8px нормы для входа элемента, не рывок),
+                      // а не одинаково всплывает снизу вне зависимости от
+                      // того, чья это реплика.
+                      initial={
+                        reduceMotion
+                          ? { opacity: 0 }
+                          : { opacity: 0, y: 10, scale: 0.97, x: isUser ? 8 : -8 }
+                      }
+                      animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
+                      transition={
+                        reduceMotion
+                          ? { duration: 0.15 }
+                          : { type: 'spring', stiffness: 300, damping: 24 }
+                      }
                     >
                       {!isUser &&
                         (isFirstOfGroup ? (
@@ -536,14 +570,41 @@ export function CompanionChat({
                           // реплика группы уезжала под аватар и колонка «плыла»
                           <div className="size-9 shrink-0" aria-hidden="true" />
                         ))}
-                      <div
-                        className={`max-w-[85%] whitespace-pre-wrap rounded-2xl ${
-                          isUser
-                            ? `chat-bubble-user ml-auto px-3 py-2 text-sm leading-relaxed ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
-                            : `chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
-                        }`}
-                      >
-                        {part.text}
+                      <div className={`relative max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
+                        {/* Копирование по долгому нажатию (450мс — стандартный
+                            порог long-press, ниже читалось бы случайным тапом).
+                            whileTap: лёгкое сжатие ПОДТВЕРЖДАЕТ, что нажатие
+                            вообще зарегистрировано, ещё до истечения таймера —
+                            без него палец не понимает, держит он что-то или нет. */}
+                        <motion.div
+                          className={`whitespace-pre-wrap rounded-2xl select-none ${
+                            isUser
+                              ? `chat-bubble-user px-3 py-2 text-sm leading-relaxed ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
+                              : `chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
+                          }`}
+                          whileTap={{ scale: 0.97 }}
+                          onPointerDown={() => startLongPress(`${message.id}-${i}`, part.text)}
+                          onPointerUp={cancelLongPress}
+                          onPointerLeave={cancelLongPress}
+                        >
+                          {part.text}
+                        </motion.div>
+                        <AnimatePresence>
+                          {copiedKey === `${message.id}-${i}` && (
+                            <motion.span
+                              initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                              transition={{ type: 'spring', stiffness: 400, damping: 26 }}
+                              className={`absolute -top-7 flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-mono text-xs text-foreground shadow-[0_4px_14px_-6px_oklch(0_0_0/0.6)] ${
+                                isUser ? 'right-0' : 'left-0'
+                              }`}
+                            >
+                              <Check className="size-3 text-primary" aria-hidden="true" />
+                              Скопировано
+                            </motion.span>
+                          )}
+                        </AnimatePresence>
                       </div>
                     </motion.div>
                   )
@@ -648,11 +709,17 @@ export function CompanionChat({
             )
           })}
 
+          {/* AnimatePresence: без ннего исчезновение индикатора не анимировано
+              вообще (exit требует контекста AnimatePresence) — пузырь просто
+              обрывался кадром, пока настоящий ответ не появлялся рядом. */}
+          <AnimatePresence>
           {status === 'submitted' && (
             <motion.div
+              key="typing"
               className="flex items-center gap-2"
               initial={{ opacity: 0, y: 6, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
               transition={{ type: 'spring', stiffness: 300, damping: 24 }}
             >
               <CompanionAvatar />
@@ -674,6 +741,7 @@ export function CompanionChat({
               </span>
             </motion.div>
           )}
+          </AnimatePresence>
           <div ref={bottomRef} />
         </div>
       </div>
