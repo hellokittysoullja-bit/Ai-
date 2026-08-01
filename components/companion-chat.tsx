@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
@@ -42,6 +42,12 @@ type CompanionChatProps = {
       одинаковых ряда пилюль подряд, ведущих к разным действиям (мгновенный
       старт vs сообщение боту), путают сильнее, чем помогают. */
   showSuggestions?: boolean
+  /** Закреплённый контекст в начале ленты (карточки «Дома»): рендерится
+      ВНУТРИ скролл-контейнера над приветствием, так что весь экран —
+      единый скролл, а не две конкурирующие зоны. Когда header задан, лента
+      открывается СВЕРХУ (человек видит контекст и приветствие), а не
+      проматывается к последней реплике. */
+  header?: ReactNode
 }
 
 function CompanionAvatar({
@@ -111,6 +117,7 @@ export function CompanionChat({
   placeholder,
   onPlanSaved,
   showSuggestions = true,
+  header,
 }: CompanionChatProps) {
   const router = useRouter()
   const [input, setInput] = useState('')
@@ -310,6 +317,12 @@ export function CompanionChat({
     if (!el) return
     const instant = !didInitialScrollRef.current
     didInitialScrollRef.current = true
+    // С закреплённой шапкой «Дома» экран открывается СВЕРХУ: человек должен
+    // увидеть карточку награды и приветствие, а не проскочить мимо всего
+    // контекста к последней реплике восстановленной истории. К низу лента
+    // едет только на реально НОВУЮ реплику этой сессии (последующие, уже
+    // не-instant, срабатывания эффекта).
+    if (instant && header) return
     const run = () =>
       el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'auto' : 'smooth' })
     run()
@@ -419,7 +432,15 @@ export function CompanionChat({
           вёрстку, ни на попадание по элементам. */}
       <div
         ref={scrollRef}
-        className="flex flex-1 flex-col overflow-y-auto [mask-image:linear-gradient(to_bottom,transparent_0,black_24px)]"
+        // Верхняя маска-затухание — только БЕЗ шапки. С закреплённым
+        // контекстом «Дома» верх ленты в покое (scrollTop 0) — это маскот и
+        // приветствие: гасить их первые пиксели нельзя. Шапка и так открывает
+        // ленту с чистого края (pt-4), растворять там нечего.
+        className={`flex flex-1 flex-col overflow-y-auto ${
+          header
+            ? ""
+            : "[mask-image:linear-gradient(to_bottom,transparent_0,black_24px)]"
+        }`}
       >
         {/* pb-24, не py-4: композер ниже — sticky и перекрывает своим
             градиентом нижнюю часть ленты. Замерено рендером: без запаса
@@ -427,6 +448,14 @@ export function CompanionChat({
             (elementFromPoint в его центре возвращал textarea, не сам чип) —
             реальному пальцу нечем было в него попасть без скролла. */}
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 pt-4 pb-6">
+          {/* Закреплённый контекст «Дома»: карточки едут в общем скролле над
+              перепиской. Отделён от разговора крупной паузой (pb-2 + hairline),
+              чтобы «контекст» и «беседа» читались как разные слои. */}
+          {header ? (
+            <div className="flex flex-col gap-5 border-b border-white/[0.06] pb-5">
+              {header}
+            </div>
+          ) : null}
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}

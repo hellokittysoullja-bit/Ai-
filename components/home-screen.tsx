@@ -263,7 +263,7 @@ function buildFirstWord(
 }
 
 /**
- * Первая реплика чата. На нулевом старте — объясняет механику: чат ещё
+ * Первая реплика чата. На нулевом старте — объясняет м��ханику: чат ещё
  * не прожит, объяснение уместно. С первого же старта эта же строка
  * продолжала звучать как онбординг для человека, который её давно знает —
  * лендинг обещает «сообщение от живого существа», а не диктофонную запись.
@@ -289,16 +289,6 @@ export function HomeScreen() {
   const router = useRouter();
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null);
   const [stats, setStats] = useState<Patterns | null>(null);
-
-  // Верхняя секция ограничена max-h-[60svh]. Когда карточка награды, форма
-  // имени и весточка совпадают, контент выше потолка и режется ЖЁСТКОЙ
-  // границей ровно посреди строки — читается как баг рендера, а не как
-  // «прокрути вниз». introRef + introFade превращают этот срез в мягкий
-  // fade-градиент со стрелкой-подсказкой, но только когда реально есть
-  // overflow и мы не у самого низа (иначе в 0-старт стейте выцветала бы
-  // последняя строка короткого контента).
-  const introRef = useRef<HTMLElement | null>(null);
-  const [introFade, setIntroFade] = useState(false);
 
   // Endowment: названное существо становится «моим». Имя спрашиваем
   // после первого старта — когда ценность уже прожита, а не обещана.
@@ -505,56 +495,19 @@ export function HomeScreen() {
     };
   }, [firstWord?.greeting, greetingClamped]);
 
-  // Fade показываем только когда секция реально переполнена и мы не у самого
-  // низа — тогда срез читается как «есть ещё, прокрути», а не как обрыв.
-  // Пересчитываем на скролл, resize и при смене контента (stats/имя/весточка
-  // меняют высоту).
-  useEffect(() => {
-    const el = introRef.current;
-    if (!el) return;
-    const measure = () => {
-      // Порог 24px, не 1px: маргинальный overflow в пару пикселей (например
-      // 0-старт секция выше потолка всего на ~14px) не должен включать
-      // 48px-fade — иначе он затемняет строку, которая по сути видна целиком.
-      const hidden = el.scrollHeight - el.clientHeight;
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1;
-      setIntroFade(hidden > 24 && !atBottom);
-    };
-    measure();
-    el.addEventListener("scroll", measure, { passive: true });
-    const ro = new ResizeObserver(measure);
-    ro.observe(el);
-    window.addEventListener("resize", measure);
-    return () => {
-      el.removeEventListener("scroll", measure);
-      ro.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [stats, firstWord, companionName, nameLoaded]);
-
-  return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* sr-only: без единого heading на экране скринридер не может
-          перескочить сюда по заголовкам — визуально ничего не меняет,
-          мимо глаза, но не мимо доступности. */}
-      <h1 className="sr-only">Напарник — дом</h1>
-      {/* max-h + overflow-y-auto: без потолка эта секция на невысоком
-          экране (проверено на 700px) может толкать композер и нав-бар за
-          пределы вьюпорта — карточка награды, форма имени и весточка могут
-          отрендериться одновременно (их условия показа пересекаются, а не
-          взаимоисключают друг друга). Сам scroll-cap — минимально
-          необходимая правка, не откат остальной структуры. */}
-      <section
-        ref={introRef}
-        className={`max-h-[60svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent transition-[mask-image] duration-200 ${
-          introFade
-            ? "[mask-image:linear-gradient(to_bottom,black_calc(100%-3rem),transparent)]"
-            : ""
-        }`}
-      >
-        {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
-            блоками — визуальная теснота = когнитивная теснота для СДВГ */}
-        <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
+  // Интро-карточки «Дома» — закреплённый контекст в начале ленты чата.
+  // Раньше это была отдельная секция max-h-[60svh] overflow-y-auto НАД
+  // чатом: две независимые скролл-зоны в одном мобильном вьюпорте. Верхняя
+  // резала последнюю карточку посреди строки (её потолок), нижняя (чат)
+  // ужималась в тонкую полоску — человек воевал сразу с двумя скроллами.
+  // Теперь всё едет ОДНИМ скроллом: карточки прокручиваются вместе с
+  // перепиской, композер остаётся прижатым внизу (canonical companion-app
+  // pattern — контекст в начале треда, разговор ниже, ввод закреплён).
+  // gap-5: крупные паузы между смысловыми блоками — визуальная теснота =
+  // когнитивная теснота для СДВГ. Ширину/боковые поля даёт скролл-контейнер
+  // чата (max-w-md px-4), поэтому здесь их нет — иначе двойной padding.
+  const introHeader = (
+    <div className="flex flex-col gap-5">
           <div className="flex items-start gap-3">
             {/*
               Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
@@ -1102,17 +1055,23 @@ export function HomeScreen() {
                 </div>
               </form>
             )}
-        </div>
-      </section>
+    </div>
+  );
 
-      <div className="flex min-h-0 flex-1 flex-col">
-        <CompanionChat
-          mode="companion"
-          greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
-          onPlanSaved={refresh}
-          showSuggestions={!firstWord?.showStarterChips}
-        />
-      </div>
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* sr-only: без единого heading на экране скринридер не может
+          перескочить сюда по заголовкам — визуально ничего не меняет. */}
+      <h1 className="sr-only">Напарник — дом</h1>
+      {/* Единственная скролл-зона экрана: интро-карточки (header) + лента
+          переписки едут вместе, композер CompanionChat прижат внизу. */}
+      <CompanionChat
+        mode="companion"
+        greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
+        onPlanSaved={refresh}
+        showSuggestions={!firstWord?.showStarterChips}
+        header={introHeader}
+      />
     </div>
   );
 }
