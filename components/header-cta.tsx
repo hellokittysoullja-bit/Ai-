@@ -43,7 +43,11 @@ export function HeaderCta() {
       }
       nativeButton={false}
       size="sm"
-      className={`press font-semibold transition-opacity duration-300 ${
+      // .press-fade, не .press: transition — shorthand-свойство, .press
+      // (transform 120ms) и отдельный transition-opacity на одном элементе
+      // не складываются — побеждает только один, кнопка либо не «жмётся»,
+      // либо не проявляется плавно.
+      className={`press-fade font-semibold ${
         visible ? "opacity-100" : "pointer-events-none opacity-0"
       }`}
     >

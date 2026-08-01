@@ -56,6 +56,7 @@ const KEYS = {
   worldSeen: 'naparnik:worldSeen',
   activeSession: 'naparnik:activeSession',
   chat: 'naparnik:chat',
+  chatTimes: 'naparnik:chatTimes',
   companionName: 'naparnik:companionName',
 } as const
 
@@ -258,6 +259,19 @@ export async function getChatMessages<T>(): Promise<T[]> {
 
 export async function saveChatMessages<T>(messages: T[]): Promise<void> {
   write(KEYS.chat, messages.slice(-MAX_CHAT_MESSAGES))
+}
+
+/**
+ * Момент первого появления каждой реплики (ISO), по id сообщения.
+ * Отдельная карта, а не поле на сообщении: тип UIMessage приходит из
+ * useChat и не резервирует место под свои метки времени.
+ */
+export async function getChatTimestamps(): Promise<Record<string, string>> {
+  return read<Record<string, string>>(KEYS.chatTimes, {})
+}
+
+export async function saveChatTimestamps(map: Record<string, string>): Promise<void> {
+  write(KEYS.chatTimes, map)
 }
 
 // ---------- Непросмотренное на острове (триггер возврата к награде) ----------

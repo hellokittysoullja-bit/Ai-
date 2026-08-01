@@ -113,7 +113,7 @@ export function Island() {
       const [s, p] = await Promise.all([getStarts(), getPatterns()])
       let f = await getFinds()
 
-      // Бэкфилл: старты сверх карты, сделанные д�� появления пула находок,
+      // Бэкфилл: старты сверх карты, сделанные до появления пула находок,
       // получают свои находки задним числом — история не теряется.
       const owed = Math.max(0, s.length - LANDMARK_COUNT) - f.length
       if (owed > 0) {

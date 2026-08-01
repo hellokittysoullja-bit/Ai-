@@ -75,6 +75,23 @@ export function AppBackdrop() {
             "radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.08) 0%, transparent 65%)",
         }}
       />
+      {/* Зерно: последний штрих плоского фона. Без него градиент+виньетка+
+          очаг всё равно читаются гладкой заливкой на OLED — глаз не называет
+          это словом, но разница между «плоско» и «дорого» физически в этом
+          зерне (см. тренд dark glassmorphism 2026: noise + градиент + тонкая
+          кромка). Турбулентность вместо PNG — не гонит лишний файл, тайлится
+          бесшовно. mix-blend-mode: overlay + 3.5% — на пороге восприятия,
+          выше уже читалось бы как «зашумлённая камера», не текстура. */}
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='90' height='90'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+          backgroundRepeat: "repeat",
+          opacity: 0.035,
+          mixBlendMode: "overlay",
+        }}
+      />
       {STARS.map(([top, left, size, alpha], i) => (
         <span
           key={i}

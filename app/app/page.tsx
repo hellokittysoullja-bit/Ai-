@@ -6,9 +6,17 @@ export const metadata: Metadata = {
   description: "Напарник пишет первым: план, первый шаг, старт.",
 };
 
+// h-dvh + overflow-hidden, не min-h-dvh: без реальной верхней границы
+// высота каскадом "auto" уходит до самого html-элемента — chatBox внутри
+// (flex-1 overflow-y-auto) никогда не получает настоящий overflow
+// (проверено: scrollHeight===clientHeight при 20 сообщениях), скроллится
+// вся страница целиком, а sticky-композер держится не за свой скролл-
+// контейнер, а за html — и повисает поверх контента, который в этот
+// момент просто оказался в его зоне. Только этот page.tsx — world/session
+// держат свой main отдельно, других экранов это не касается.
 export default function AppHomePage() {
   return (
-    <main className="app-page-enter flex min-h-dvh flex-col pb-20">
+    <main className="app-page-enter flex h-dvh flex-col overflow-hidden pb-20">
       <HomeScreen />
     </main>
   );
