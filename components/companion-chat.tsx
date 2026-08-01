@@ -380,38 +380,78 @@ export function CompanionChat({
   // Первый скролл — мгновенный (это не анимация, это стартовая позиция),
   // последующие — плавные. rAF: к моменту эффекта шрифты могли ещё не
   // примениться, и высота ленты была занижена.
-  const didInitialScrollRef = useRef(false)
+  /*
+   * «Стартовая фаза» = первые 400 мс жизни экрана. Раньше признаком первого
+   * захода служил сам факт первого срабатывания эффекта, и на ЧИСТОМ старте
+   * это ломало главный сценарий: при пустой истории эффект на монтировании
+   * выходил досрочно (messages.length === 0), поэтому «первым» считался уже
+   * ответ на первое сообщение человека — и правило «с шапкой открываем
+   * сверху» глушило скролл к нему. Проверено в браузере: scrollTop оставался
+   * 0, до низа 305 px, ответ напарника целиком лежал под композером.
+   * Время разделяет два разных события честно: восстановление истории
+   * происходит на монтировании, новая реплика — всегда позже.
+   */
+  const initialPhaseOverRef = useRef(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      initialPhaseOverRef.current = true
+    }, 400)
+    return () => window.clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     if (messages.length === 0) return
     const el = scrollRef.current
     if (!el) return
-    const instant = !didInitialScrollRef.current
-    didInitialScrollRef.current = true
+    const instant = !initialPhaseOverRef.current
     // С закреплённой шапкой «Дома» экран открывается СВЕРХУ: человек должен
     // увидеть карточку награды и приветствие, а не проскочить мимо всего
-    // контекста к последней реплике восстановленной истории. К низу лента
-    // едет только на реально НОВУЮ реплику этой сессии (последующие, уже
-    // не-instant, срабатывания эффекта).
+    // контекста к последней реплике восстановленной истории.
     if (instant && header) return
-    const run = () =>
-      el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'auto' : 'smooth' })
-    run()
-    if (!instant) return
-    // Первый заход требует нескольких точек синхронизации: на момент
-    // коммита рукописный Caveat ещё не применён, лента ниже вьюпорта не
-    // переполнена, и scrollTo молча схлопывается в ноль. Повторяем после
-    // кадра, после готовности шрифтов и с запасом по таймеру.
-    requestAnimationFrame(run)
-    let cancelled = false
-    const guarded = () => {
-      if (!cancelled) run()
+    const run = (behavior: ScrollBehavior) =>
+      el.scrollTo({ top: el.scrollHeight, behavior })
+
+    if (instant) {
+      // Первый заход требует нескольких точек синхронизации: на момент
+      // коммита рукописный Caveat ещё не применён, лента ниже вьюпорта не
+      // переполнена, и scrollTo молча схлопывается в ноль. Повторяем после
+      // кадра, после готовности шрифтов и с запасом по таймеру.
+      run('auto')
+      requestAnimationFrame(() => run('auto'))
+      let cancelled = false
+      const guarded = () => {
+        if (!cancelled) run('auto')
+      }
+      document.fonts?.ready.then(guarded).catch(() => {})
+      const t = window.setTimeout(guarded, 300)
+      return () => {
+        cancelled = true
+        window.clearTimeout(t)
+      }
     }
-    document.fonts?.ready.then(guarded).catch(() => {})
-    const t = window.setTimeout(guarded, 300)
-    return () => {
-      cancelled = true
-      window.clearTimeout(t)
+
+    /*
+     * Новая реплика: одного scrollTo мало. Лента ПРОДОЛЖАЕТ расти после
+     * него — дорисовывается карточка первого шага, приезжают чипы, шрифт
+     * пересчитывает высоту абзаца. Единственный плавный скролл уезжал по
+     * старой высоте, и свежий ответ снова оказывался под кромкой.
+     * Поэтому держим низ ~900 мс: каждый кадр подтягиваем, пока контент
+     * устаканивается. Прерываемся сразу, как человек сам увёл ленту вверх —
+     * автоскролл, спорящий с рукой, хуже отсутствия автоскролла.
+     */
+    run('smooth')
+    let raf = 0
+    const until = performance.now() + 900
+    const follow = () => {
+      if (performance.now() > until) return
+      const distance = el.scrollHeight - el.clientHeight - el.scrollTop
+      // > 240 px — это не «контент подрос», это человек листает историю
+      if (distance > 240) return
+      if (distance > 1) el.scrollTop = el.scrollHeight
+      raf = requestAnimationFrame(follow)
     }
+    raf = requestAnimationFrame(follow)
+    return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
@@ -562,12 +602,6 @@ export function CompanionChat({
             'radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.2) 0%, transparent 70%)',
         }}
       />
-      {/* Мягкий верхний край ленты. Низ уже растворяется в градиенте
-          композера, а сверху реплики обрезались жёсткой линией о границу
-          секции «Дома» — «резкий стоп списка». mask-image гасит только
-          верхние 24px прокручиваемого содержимого: уходящее сообщение
-          именно РАСТВОРЯЕТСЯ, а не отрезается. Маска не влияет ни на
-          вёрстку, ни на попадание по элементам. */}
       {/* #23 · Кот потягивается при pull-to-refresh. Рендерим только там, где
           наверху ленты реально есть что обновлять (передан onPullRefresh):
           жест без результата хуже, чем отсутствие жеста. */}
