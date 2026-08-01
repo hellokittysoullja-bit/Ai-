@@ -21,6 +21,7 @@ import {
   WARM,
   WHITE,
 } from "@/components/mascot-geometry";
+import { SPRING_GAZE } from "@/lib/motion";
 
 /**
  * Рукокодный векторный маскот — живое существо, а не картинка.

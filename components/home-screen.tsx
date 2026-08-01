@@ -37,6 +37,7 @@ import {
 import { trimLabel } from "@/lib/utils";
 import { Bell } from "lucide-react";
 import { GreetingSkeleton, RewardCardSkeleton } from "@/components/skeletons";
+import { SPRING_GESTURE } from "@/lib/motion";
 
 type FirstWord = {
   greeting: string;
@@ -792,7 +793,7 @@ export function HomeScreen() {
                   />
                   <span className="relative flex items-center gap-3.5">
                     {/* #14 · МИНИ-СЦЕНА вместо плоской иконки. Ориентир
-                        вырезался из карты без земли под ним — «иконка
+                        вырезался из ��арты без земли под ним — «иконка
                         предмета», хотя обещание карточки в том, что на
                         острове появится МЕСТО. Здесь тот же спрайт получает
                         свой клочок мира: горизонт, две звезды и холодный
@@ -1024,7 +1025,7 @@ export function HomeScreen() {
               )}
 
               {/* Действие — внутри той же рамки, что и его награда (по
-                  вашей просьбе в этой сессии). Ночью действие сюда не
+                  вашей просьбе в этой сессии). Ночью де��ствие сюда не
                   переезжает — см. комментарий у ghost-кнопки выше. */}
               {firstWord?.actionStep ? (
                 <div className="flex flex-col gap-1">

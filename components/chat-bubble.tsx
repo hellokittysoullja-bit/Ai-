@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
-import { Check, Copy, Reply } from 'lucide-react'
+import { Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
 import { SPRING_GESTURE, SPRING_SNAPPY } from '@/lib/motion'
 import { hapticDone, hapticReaction, hapticThreshold } from '@/lib/haptics'
 
@@ -24,10 +24,22 @@ import { hapticDone, hapticReaction, hapticThreshold } from '@/lib/haptics'
 
 export type Reaction = 'paw' | 'spark' | 'heart'
 
-const REACTIONS: ReadonlyArray<{ key: Reaction; label: string; glyph: string }> = [
-  { key: 'paw', label: 'Лапка', glyph: '🐾' },
-  { key: 'spark', label: 'Искра', glyph: '✦' },
-  { key: 'heart', label: 'Тепло', glyph: '❤' },
+/*
+ * Реакции — иконками, а не текстовыми глифами. Первая версия рисовала
+ * '🐾' / '✦' / '❤', и на снимке из браузера средняя кнопка оказалась ПУСТОЙ:
+ * '✦' (U+2726) нет ни в одном шрифте этого проекта, а эмодзи-лапка и '❤'
+ * приходят из системного эмодзи-шрифта — три «иконки» жили в трёх разных
+ * гарнитурах, с разным весом и базовой линией. Lucide даёт один вес, один
+ * размер и один цвет, наследуемый от состояния кнопки.
+ */
+const REACTIONS: ReadonlyArray<{
+  key: Reaction
+  label: string
+  Icon: typeof PawPrint
+}> = [
+  { key: 'paw', label: 'Лапка', Icon: PawPrint },
+  { key: 'spark', label: 'Искра', Icon: Sparkle },
+  { key: 'heart', label: 'Тепло', Icon: Heart },
 ]
 
 /** Хвостик пузыря: оттяжка к говорящему, переходящая в тело кривой Безье. */
@@ -92,13 +104,33 @@ export function ChatBubble({
     }
   }, [])
 
+  /*
+   * Момент открытия меню. Нужен из-за реального бага, найденного удержанием
+   * в браузере: меню появлялось на 450-й мс, пока палец ЕЩЁ ПРИЖАТ, и
+   * подкладывало под себя оверлей-«клик вне». Отпускание того же самого
+   * жеста прилетало в этот оверлей и закрывало меню мгновенно — выбрать
+   * реакцию было физически невозможно ни мышью, ни пальцем.
+   * Оверлей игнорирует всё, что прилетело в первые 300 мс своей жизни:
+   * это хвост открывающего жеста, а не новый выбор пользователя.
+   */
+  const openedAt = useRef(0)
+
   function startLongPress() {
     longPressTimer.current = window.setTimeout(() => {
       if (draggingRef.current) return
       hapticReaction()
+      openedAt.current = Date.now()
       setMenuOpen(true)
     }, 450)
   }
+  /*
+   * Отменяет только НЕ СРАБОТАВШЕЕ удержание. Раньше эта же функция висела
+   * на onPointerLeave, и получался второй способ убить меню собственным
+   * жестом: всплывшее меню перекрывает верх пузыря, курсор/палец оказывается
+   * над ним → браузер шлёт pointerleave на пузырь → отмена. Мышью меню
+   * умирало ровно в тот момент, когда его собирались использовать.
+   * Теперь после открытия отменять уже нечего: таймер отработал.
+   */
   function cancelLongPress() {
     if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
   }
@@ -212,7 +244,18 @@ export function ChatBubble({
               isUser ? 'left-1' : 'right-1'
             }`}
           >
-            {REACTIONS.find((r) => r.key === reaction)?.glyph}
+            {(() => {
+              const R = REACTIONS.find((r) => r.key === reaction)
+              return R ? (
+                <R.Icon
+                  className="size-3.5 text-primary"
+                  // fill для сердца и лапки: поставленная реакция — «залитая»,
+                  // как в мессенджерах, а не контурная иконка-действие
+                  fill="currentColor"
+                  aria-hidden="true"
+                />
+              ) : null
+            })()}
           </motion.button>
         )}
       </AnimatePresence>
@@ -224,7 +267,10 @@ export function ChatBubble({
           <>
             <div
               className="fixed inset-0 z-30"
-              onPointerDown={() => setMenuOpen(false)}
+              onPointerDown={() => {
+                if (Date.now() - openedAt.current < 300) return
+                setMenuOpen(false)
+              }}
               aria-hidden="true"
             />
             <motion.div
@@ -246,11 +292,15 @@ export function ChatBubble({
                     setMenuOpen(false)
                   }}
                   aria-label={r.label}
-                  className={`flex size-9 items-center justify-center rounded-full text-sm transition-colors ${
+                  className={`flex size-9 items-center justify-center rounded-full transition-colors ${
                     reaction === r.key ? 'bg-primary/20' : 'hover:bg-white/8'
                   }`}
                 >
-                  {r.glyph}
+                  <r.Icon
+                    className={`size-4 ${reaction === r.key ? 'text-primary' : 'text-foreground'}`}
+                    fill={reaction === r.key ? 'currentColor' : 'none'}
+                    aria-hidden="true"
+                  />
                 </button>
               ))}
               <span className="mx-0.5 h-5 w-px bg-white/10" aria-hidden="true" />

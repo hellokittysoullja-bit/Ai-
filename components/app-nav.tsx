@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { House, Timer, Sprout } from "lucide-react";
 import { getActiveSession, getUnseenWorldCount } from "@/lib/memory";
+import { SPRING_GESTURE } from "@/lib/motion";
 
 /**
  * Нижний nav — только навигация ВНУТРИ приложения.
