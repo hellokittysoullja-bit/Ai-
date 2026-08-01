@@ -210,7 +210,12 @@
 
 /* Следующий призрак-ориентир «дышит»: единственный живой элемент среди
    спящих силуэтов — пространственный якорь предвкушения следующей награды.
-   Медленный ритм (4.2s) — дыхание, не мигание: манит, не дёргает. */
+   Медленный ритм (4.2s) — дыхание, не мигание: манит, не дёргает.
+   3 цикла и стоп (тот же приём, что у island-new-pulse выше), не infinite —
+   вечный луп на экране, где человек может подолгу разглядывать карту,
+   становится источником отвлечения, а не приглашением. Три вдоха уже
+   доносят сигнал «этот следующий»; после — тот же resting-опасити 0.13,
+   что и у остальных призраков. */
 @keyframes island-ghost-breathe {
   0%,
   100% {
@@ -222,7 +227,7 @@
 }
 
 .island-next-ghost {
-  animation: island-ghost-breathe 4.2s ease-in-out infinite;
+  animation: island-ghost-breathe 4.2s ease-in-out 3;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -410,6 +415,29 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
   transform: scale(0.97);
 }
 
+/* .press-warm/.press-fade: transition — shorthand-свойство, оно не
+   складывается из двух классов на одном элементе. .press (только
+   transform) рядом с отдельным transition-opacity/transition-shadow
+   взаимно перекрывали друг друга — побеждал только один, вторая анимация
+   молча не срабатывала. Эти два класса комбинируют transform с нужным
+   вторым свойством в одном объявлении. */
+.press-warm {
+  transition:
+    transform 120ms ease,
+    box-shadow 700ms ease;
+}
+.press-warm:active {
+  transform: scale(0.97);
+}
+.press-fade {
+  transition:
+    transform 120ms ease,
+    opacity 300ms ease;
+}
+.press-fade:active {
+  transform: scale(0.97);
+}
+
 /* Плавный скролл к якорям («Как это работает») — только если motion разрешён.
    На чат не влияет: там свой overflow-контейнер с явным scrollIntoView. */
 @media (prefers-reduced-motion: no-preference) {
@@ -419,10 +447,14 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .press {
+  .press,
+  .press-warm,
+  .press-fade {
     transition: none;
   }
-  .press:active {
+  .press:active,
+  .press-warm:active,
+  .press-fade:active {
     transform: none;
   }
 }
@@ -449,7 +481,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     ),
     /* Тёмная подложка (пакет Клода): стеклянный пузырь на светлеющих
        участках сцены терял контраст текста — плотное тёмное основание
-       под преломлением держит белый текст в зоне AAA-читаемост�� */
+       под преломлением держит белый текст в зоне AAA-читаемости */
     linear-gradient(oklch(0.16 0.02 150 / 0.62), oklch(0.16 0.02 150 / 0.62));
   backdrop-filter: blur(16px) saturate(150%);
   border: 1px solid oklch(1 0 0 / 0.14);
@@ -475,11 +507,13 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     0 4px 18px -6px oklch(0.86 0.22 130 / 0.4);
 }
 
-/* Проблеск по CTA: раз в 5s по кнопке пробегает быстрый диагональный блик —
-   приём пре��иальных кнопок (Apple Pay, AAA-геймдев). Свет ЛОВИТСЯ на
-   поверхности, а не излучается ею — консистентно закону «светится мир».
-   Один короткий проход + долгая пауза: выше порога заметности, ниже
-   порога раздражения. */
+/* Проблеск по CTA: по кнопке пробегает быстрый диагональный блик — приём
+   премиальных кнопок (Apple Pay, AAA-геймдев). Свет ЛОВИТСЯ на поверхности,
+   а не излучается ею — консистентно закону «светится мир».
+   2 прохода и стоп, не infinite: бесконечный блик на кнопке, которая
+   стоит на экране минутами (это же героический CTA), — уже не акцент, а
+   тикающий метроном, источник отвлечения для аудитории с СДВГ.
+   animation-fill-mode: both держит блик за кадром и до, и после проходов. */
 @keyframes cta-sheen-sweep {
   0% {
     transform: translateX(-140%) skewX(-18deg);
@@ -508,8 +542,9 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     transparent 100%
   );
   transform: translateX(-140%) skewX(-18deg);
-  animation: cta-sheen-sweep 5s ease-in-out infinite;
-  animation-delay: 1.2s;
+  animation: cta-sheen-sweep 5s ease-in-out 2;
+  animation-delay: 0.6s;
+  animation-fill-mode: both;
 }
 @media (prefers-reduced-motion: reduce) {
   .cta-sheen::after {
@@ -520,7 +555,12 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 
 /* Дыхание карточки «готов к старту» — единственный CTA ленты зовёт телом,
    а не миганием: медленный (3.2s) пульс primary-света, ниже порога
-   раздражения, выше порога заметности */
+   раздражения, выше порога заметности.
+   3 вдоха и стоп, не infinite — та же логика, что у cta-sheen выше:
+   вечная пульсация карточки, которая может провисеть в чате долго, читается
+   как тик, не как зов. animation-fill-mode: forwards: конец 100%-кадра
+   идентичен состоянию покоя (нет свечения), поэтому финальный кадр не
+   «дёргается» обратно. */
 @keyframes start-card-breathe {
   0%,
   100% {
@@ -537,7 +577,8 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
   }
 }
 .start-card-breathe {
-  animation: start-card-breathe 3.2s ease-in-out infinite;
+  animation: start-card-breathe 3.2s ease-in-out 3;
+  animation-fill-mode: forwards;
 }
 
 /* Док ввода: поле отвечает на фокус тёплым свечением кромки — «напарник
@@ -687,7 +728,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    Все — с reduced-motion фолбэком; ни один не светится неоном (закон Р1).
    ========================================================================== */
 
-/* Э4 · Лунный блик по стеклу: ОДИН проход при появлении э��емента (не hover).
+/* Э4 · Лунный блик по стеклу: ОДИН проход при появлении элемента (не hover).
    Тёплая кость лунного света (hue 95), никогда не лайм. */
 @keyframes glass-shine {
   from { transform: translateX(-140%) skewX(-18deg); }

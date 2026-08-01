@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, Play } from "lucide-react";
+import { CalendarCheck, Play, Sparkles } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -257,7 +257,7 @@ function buildFirstWord(
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или ��апиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -407,7 +407,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, д��ступны ли весточки
+    // Тихо ставим service worker и узнаём, доступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
   }, []);
@@ -440,9 +440,48 @@ export function HomeScreen() {
     setEveningPlanBusy(false);
   }
 
+  // Приветствие — голос персонажа, вырезать нельзя. Но с третьего визита
+  // это уже не знакомство, а стена текста перед единственной нужной
+  // кнопкой — сворачиваем до трёх строк (не двух: первая фраза часто несёт
+  // сам план) с «Дочитать», и только когда голос уже узнан.
+  const [greetingExpanded, setGreetingExpanded] = useState(false);
+  const [greetingOverflows, setGreetingOverflows] = useState(false);
+  const greetingRef = useRef<HTMLParagraphElement>(null);
+  const greetingClamped =
+    !!stats && stats.totalStarts >= 3 && !greetingExpanded;
+
+  useEffect(() => {
+    if (!greetingClamped) {
+      setGreetingOverflows(false);
+      return;
+    }
+    const measure = () => {
+      const el = greetingRef.current;
+      if (el) setGreetingOverflows(el.scrollHeight - el.clientHeight > 2);
+    };
+    measure();
+    // Рукописный Caveat на момент коммита мог ещё не примениться — высота
+    // была бы посчитана по подменному шрифту.
+    let cancelled = false;
+    document.fonts?.ready
+      .then(() => {
+        if (!cancelled) measure();
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [firstWord?.greeting, greetingClamped]);
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <section className="border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
+      {/* max-h + overflow-y-auto: без потолка эта секция на невысоком
+          экране (проверено на 700px) может толкать композер и нав-бар за
+          пределы вьюпорта — карточка награды, форма имени и весточка могут
+          отрендериться одновременно (их условия показа пересекаются, а не
+          взаимоисключают друг друга). Сам scroll-cap — минимально
+          необходимая правка, не откат остальной структуры. */}
+      <section className="max-h-[60svh] overflow-y-auto border-b border-white/[0.06] bg-gradient-to-b from-card/55 via-card/15 to-transparent">
         {/* gap-5/py-6 (пакет Клода): крупные паузы между смысловыми
             блоками — визуальная теснота = когнитивная теснота для СДВГ */}
         <div className="mx-auto flex max-w-md flex-col gap-5 px-4 py-6">
@@ -488,11 +527,29 @@ export function HomeScreen() {
                   className="flex flex-col gap-1 pt-1"
                   initial={reduceMotion ? false : { opacity: 0, y: 5 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                  transition={
+                    reduceMotion
+                      ? { duration: 0 }
+                      : { type: "spring", stiffness: 400, damping: 30 }
+                  }
                 >
-                  <p className="font-hand text-xl leading-snug">
+                  <p
+                    ref={greetingRef}
+                    className={`font-hand text-xl leading-snug ${
+                      greetingClamped ? "line-clamp-3" : ""
+                    }`}
+                  >
                     {firstWord.greeting}
                   </p>
+                  {greetingClamped && greetingOverflows && (
+                    <button
+                      type="button"
+                      onClick={() => setGreetingExpanded(true)}
+                      className="inline-flex min-h-11 w-fit items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Дочитать
+                    </button>
+                  )}
                   {/* Инструкция — системным шрифтом: голос кота и указание
                       интерфейса разделены типографически */}
                   {firstWord.hint && (
@@ -505,124 +562,16 @@ export function HomeScreen() {
             </AnimatePresence>
           </div>
 
-          {firstWord?.actionStep && (
-            <div className="flex flex-col gap-1">
-              <Button
-                size="lg"
-                className="cta-sheen w-full gap-2 font-semibold"
-                onClick={() => startNow(firstWord.actionStep as string)}
-              >
-                <Play className="size-4 shrink-0" aria-hidden="true" />
-                {/* Задача — в лейбле (как в проде было «Повторить: …»):
-                    кнопка с конкретикой снимает последнюю микро-неопределённость
-                    «а что именно начнётся?» — labeled CTA конвертит лучше
-                    generic (исследования NN/g по link labels). trimLabel
-                    защищает от длинных задач. */}
-                <span className="truncate">
-                  Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
-                </span>
-              </Button>
-              {/* Выход «Другое дело» (пакет Клода): явный второй путь —
-                  для СДВГ отсутствие альтернативы у единственного CTA
-                  читается как ловушка и подталкивает к избеганию */}
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-10 self-center text-muted-foreground"
-                onClick={() => router.push("/app/session")}
-              >
-                Другое дело
-              </Button>
-            </div>
-          )}
-
-          {/* К-Б → М1 → С3 · Главное действие в ОДИН тап и с нулевым решением:
-              опытный пользователь получал больше трения, чем новичок
-              (3 тапа против 1). Очередь дробления приоритетнее повтора:
-              «следующий шаг» продолжает начатую задачу; без очереди —
-              повтор последнего шага; «Другое дело» — сетап для нового */}
-          {stats &&
-            stats.totalStarts > 0 &&
-            !firstWord?.actionStep &&
-            !firstWord?.showStarterChips && (
-              <div
-                className={
-                  firstWord?.nightMode
-                    ? // Ночная инверсия порядка: договор на утро выше, старт
-                      // ниже. order работает, потому что оба блока — сиблинги
-                      // одной flex-колонки.
-                      "order-2 flex flex-col gap-2"
-                    : "flex flex-col gap-2"
-                }
-              >
-                {/*
-                  НОЧНАЯ ИНВЕРСИЯ АКЦЕНТА (уникальная механика этого экрана).
-                  Днём это кнопка-герой: лаймовая заливка, size lg, полная
-                  ширина — намеренно самый тяжёлый объект экрана.
-                  В 4:14 та же кнопка кричала «Повторить: «…»» ровно поверх
-                  реплики «ночь — не время начинать»: два взаимоисключающих
-                  приказа в одном кадре, и побеждал более контрастный —
-                  визуальный вес важнее текста.
-                  Ночью она становится тихой ghost-строкой: путь к старту
-                  сохранён полностью (никакой блокировки — запрет породил бы
-                  реактивное сопротивление), но перестаёт быть точкой
-                  притяжения взгляда. Закон Фиттса, применённый наоборот:
-                  трение до действия повышается осознанно, потому что
-                  вредное в этот час действие — именно старт.
-                */}
-                <Button
-                  size={firstWord?.nightMode ? "sm" : "lg"}
-                  variant={firstWord?.nightMode ? "ghost" : "default"}
-                  className={
-                    firstWord?.nightMode
-                      ? "h-10 gap-2 self-center text-muted-foreground"
-                      : "w-full gap-2 font-semibold"
-                  }
-                  onClick={() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    return quick
-                      ? router.push(
-                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                        )
-                      : router.push("/app/session");
-                  }}
-                >
-                  {!firstWord?.nightMode && (
-                    <Play className="size-4" aria-hidden="true" />
-                  )}
-                  {(() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    if (!quick) return "Начать сессию";
-                    // Обрезка по границе слова: рваное «созда…» на
-                    // кнопке-герое читается как брак
-                    const short = trimLabel(quick, 22);
-                    // Ночью — честная формулировка выбора, а не приглашение
-                    if (firstWord?.nightMode) return "Всё равно начать сейчас";
-                    return queuedStep
-                      ? `Следующий шаг: «${short}»`
-                      : `Повторить: «${short}»`;
-                  })()}
-                </Button>
-                {/* «Другое дело» ночью убрано: в 4 утра лишняя ветка выбора
-                    (закон Хика) работает против единственной верной цели —
-                    закрыть день одним тапом */}
-                {lastStepLabel && !firstWord?.nightMode && (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-10 self-center text-muted-foreground"
-                    onClick={() => router.push("/app/session")}
-                  >
-                    Другое дело
-                  </Button>
-                )}
-              </div>
-            )}
-
           {/* Вечерний договор в один тап: шаг уже известен продукту
               (очередь дробления или последний старт) — человеку остаётся
               только согласиться. Приоритет очереди: продолжение начатой
-              задачи (Zeigarnik) сильнее повтора. */}
+              задачи (Zeigarnik) сильнее повтора.
+              Стоит ВЫШЕ ghost-кнопки старта ниже намеренно (порядок в
+              разметке, не CSS order): раньше здесь была пара order-1/
+              order-2 — но order сортирует ВСЕ flex-сиблинги колонки, а не
+              только эти два блока, поэтому оба реально уезжали в конец
+              экрана, за карточку награды и форму имени. Простой порядок в
+              JSX не ломается соседними order:0 элементами. */}
           {firstWord?.offerEveningPlan && (queuedStep ?? lastStepLabel) && (
             <button
               type="button"
@@ -630,10 +579,9 @@ export function HomeScreen() {
               disabled={eveningPlanBusy}
               className={
                 firstWord?.nightMode
-                  ? // Ночью карточка — единственный акцент экрана, поэтому
-                    // поднята выше кнопки старта (order-1) и получает
+                  ? // Ночью карточка — единственный акцент экрана, получает
                     // кольцо primary: тот же вес, что днём у кнопки-героя
-                    "glass glass-interactive press order-1 flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left ring-1 ring-primary/30 disabled:opacity-60"
+                    "glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left ring-1 ring-primary/30 disabled:opacity-60"
                   : "glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left disabled:opacity-60"
               }
             >
@@ -667,6 +615,52 @@ export function HomeScreen() {
             </button>
           )}
 
+          {/* М2 fused: действие обычно живёт ВНУТРИ карточки награды ниже
+              (действие и его награда в одной рамке). Ночью — исключение:
+              здесь остаётся тихая ghost-строка вне карточки, потому что
+              весь смысл ночного режима — НЕ привлекать взгляд к старту, а
+              карточка награды сама по себе яркая точка притяжения. */}
+          {stats &&
+            stats.totalStarts > 0 &&
+            !firstWord?.actionStep &&
+            !firstWord?.showStarterChips &&
+            firstWord?.nightMode && (
+              <div className="flex flex-col gap-2">
+                {/*
+                  НОЧНАЯ ИНВЕРСИЯ АКЦЕНТА (уникальная механика этого экрана).
+                  Днём это кнопка-герой: лаймовая заливка, size lg, полная
+                  ширина — намеренно самый тяжёлый объект экрана.
+                  В 4:14 та же кнопка кричала «Повторить: «…»» ровно поверх
+                  реплики «ночь — не время начинать»: два взаимоисключающих
+                  приказа в одном кадре, и побеждал более контрастный —
+                  визуальный вес важнее текста.
+                  Ночью она становится тихой ghost-строкой: путь к старту
+                  сохранён полностью (никакой блокировки — запрет породил бы
+                  реактивное сопротивление), но перестаёт быть точкой
+                  притяжения взгляда. Закон Фиттса, применённый наоборот:
+                  трение до действия повышается осознанно, потому что
+                  вредное в этот час действие — именно старт.
+                */}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-10 gap-2 self-center text-muted-foreground"
+                  onClick={() => {
+                    const quick = queuedStep ?? lastStepLabel;
+                    return quick
+                      ? router.push(
+                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                        )
+                      : router.push("/app/session");
+                  }}
+                >
+                  {/* Ночью — честная формулировка выбора, а не приглашение,
+                      вне зависимости от того, есть ли известный шаг */}
+                  Всё равно начать сейчас
+                </Button>
+              </div>
+            )}
+
           {firstWord?.showStarterChips && (
             <div className="flex flex-col gap-2">
               <p className="text-xs leading-relaxed text-muted-foreground">
@@ -687,7 +681,7 @@ export function HomeScreen() {
           )}
 
           {/* Весточки от напарника: предлагаем один раз, после того как
-              человек уже назвал суще��тво. Только там, где браузер их умеет.
+              человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
           {checkinState === "available" && !!companionName && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
@@ -730,19 +724,15 @@ export function HomeScreen() {
             </p>
           )}
 
-          {/* М2 · Goal gradient: ближайшая цель прогрессии видна прямо с
-              Дома (раньше — только в Мире). Показывается и новичку с нуля
-              стартов — призрачный силуэт первой находки работает сильнее,
-              чем голая строка «Каждый старт растит остров»: конкретное
-              обещание вместо абстракции. До 10-го старта — следующий
-              ориентир с силуэтом; дальше — счёт редких находок */}
+          {/* М2 · Goal gradient: слитая карточка — действие и его награда в
+              одной рамке. Раньше здесь стояли два раздельных объекта (кнопка
+              сверху, карточка награды снизу); слитые — карточка перестаёт быть
+              целиком-Link (внутри неё теперь живёт кнопка со своим переходом:
+              кнопка внутри <a> кликалась бы одновременно с переходом самой
+              ссылки — невалидно). Вместо этого «весь остров →» — свои
+              маленькие ссылки в каждой ветке ниже. */}
           {stats && (
-            <Link
-              href="/app/world"
-              // relative + overflow-hidden: внутри живёт лунная аура.
-              // Тонкая тёплая кромка сверху — свет костра касается карты
-              className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4"
-            >
+            <div className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
                   {/* Аура за силуэтом: холодный лунный свет из угла карты.
@@ -777,7 +767,7 @@ export function HomeScreen() {
                       </span>
                     </span>
                   </span>
-                  {/* Endowed progress (Nunes & Drèze, 2006): видим��я
+                  {/* Endowed progress (Nunes & Drèze, 2006): видимая
                       заполненная часть пути к находке. Только при
                       totalStarts > 0 — пустой бар у новичка демотивирует */}
                   {stats.totalStarts > 0 && (
@@ -820,9 +810,12 @@ export function HomeScreen() {
                               ? ' · вырос сегодня'
                               : ''}
                         </span>
-                        <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                        <Link
+                          href="/app/world"
+                          className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                        >
                           весь остров →
-                        </span>
+                        </Link>
                       </span>
                     </span>
                   )}
@@ -858,31 +851,131 @@ export function HomeScreen() {
                       <span className="min-w-0 font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
                         {LANDMARK_COUNT} ориентиров ждут
                       </span>
-                      <span className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary">
+                      <Link
+                        href="/app/world"
+                        className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                      >
                         весь остров →
-                      </span>
+                      </Link>
                     </span>
                   )}
+                  {/* Вариативный слой награды — раньше этот текст жил только
+                      в ветке totalStarts >= LANDMARK_COUNT ниже, то есть
+                      впервые появлялся ПОСЛЕ десятого старта, хотя drawFind
+                      (island-elements.ts) уже считает находку на каждый
+                      старт с первого. Перенесено сюда, к раннему окну
+                      удержания. */}
+                  <span
+                    className={`flex items-center gap-1.5 text-xs leading-snug ${
+                      pityRipe ? "text-primary" : "text-muted-foreground"
+                    }`}
+                  >
+                    <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
+                    {pityRipe
+                      ? "Следующая находка будет необычной — или лучше"
+                      : "И одна находка на остров — какая, не знаю сам"}
+                  </span>
                 </>
               ) : pityRipe ? (
-                <span className="text-sm leading-snug text-muted-foreground">
-                  Следующая находка будет{" "}
-                  <span className="font-semibold text-reward">
-                    необычной — или лучше
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    Следующая находка будет{" "}
+                    <span className="font-semibold text-reward">
+                      необычной — или лучше
+                    </span>
+                    .
                   </span>
-                  . Она уже ждёт →
-                </span>
+                  <Link
+                    href="/app/world"
+                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                  >
+                    она уже ждёт →
+                  </Link>
+                </div>
               ) : (
-                <span className="text-sm leading-snug text-muted-foreground">
-                  Редких находок:{" "}
-                  <span className="font-semibold text-reward">
-                    {rareFound} из{" "}
-                    {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
-                  </span>{" "}
-                  — полная сессия повышает шанс →
-                </span>
+                <div className="flex flex-col gap-1">
+                  <span className="text-sm leading-snug text-muted-foreground">
+                    Редких находок:{" "}
+                    <span className="font-semibold text-reward">
+                      {rareFound} из{" "}
+                      {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
+                    </span>{" "}
+                    — полная сессия повышает шанс.
+                  </span>
+                  <Link
+                    href="/app/world"
+                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                  >
+                    весь остров →
+                  </Link>
+                </div>
               )}
-            </Link>
+
+              {/* Действие — внутри той же рамки, что и его награда (по
+                  вашей просьбе в этой сессии). Ночью действие сюда не
+                  переезжает — см. комментарий у ghost-кнопки выше. */}
+              {firstWord?.actionStep ? (
+                <div className="flex flex-col gap-1">
+                  <Button
+                    size="lg"
+                    className="cta-sheen w-full gap-2 font-semibold"
+                    onClick={() => startNow(firstWord.actionStep as string)}
+                  >
+                    <Play className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">
+                      Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
+                    </span>
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-10 self-center text-muted-foreground"
+                    onClick={() => router.push("/app/session")}
+                  >
+                    Другое дело
+                  </Button>
+                </div>
+              ) : (
+                stats.totalStarts > 0 &&
+                !firstWord?.showStarterChips &&
+                !firstWord?.nightMode && (
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="lg"
+                      className="cta-sheen w-full gap-2 font-semibold"
+                      onClick={() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        return quick
+                          ? router.push(
+                              `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                            )
+                          : router.push("/app/session");
+                      }}
+                    >
+                      <Play className="size-4" aria-hidden="true" />
+                      {(() => {
+                        const quick = queuedStep ?? lastStepLabel;
+                        if (!quick) return "Начать сессию";
+                        const short = trimLabel(quick, 22);
+                        return queuedStep
+                          ? `Следующий шаг: «${short}»`
+                          : `Повторить: «${short}»`;
+                      })()}
+                    </Button>
+                    {lastStepLabel && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-10 self-center text-muted-foreground"
+                        onClick={() => router.push("/app/session")}
+                      >
+                        Другое дело
+                      </Button>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
           )}
 
           {/* Порядок сверху вниз = приоритет: действие (CTA) → награда

@@ -14,7 +14,6 @@ import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene, Moon } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
 import { SPRING_SNAPPY } from "@/lib/motion";
-import { hapticDone } from "@/lib/haptics";
 import { playPurr } from "@/lib/reward-sound";
 
 /**
@@ -97,51 +96,74 @@ function WordReveal({
   );
 }
 
+/**
+ * Реплика кота в чате. Раньше дописывалась посимвольно (`text.slice(0,
+ * shown)`) — пузырь физически рос вместе с текстом 1.7с, и рукописная
+ * пометка под ним ехала вниз следом (layout reflow на каждый символ).
+ * Тот же приём, что уже верно сделан в WordReveal выше: весь текст сразу
+ * в разметке (пузырь с первого кадра нужной высоты), проявляются только
+ * слова через opacity — реflow ноль, ощущение «печатает» остаётся за
+ * счёт последовательного появления слов, а не за счёт роста контейнера.
+ */
 function TypedLine({ text, onDone }: { text: string; onDone?: () => void }) {
   const reduceMotion = useReducedMotion();
-  const [shown, setShown] = useState(reduceMotion ? text.length : 0);
+  const words = text.split(" ");
+  const startDelay = 0.05;
+  const step = 0.045;
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
-  const finishRef = useRef<() => void>(() => {});
+  const firedRef = useRef(false);
+  const [skipped, setSkipped] = useState(false);
 
   useEffect(() => {
-    if (reduceMotion) {
+    firedRef.current = false;
+    const fireDone = () => {
+      if (firedRef.current) return;
+      firedRef.current = true;
       onDoneRef.current?.();
+    };
+    if (reduceMotion) {
+      fireDone();
       return;
     }
-    let done = false;
-    const fireDone = () => {
-      if (!done) {
-        done = true;
-        onDoneRef.current?.();
-      }
-    };
-    let i = 0;
-    const id = setInterval(() => {
-      i += 1;
-      setShown(i);
-      if (i >= text.length) {
-        clearInterval(id);
-        fireDone();
-      }
-    }, 16);
-    finishRef.current = () => {
-      clearInterval(id);
-      setShown(text.length);
-      fireDone();
-    };
-    return () => clearInterval(id);
+    // Вся фраза проявлена + небольшой запас на длительность самого fade-in
+    // (hero-word: 0.32s) — момент, когда последнее слово реально видно.
+    const totalMs = (startDelay + words.length * step) * 1000 + 320;
+    const id = window.setTimeout(fireDone, totalMs);
+    return () => window.clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text, reduceMotion]);
+
+  function skip() {
+    setSkipped(true);
+    if (!firedRef.current) {
+      firedRef.current = true;
+      onDoneRef.current?.();
+    }
+  }
 
   return (
     <p
       className="font-hand text-xl leading-snug text-secondary-foreground md:text-2xl"
-      onClick={() => finishRef.current()}
+      onClick={skip}
     >
-      {text.slice(0, shown)}
-      {shown < text.length && (
-        <span className="ml-0.5 inline-block h-[0.9em] w-0.5 animate-pulse rounded bg-primary align-middle" />
-      )}
+      <span className="sr-only">{text}</span>
+      <span aria-hidden="true">
+        {words.map((word, i) => (
+          <span key={i}>
+            <span
+              className="hero-word"
+              style={
+                skipped
+                  ? { animationDuration: "0.01s", animationDelay: "0s" }
+                  : { animationDelay: `${(startDelay + i * step).toFixed(2)}s` }
+              }
+            >
+              {word}
+            </span>{" "}
+          </span>
+        ))}
+      </span>
     </p>
   );
 }
@@ -187,10 +209,12 @@ export function Hero() {
 
   // Э2 · Погладить кота: ни одно касание экрана не должно быть мёртвым.
   // Тап → искренний восторг (искры, широкие зрачки, виляние хвостом) +
-  // едва ощутимая хаптика. Таймер сбрасывается при повторных тапах.
+  // мурлыканье. Таймер сбрасывается при повторных тапах.
+  // Без хаптики: это декоративная шутка лендинга, не продуктовое
+  // достижение — вибрация здесь спорила бы по весу с hapticDone на
+  // завершении настоящей рабочей сессии.
   const petTimerRef = useRef<number | null>(null);
   function petCat() {
-    hapticDone();
     playPurr();
     setExpression("excited");
     if (petTimerRef.current) window.clearTimeout(petTimerRef.current);
@@ -199,6 +223,14 @@ export function Hero() {
       1600,
     );
   }
+
+  // D3 · Раньше 550мс между отправленной репликой и ответом кота были
+  // тишиной без единого сигнала — не ноль (мгновенный честный ответ) и не
+  // настоящее предвкушение (сигнал «печатает»), а худшее из двух: пауза,
+  // которую мозг читает как «сайт завис», а не как «он думает». Тот же
+  // паттерн точек, что уже есть в companion-chat.tsx — переиспользован,
+  // не изобретён заново.
+  const [typing, setTyping] = useState(false);
 
   function choose(key: ReplyKey) {
     setAnswered(true);
@@ -209,7 +241,9 @@ export function Hero() {
       // приватный режим — не критично
     }
     setSteps([{ kind: "visitor", text: REPLIES[key].visitor, replyKey: key }]);
+    setTyping(true);
     setTimeout(() => {
+      setTyping(false);
       setSteps((prev) => [
         ...prev,
         { kind: "companion", text: REPLIES[key].companion },
@@ -406,8 +440,12 @@ export function Hero() {
                 // rounded-2xl: радиус единый с чипами и пузырём. А4: после
                 // ответа в диалоге кнопка «нагревается» — тёплая нижняя грань
                 // усиливается (событийное изменение, дофаминовый мостик
-                // диалог → действие), переход мягкий 700мс
-                className={`press w-full max-w-xs rounded-2xl font-semibold transition-shadow duration-700 sm:w-auto sm:px-10 ${
+                // диалог → действие), переход мягкий 700мс.
+                // .press-warm, не .press: transition — shorthand-свойство,
+                // .press (transform 120ms) и отдельный transition-shadow на
+                // одном элементе не складываются — тень никогда не
+                // «нагревалась» бы плавно.
+                className={`press-warm w-full max-w-xs rounded-2xl font-semibold sm:w-auto sm:px-10 ${
                   ctaBoost
                     ? "shadow-[inset_0_1px_0_oklch(1_0_0/0.5),inset_0_-9px_18px_-9px_oklch(0.68_0.17_75/0.75),0_14px_30px_-14px_oklch(0_0_0/0.6)]"
                     : "shadow-[inset_0_1px_0_oklch(1_0_0/0.45),inset_0_-8px_16px_-10px_oklch(0.55_0.18_130/0.6),0_14px_28px_-14px_oklch(0_0_0/0.6)]"
@@ -538,6 +576,27 @@ export function Hero() {
                     </p>
                   </motion.div>
                 ),
+              )}
+              {typing && (
+                <motion.div
+                  key="typing"
+                  initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={SPRING_SNAPPY}
+                  className="flex items-center gap-1 self-start rounded-2xl rounded-tl-sm border border-white/5 bg-secondary/85 px-4 py-3 shadow-xl backdrop-blur-md"
+                  aria-label="Напарник печатает"
+                >
+                  <span
+                    className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                    style={{ animationDelay: "-0.3s" }}
+                  />
+                  <span
+                    className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                    style={{ animationDelay: "-0.15s" }}
+                  />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                </motion.div>
               )}
             </AnimatePresence>
 
