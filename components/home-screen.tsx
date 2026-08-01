@@ -259,7 +259,7 @@ function buildFirstWord(
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сег��дня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -669,7 +669,7 @@ export function HomeScreen() {
                   визуальный вес важнее текста.
                   Ночью она становится тихой ghost-строкой: путь к старту
                   сохранён полностью (никакой блокировки — запрет породил бы
-                  реактивное сопротивление), но перестаёт быть точкой
+                  реактивное сопротивление), но переста��т быть точкой
                   притяжения взгляда. Закон Фиттса, применённый наоборот:
                   трение до действия повышается осознанно, потому что
                   вредное в этот час действие — именно старт.
@@ -1029,16 +1029,26 @@ export function HomeScreen() {
                   переезжает — см. комментарий у ghost-кнопки выше. */}
               {firstWord?.actionStep ? (
                 <div className="flex flex-col gap-1">
-                  <Button
-                    size="lg"
-                    className="cta-sheen w-full gap-2 font-semibold"
-                    onClick={() => startNow(firstWord.actionStep as string)}
-                  >
-                    <Play className="size-4 shrink-0" aria-hidden="true" />
-                    <span className="truncate">
-                      Начинаю: «{trimLabel(firstWord.actionStep, 28)}»
-                    </span>
-                  </Button>
+                        {/* Шаг на кнопке НЕ обрезаем. Проверено в браузере на
+                            реальном плане: trimLabel(28) + truncate давали
+                            «Начинаю: „открыть файл и перечитат…"» — человек
+                            видел обрубок ровно того текста, ради которого
+                            кнопка существует. Весь смысл первого шага в том,
+                            что он крошечный и конкретный: «перечитать
+                            последний абзац» снимает страх, «перечитат…» его
+                            добавляет — мозг достраивает неизвестный объём.
+                            Кнопка растёт в высоту под текст, а не режет его:
+                            две строки здесь дешевле, чем потерянный старт. */}
+                        <Button
+                          size="lg"
+                          className="cta-sheen h-auto w-full items-start gap-2 py-3 font-semibold whitespace-normal"
+                          onClick={() => startNow(firstWord.actionStep as string)}
+                        >
+                          <Play className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                          <span className="text-left leading-snug text-pretty">
+                            Начинаю: «{firstWord.actionStep}»
+                          </span>
+                        </Button>
                   <Button
                     size="sm"
                     variant="ghost"

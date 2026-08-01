@@ -937,9 +937,16 @@ export function FocusSession() {
             {nextUp.tease}
           </p>
         )}
+        {/* whitespace-normal — не косметика. Button по умолчанию несёт
+            whitespace-nowrap + shrink-0 (проверено в components/ui/button.tsx),
+            поэтому кнопка с подставленным шагом не сжимается и не переносится,
+            а РАСПИРАЕТ контейнер за край экрана — на 320px это гарантированно.
+            Разрешаем перенос и рост в высоту, как у «Начинаю» на Доме: лимит
+            щедрый (60) и режет по границе слова, чтобы обрубок первого шага не
+            добавлял страха вместо того, чтобы его снимать. */}
         <Button
           size="lg"
-          className="font-semibold"
+          className="h-auto py-3 font-semibold whitespace-normal"
           onClick={() => {
             // Очередь дробления сама подставляет следующий микрошаг —
             // продолжение той же работы в один тап
@@ -950,7 +957,9 @@ export function FocusSession() {
             setPhase('setup')
           }}
         >
-          {nextUp.step ? `Ещё одна: «${trimLabel(nextUp.step, 26)}»` : 'Ещё одна сессия'}
+          <span className="text-pretty">
+            {nextUp.step ? `Ещё одна: «${trimLabel(nextUp.step, 60)}»` : 'Ещё одна сессия'}
+          </span>
         </Button>
         <Button
           render={<Link href="/app/world" />}
