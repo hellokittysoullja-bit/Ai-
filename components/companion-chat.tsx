@@ -699,8 +699,12 @@ export function CompanionChat({
                   }`}
                 >
                   {formatClock(thisTime)}
+                  {/* text-primary: галочка «доставлено» — акцентный сигнал
+                      подтверждения (тот же приём, что синие галочки в
+                      мессенджерах), не просто ещё один серый символ рядом
+                      с временем */}
                   {isUser && status !== 'streaming' && status !== 'submitted' && (
-                    <Check className="size-3" aria-hidden="true" />
+                    <Check className="size-3 text-primary" aria-hidden="true" />
                   )}
                 </span>
               )}
