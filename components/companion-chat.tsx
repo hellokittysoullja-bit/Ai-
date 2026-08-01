@@ -420,7 +420,7 @@ export function CompanionChat({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 22 }}
             >
-              <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                 можно просто нажать
               </span>
               <div className="flex flex-wrap gap-2">
@@ -459,7 +459,7 @@ export function CompanionChat({
                   из чата прямо к сессии */}
               <Link
                 href="/app/session"
-                className="mt-1 inline-flex min-h-11 w-fit items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
+                className="mt-1 inline-flex min-h-11 w-fit items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
               >
                 или сразу к делу
                 <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -505,7 +505,7 @@ export function CompanionChat({
             <div key={message.id} className="flex flex-col gap-2">
               {showDayDivider && (
                 <div className="my-1 flex items-center justify-center">
-                  <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                  <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
                     {formatDayLabel(thisTime)}
                   </span>
                 </div>
@@ -560,7 +560,7 @@ export function CompanionChat({
                       key={i}
                       className="chat-bubble-cat ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3"
                     >
-                      <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-primary">
+                      <span className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-primary">
                         <CalendarCheck className="size-3.5" aria-hidden="true" />
                         план положен
                       </span>
@@ -585,7 +585,7 @@ export function CompanionChat({
                       className="glass start-card-breathe ml-10 flex max-w-[85%] flex-col gap-2 rounded-2xl px-4 py-3"
                       style={{ '--glass-border': 'color-mix(in oklab, var(--primary) 45%, transparent)' } as CSSProperties}
                     >
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-primary">
+                      <span className="font-mono text-xs uppercase tracking-widest text-primary">
                         готов к старту · {d} мин
                       </span>
                       <span className="text-sm font-semibold">{firstStep}</span>
@@ -604,7 +604,7 @@ export function CompanionChat({
                       {/* Связка «нажал → выросло» видна и внутри самого
                           диалога, не только в карточке вехи наверху экрана —
                           та же механика упомянута там, где реально жмут. */}
-                      <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                         <Sprout className="size-3.5 shrink-0 text-primary/70" aria-hidden="true" />
                         этот старт вырастит что-то на острове
                       </span>
@@ -617,7 +617,7 @@ export function CompanionChat({
                   return (
                     <span
                       key={i}
-                      className="ml-10 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-muted-foreground"
+                      className="ml-10 flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-muted-foreground"
                     >
                       <Sparkles className="size-3" aria-hidden="true" />
                       запомнил: {fact}
@@ -633,7 +633,7 @@ export function CompanionChat({
                   (не во время стриминга: секунду назад это было бы ложью). */}
               {isLastOfGroup && thisTime && (
                 <span
-                  className={`flex items-center gap-1 px-1 font-mono text-[10px] text-muted-foreground/70 ${
+                  className={`flex items-center gap-1 px-1 font-mono text-xs text-muted-foreground/70 ${
                     isUser ? 'justify-end' : 'justify-start'
                   }`}
                 >

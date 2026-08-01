@@ -625,7 +625,7 @@ export function HomeScreen() {
                   </span>
                 </span>
               </span>
-              <span className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-primary">
+              <span className="shrink-0 font-mono text-xs uppercase tracking-widest text-primary">
                 {eveningPlanBusy ? "кладу…" : "один тап"}
               </span>
             </button>
@@ -775,7 +775,7 @@ export function HomeScreen() {
                       {landmarkNodes[stats.totalStarts]}
                     </svg>
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+                      <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                         Следующий старт вырастит
                       </span>
                       <span className="text-lg font-semibold leading-snug text-foreground text-balance">
@@ -818,7 +818,7 @@ export function HomeScreen() {
                         {/* Вербальный фрейминг близости (goal-gradient,
                             Kivetz 2006): «остался последний» сильнее голого
                             счёта */}
-                        <span className="font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                        <span className="font-mono text-xs uppercase tracking-wider tabular-nums text-muted-foreground">
                           {stats.totalStarts} из {LANDMARK_COUNT}
                           {LANDMARK_COUNT - stats.totalStarts === 1
                             ? ' · остался последний'
@@ -830,7 +830,7 @@ export function HomeScreen() {
                             трогая визуальную высоту строки (WCAG 2.5.8) */}
                         <Link
                           href="/app/world"
-                          className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                          className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                         >
                           весь остров →
                         </Link>
@@ -866,12 +866,12 @@ export function HomeScreen() {
                   */}
                   {stats.totalStarts === 0 && (
                     <span className="flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 font-mono text-[11px] uppercase tracking-wider tabular-nums text-muted-foreground">
+                      <span className="min-w-0 font-mono text-xs uppercase tracking-wider tabular-nums text-muted-foreground">
                         {LANDMARK_COUNT} ориентиров ждут
                       </span>
                       <Link
                         href="/app/world"
-                        className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                        className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                       >
                         весь остров →
                       </Link>
@@ -905,7 +905,7 @@ export function HomeScreen() {
                   </span>
                   <Link
                     href="/app/world"
-                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                   >
                     она уже ждёт →
                   </Link>
@@ -922,7 +922,7 @@ export function HomeScreen() {
                   </span>
                   <Link
                     href="/app/world"
-                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                   >
                     весь остров →
                   </Link>
