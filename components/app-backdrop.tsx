@@ -250,7 +250,7 @@ export function AppBackdrop() {
           Дышит только грудная клетка (7s). Сидит на 118px — ниже пузырей,
           выше таб-бара. */}
       <svg
-        className="absolute bottom-[188px] left-1/2 h-auto w-[clamp(3rem,9vw,4.2rem)] -translate-x-[300%]"
+        className="absolute bottom-[168px] left-[6%] h-auto w-[clamp(2.4rem,6.5vw,3.1rem)]"
         viewBox="0 0 40 44"
       >
         {/* Ореол от очага: край силуэта, обращённый к огню, ловит тепло */}

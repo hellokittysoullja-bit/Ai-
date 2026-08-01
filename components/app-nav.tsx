@@ -84,7 +84,7 @@ export function AppNav() {
               {active && (
                 <motion.span
                   layoutId="nav-pill"
-                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  transition={SPRING_GESTURE}
                   className="absolute inset-0 rounded-2xl bg-primary/10"
                   style={{
                     boxShadow:

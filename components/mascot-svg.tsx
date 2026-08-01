@@ -72,8 +72,8 @@ export function MascotSvg({
   const excited = expression === "excited";
 
   /* Зрачки следят за курсором */
-  const px = useSpring(0, { stiffness: 140, damping: 16 });
-  const py = useSpring(0, { stiffness: 140, damping: 16 });
+  const px = useSpring(0, SPRING_GAZE);
+  const py = useSpring(0, SPRING_GAZE);
 
   useEffect(() => {
     if (reduceMotion || sleepy || !inView) {

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
@@ -13,10 +13,15 @@ import {
   ArrowUp,
   CalendarCheck,
   Check,
+  Mic,
   Play,
   Sparkles,
   Sprout,
+  Square,
+  X,
 } from 'lucide-react'
+import { useDictation } from '@/hooks/use-dictation'
+import { PullToStretch } from '@/components/pull-to-stretch'
 import { hapticStart } from '@/lib/haptics'
 import { ChatBubble, type Reaction } from '@/components/chat-bubble'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
@@ -50,6 +55,10 @@ type CompanionChatProps = {
       открывается СВЕРХУ (человек видит контекст и приветствие), а не
       проматывается к последней реплике. */
   header?: ReactNode
+  /** #23 · Обновление данных по pull-to-refresh. Передаётся только там, где
+      наверху ленты реально есть что обновлять (карточки «Дома») — в чистом
+      чате жест был бы пустым обещанием. */
+  onPullRefresh?: () => Promise<void> | void
 }
 
 function CompanionAvatar({
@@ -172,6 +181,7 @@ export function CompanionChat({
   onPlanSaved,
   showSuggestions = true,
   header,
+  onPullRefresh,
 }: CompanionChatProps) {
   const router = useRouter()
   const [input, setInput] = useState('')
@@ -197,11 +207,30 @@ export function CompanionChat({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [input])
 
+  // Контекст держим И в ref (тело запроса читает его без рендера), И в
+  // state: от него зависят быстрые ответы (#16), а ref перерисовку не
+  // вызывает. clientHour тоже в state — на сервере часа клиента нет, и
+  // расчёт чипов прямо в рендере дал бы расхождение гидратации.
+  const [memoryCtx, setMemoryCtx] = useState<MemoryContext | null>(null)
+  const [clientHour, setClientHour] = useState<number | null>(null)
+
   useEffect(() => {
+    setClientHour(new Date().getHours())
     buildMemoryContext().then((m) => {
       memoryRef.current = m
+      setMemoryCtx(m)
     })
   }, [])
+
+  const suggestionChips = useMemo(
+    () =>
+      clientHour === null
+        ? // До монтирования — нейтральный набор, совпадающий с серверной
+          // разметкой: подсказки не должны прыгать на первом кадре.
+          ['Не могу заставить себя начать', 'Раздроби мне задачу', 'Просто тяжело сегодня']
+        : buildSuggestions(memoryCtx, clientHour),
+    [memoryCtx, clientHour],
+  )
 
   const { messages, sendMessage, status, addToolOutput, setMessages } = useChat({
     transport: new DefaultChatTransport({
@@ -258,7 +287,11 @@ export function CompanionChat({
           startTime?: string
         }
         savePlan({ task, firstStep, startTime }).then(async () => {
-          memoryRef.current = await buildMemoryContext()
+          const fresh = await buildMemoryContext()
+          memoryRef.current = fresh
+          // Чипы читают память из state — без этого «Поехали: <первый шаг>»
+          // не появится до перезагрузки, хотя план уже сохранён.
+          setMemoryCtx(fresh)
           onPlanSaved?.()
           addToolOutput({
             tool: 'savePlan',
@@ -341,7 +374,7 @@ export function CompanionChat({
   // scrollIntoView на каждом токене дёргал ленту.
   //
   // Скроллим сам контейнер, а не через scrollIntoView на маркере: при
-  // восстановлении переписки из памяти лента открывалась на scrollTop 0 —
+  // восстановлении переписки из памяти лент�� открывалась на scrollTop 0 —
   // человек видел САМОЕ СТАРОЕ сообщение, а свежее было срезано нижней
   // кромкой. Обещание «он тебя помнит» встречало старым контекстом.
   // Первый скролл — мгновенный (это не анимация, это стартовая позиция),
@@ -475,16 +508,31 @@ export function CompanionChat({
     if (replyTo) textareaRef.current?.focus()
   }, [replyTo])
 
+  // #15 · Диктовка дописывает распознанное в конец поля, а не заменяет его:
+  // человек мог начать печатать, потом переключиться на голос.
+  const dictation = useDictation((text) => {
+    setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
+  })
+
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
   function submit() {
     if (!input.trim() || !canSend) return
+    // Диктовка активна — отправка её закрывает: иначе микрофон продолжает
+    // писать в уже опустевшее поле.
+    if (dictation.listening) dictation.stop()
     // Подтверждение телом в момент отправки: действие получает отклик
     // раньше, чем придёт ответ по сети.
     hapticStart()
-    sendMessage({ text: input })
+    // #12 · Цитату передаём модели как контекст, а не как украшение в UI:
+    // ответ «на это» бессмысленен, если напарник не знает, на что именно.
+    const text = replyTo
+      ? `> ${replyTo.text.replace(/\n/g, ' ')}\n\n${input}`
+      : input
+    sendMessage({ text })
     setInput('')
+    setReplyTo(null)
     setSendCount((c) => c + 1)
   }
 
@@ -520,6 +568,12 @@ export function CompanionChat({
           верхние 24px прокручиваемого содержимого: уходящее сообщение
           именно РАСТВОРЯЕТСЯ, а не отрезается. Маска не влияет ни на
           вёрстку, ни на попадание по элементам. */}
+      {/* #23 · Кот потягивается при pull-to-refresh. Рендерим только там, где
+          наверху ленты реально есть что обновлять (передан onPullRefresh):
+          жест без результата хуже, чем отсутствие жеста. */}
+      {onPullRefresh && (
+        <PullToStretch scrollRef={scrollRef} onRefresh={onPullRefresh} />
+      )}
       <div
         ref={scrollRef}
         // Верхняя маска-затухание — только БЕЗ шапки. С закреплённым
@@ -550,7 +604,7 @@ export function CompanionChat({
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+            transition={SPRING_ITEM}
           >
             <CompanionAvatar />
             {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
@@ -567,7 +621,7 @@ export function CompanionChat({
               className="ml-10 flex flex-col gap-2"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 22 }}
+              transition={{ ...SPRING_ITEM, delay: 0.35 }}
             >
               <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                 можно просто нажать
@@ -587,12 +641,9 @@ export function CompanionChat({
                     }}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: 0.4 + ci * 0.045,
-                      type: 'spring',
-                      stiffness: 300,
-                      damping: 24,
-                    }}
+                    // #27 · Чипы приходят лестницей после приветствия:
+                    // stagger из lib/motion — один шаг ритма на весь продукт.
+                    transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
                     className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
                   >
                     {chip}
@@ -688,7 +739,7 @@ export function CompanionChat({
                       transition={
                         reduceMotion
                           ? { duration: 0.15 }
-                          : { type: 'spring', stiffness: 300, damping: 24 }
+                          : SPRING_SNAPPY
                       }
                     >
                       {!isUser &&
@@ -841,7 +892,7 @@ export function CompanionChat({
               initial={{ opacity: 0, y: 6, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+              transition={SPRING_SNAPPY}
             >
               <CompanionAvatar />
               {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
@@ -897,7 +948,7 @@ export function CompanionChat({
       {/* Плавающая "капсула" вместо сплошной панели во весь экран: градиент
           растворяет уходящие вверх реплики в фон ДО композера — та же
           маска-затухание, что у премиальных чатов (Linear, iMessage), а
-          не жёсткий обрез бордером. items-end: поле растёт вверх, кнопка
+          не ж��сткий обрез бордером. items-end: поле растёт вверх, кнопка
           остаётся прижатой к низу строки, как у любого настоящего мессенджера.
           Просто докнутый flex-сосед, не sticky: теперь, когда родительский
           <main> реально ограничен по высоте (h-dvh), лента над ним скроллится
@@ -910,6 +961,40 @@ export function CompanionChat({
         }}
         className="z-10 bg-gradient-to-t from-background via-background/85 to-transparent px-4 pt-6 pb-3"
       >
+        {/* #12 · Цитата отвечаемой реплики. Появляется над полем, а не внутри
+            него: текст ответа не должен смешиваться с текстом цитаты. Крестик
+            обязателен — жест, из которого нет выхода, ощущается ловушкой. */}
+        <AnimatePresence>
+          {replyTo && (
+            <motion.div
+              initial={{ opacity: 0, y: 8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: 6, height: 0 }}
+              transition={reduceMotion ? { duration: 0 } : SPRING_SNAPPY}
+              className="mx-auto mb-2 max-w-md overflow-hidden"
+            >
+              <div className="glass flex items-start gap-2 rounded-xl border-l-2 border-l-primary/70 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <span className="font-mono text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                    {replyTo.isUser ? 'Твоя реплика' : 'Напарник'}
+                  </span>
+                  <p className="truncate text-xs leading-relaxed text-foreground/85">
+                    {replyTo.text}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  aria-label="Отменить ответ на реплику"
+                  className="press -mr-1 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
             рассеянный свет (тонкий контур + вынесенное свечение), а не
             сплошная неоновая обводка — так фокус читается премиально, а
@@ -940,6 +1025,34 @@ export function CompanionChat({
             // минимума тач-цели 44px (замерено рендеро��).
             className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
+          {/* #15 · Диктовка. Рендерится только там, где Web Speech реально
+              есть — кнопка, которая ничего не делает, хуже её отсутствия.
+              Во время записи иконка меняется на «стоп»: одна кнопка, два
+              состояния, без второго элемента управления. */}
+          {dictation.supported && (
+            <button
+              type="button"
+              onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+              aria-label={dictation.listening ? 'Остановить диктовку' : 'Диктовать голосом'}
+              aria-pressed={dictation.listening}
+              className={`press flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                dictation.listening
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {dictation.listening ? (
+                <span className="relative flex items-center justify-center">
+                  {/* Пульс — контингентный сигнал «идёт запись», ровно на
+                      время жеста, а не бесконечная анимация в интерфейсе. */}
+                  <span className="absolute size-7 animate-ping rounded-full bg-primary/25 motion-reduce:animate-none" />
+                  <Square className="relative size-4 fill-current" aria-hidden="true" />
+                </span>
+              ) : (
+                <Mic className="size-5" aria-hidden="true" />
+              )}
+            </button>
+          )}
           <Button
             type="submit"
             size="icon"

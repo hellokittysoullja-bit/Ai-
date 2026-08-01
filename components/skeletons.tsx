@@ -36,13 +36,15 @@ function Bar({
 
 /** Приветствие: аватар-кружок + две строки текста. */
 export function GreetingSkeleton() {
+  // Только текстовая часть: живой маскот рендерится рядом всегда (он не
+  // ждёт данных), поэтому дублировать его кружком здесь нельзя — при
+  // подмене получилось бы два аватара подряд. size-13/pt-1 повторяют
+  // реальную колонку приветствия.
   return (
-    <div className="flex items-start gap-3" aria-hidden="true">
-      <div className="skeleton-pulse size-16 shrink-0 rounded-full bg-foreground/[0.07]" />
-      <div className="flex flex-1 flex-col gap-2 pt-2">
-        <Bar w="92%" h={14} />
-        <Bar w="64%" h={14} />
-      </div>
+    <div className="flex flex-1 flex-col gap-2 pt-2" aria-hidden="true">
+      <Bar w="92%" h={13} />
+      <Bar w="78%" h={13} />
+      <Bar w="55%" h={13} />
     </div>
   );
 }
@@ -53,28 +55,30 @@ export function GreetingSkeleton() {
  */
 export function RewardCardSkeleton() {
   return (
+    // rounded-2xl и gap-3 — ровно как у живой карточки, иначе подмена
+    // читается сменой формы, а не проявлением содержимого.
     <div
-      className="glass flex flex-col gap-4 rounded-3xl p-4"
+      className="glass flex flex-col gap-3 rounded-2xl p-4"
       aria-hidden="true"
     >
-      <div className="flex items-center gap-3">
-        <div className="skeleton-pulse size-14 shrink-0 rounded-2xl bg-foreground/[0.07]" />
+      <div className="flex items-center gap-3.5">
+        <div className="skeleton-pulse size-14 shrink-0 rounded-xl bg-foreground/[0.07]" />
         <div className="flex flex-1 flex-col gap-2">
-          <Bar w="52%" h={10} />
-          <Bar w="34%" h={16} />
+          <Bar w="58%" h={10} />
+          <Bar w="40%" h={18} />
         </div>
       </div>
-      {/* Сегменты прогресса — та же сетка, что у живого трека */}
-      <div className="flex gap-1">
+      {/* Тропа (#22): точки-следы, а не сегменты — повторяем новый трек */}
+      <div className="flex h-4 items-center justify-between">
         {Array.from({ length: 10 }).map((_, i) => (
           <div
             key={i}
-            className="skeleton-pulse h-1.5 flex-1 rounded-full bg-foreground/[0.07]"
+            className="skeleton-pulse size-1.5 rounded-full bg-foreground/[0.07]"
             style={{ animationDelay: `${i * 60}ms` }}
           />
         ))}
       </div>
-      <div className="skeleton-pulse h-[52px] w-full rounded-2xl bg-foreground/[0.07]" />
+      <Bar w="70%" h={12} />
     </div>
   );
 }

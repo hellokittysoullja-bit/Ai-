@@ -36,6 +36,7 @@ import {
 } from "@/lib/checkin";
 import { trimLabel } from "@/lib/utils";
 import { Bell } from "lucide-react";
+import { GreetingSkeleton, RewardCardSkeleton } from "@/components/skeletons";
 
 type FirstWord = {
   greeting: string;
@@ -263,7 +264,7 @@ function buildFirstWord(
 }
 
 /**
- * Первая реплика чата. На нулевом старте — объясняет м��ханику: чат ещё
+ * Первая реплика чата. На нулевом старте — объясняет м����ханику: чат ещё
  * не прожит, объяснение уместно. С первого же старта эта же строка
  * продолжала звучать как онбординг для человека, который её давно знает —
  * лендинг обещает «сообщение от живого существа», а не диктофонную запись.
@@ -452,7 +453,7 @@ export function HomeScreen() {
     // savePlan по умолчанию ставит tomorrowKey(): в 4:14 30-го числа это
     // 31-е — а человек ляжет и встанет всё ещё 30-го. План оказался бы
     // невидим весь предстоящий день (проверка `plan.forDate === today` не
-    // сработала бы), и однотаповый договор молча промахнулся бы на сутки.
+    // сработала бы), и однотаповый договор молча промах��улся бы на сутки.
     await savePlan({
       task: queuedTask ?? step,
       firstStep: step,
@@ -553,7 +554,7 @@ export function HomeScreen() {
                   transition={
                     reduceMotion
                       ? { duration: 0 }
-                      : { type: "spring", stiffness: 400, damping: 30 }
+                      : SPRING_GESTURE
                   }
                 >
                   <p
@@ -581,7 +582,15 @@ export function HomeScreen() {
                     </p>
                   )}
                 </motion.div>
-              ) : null}
+              ) : (
+                /* #29 · Первый кадр: firstWord приходит из localStorage в
+                   useEffect, и до этого здесь была ПУСТОТА рядом с маскотом —
+                   экран выглядел сломанным именно в тот момент, когда человек
+                   решает, доверять ли продукту. Скелетон повторяет форму
+                   реплики (три строки рукописной высоты), поэтому появление
+                   текста не сдвигает раскладку. */
+                <GreetingSkeleton key="greeting-skeleton" />
+              )}
             </AnimatePresence>
           </div>
 
@@ -706,7 +715,12 @@ export function HomeScreen() {
           {/* Весточки от напарника: предлагаем один раз, после того как
               человек уже назвал существо. Только там, где браузер их умеет.
               Ни спама, ни давления — «один тихий раз в день». */}
-          {checkinState === "available" && !!companionName && (
+          {/* #24 · Тот же принцип: предложение весточек — не срочное дело.
+              Пока на экране лежит готовый первый шаг, оно ждёт свободного
+              кадра, иначе человек читает две просьбы вместо одного действия. */}
+          {checkinState === "available" &&
+            !!companionName &&
+            !firstWord?.actionStep && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">
               <div className="flex items-start gap-2">
                 <Bell
@@ -758,6 +772,10 @@ export function HomeScreen() {
               кнопка внутри <a> кликалась бы одновременно с переходом самой
               ссылки — невалидно). Вместо этого «весь остров →» — свои
               маленькие ссылки в каждой ветке ниже. */}
+          {/* #29 · Карточка награды — самый крупный объект экрана; её
+              отсутствие на первом кадре роняло всю раскладку вверх, а потом
+              она въезжала и толкала контент вниз. Скелетон держит место. */}
+          {!stats && <RewardCardSkeleton />}
           {stats && (
             <div className="glass press relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
               {stats.totalStarts < LANDMARK_COUNT ? (
@@ -773,17 +791,56 @@ export function HomeScreen() {
                     className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
                   />
                   <span className="relative flex items-center gap-3.5">
+                    {/* #14 · МИНИ-СЦЕНА вместо плоской иконки. Ориентир
+                        вырезался из карты без земли под ним — «иконка
+                        предмета», хотя обещание карточки в том, что на
+                        острове появится МЕСТО. Здесь тот же спрайт получает
+                        свой клочок мира: горизонт, две звезды и холодный
+                        лунный свет — награда читается как кадр из будущего
+                        острова, а не как ассет в списке. Всё внутри одного
+                        SVG с клипом по скруглению: ни одного лишнего узла в
+                        DOM и ни одного нового цвета в палитре. */}
                     <svg
-                      viewBox={`${landmarkAnchors[stats.totalStarts].x - 24} ${landmarkAnchors[stats.totalStarts].y - 36} 48 48`}
-                      // brightness-150: SVG-ассеты ориентиров нарисованы
-                      // под тёмную сцену Мира — в карточке без осветления
-                      // тёмный диск читался «чёрным блином-затмением», а
-                      // не наградой. Осветляем именно пиксели силуэта +
-                      // умеренное контурное свечение 7px/0.4
-                      className="h-14 w-14 shrink-0 brightness-150 drop-shadow-[0_0_7px_oklch(0.9_0.06_240/0.4)] saturate-[0.75]"
+                      viewBox="0 0 48 48"
+                      className="size-16 shrink-0"
                       aria-hidden="true"
                     >
-                      {landmarkNodes[stats.totalStarts]}
+                      <defs>
+                        <clipPath id="mini-scene-clip">
+                          <rect x="0" y="0" width="48" height="48" rx="12" />
+                        </clipPath>
+                        <radialGradient id="mini-moonlight" cx="22%" cy="16%" r="72%">
+                          <stop offset="0%" stopColor="oklch(0.9 0.05 240 / 0.3)" />
+                          <stop offset="100%" stopColor="oklch(0.9 0.05 240 / 0)" />
+                        </radialGradient>
+                      </defs>
+                      <g clipPath="url(#mini-scene-clip)">
+                        {/* Ночное небо кадра — на полтона светлее стекла
+                            карточки, чтобы сцена читалась как окно, а не
+                            как дырка */}
+                        <rect x="0" y="0" width="48" height="48" fill="oklch(0.2 0.02 140)" />
+                        <rect x="0" y="0" width="48" height="48" fill="url(#mini-moonlight)" />
+                        <circle cx="37" cy="9" r="0.9" fill="oklch(0.92 0.01 210 / 0.5)" />
+                        <circle cx="30" cy="15" r="0.6" fill="oklch(0.92 0.01 210 / 0.32)" />
+                        {/* Земля: тот же силуэт холмов, что в сцене фона */}
+                        <path
+                          d="M0 34 Q 12 29 24 32 T 48 30 L 48 48 L 0 48 Z"
+                          fill="oklch(0.17 0.018 138)"
+                        />
+                        {/* Сам ориентир — стоит НА земле, не висит в пустоте.
+                            brightness-150: ассеты нарисованы под тёмную сцену
+                            Мира, без осветления силуэт читался чёрным блином. */}
+                        <g
+                          transform={`translate(${24 - landmarkAnchors[stats.totalStarts].x * 0.58}, ${30 - landmarkAnchors[stats.totalStarts].y * 0.58}) scale(0.58)`}
+                          className="brightness-150 saturate-[0.75]"
+                          style={{
+                            filter:
+                              "drop-shadow(0 0 5px oklch(0.9 0.06 240 / 0.45))",
+                          }}
+                        >
+                          {landmarkNodes[stats.totalStarts]}
+                        </g>
+                      </g>
                     </svg>
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
@@ -806,24 +863,50 @@ export function HomeScreen() {
                       aria-valuemax={LANDMARK_COUNT}
                       aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
                     >
-                      {/* Сегменты-фишки (unit bias): каждый тик = один
-                          реальный старт. h-1.5 + gap-1 — деления читаются
-                          раздельно, не сливаются в полоску. Полный bg-primary
-                          с мягким глоу: приглушение до /65 давало грязный
-                          оливковый (полупрозрачный зелёный на тёмном стекле
-                          мутнеет) — заработанный прогресс обязан выглядеть
-                          живым; CTA сохраняет главенство размером массы */}
-                      <span className="flex gap-1">
-                        {Array.from({ length: LANDMARK_COUNT }, (_, i) => (
-                          <span
-                            key={i}
-                            className={`h-1.5 flex-1 rounded-full ${
-                              i < stats.totalStarts
-                                ? 'bg-primary shadow-[0_0_5px_oklch(0.86_0.22_130/0.35)]'
-                                : 'bg-white/[0.08]'
-                            }`}
-                          />
-                        ))}
+                      {/* #22 · ЖИВАЯ ТРОПА вместо сегментов прогресса.
+                          Сегменты честно считали старты (unit bias), но
+                          говорили языком загрузки файла — «системный
+                          индикатор», к тому же неотличимый от прогресс-бара
+                          в любом приложении. Здесь прогресс — это ПУТЬ по
+                          острову, и тропа говорит это буквально: пройденные
+                          шаги — следы на земле, следующий — пульсирующая
+                          точка-цель (Goal Gradient: видимая близость цели
+                          ускоряет действие), непройденные — бледный пунктир
+                          уходящей вдаль дороги.
+                          Семантика progressbar сохранена на родителе: для
+                          скринридера ничего не изменилось. */}
+                      <span className="relative flex h-4 items-center">
+                        {/* Земля под следами — тонкая линия тропы */}
+                        <span
+                          aria-hidden="true"
+                          className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/[0.07]"
+                        />
+                        {/* Пройденная часть тропы — тёплая, заработанная */}
+                        <span
+                          aria-hidden="true"
+                          className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-primary/45"
+                          style={{
+                            width: `${(Math.max(0, stats.totalStarts - 1) / (LANDMARK_COUNT - 1)) * 100}%`,
+                          }}
+                        />
+                        <span className="relative flex w-full items-center justify-between">
+                          {Array.from({ length: LANDMARK_COUNT }, (_, i) => {
+                            const done = i < stats.totalStarts;
+                            const isNext = i === stats.totalStarts;
+                            return (
+                              <span
+                                key={i}
+                                className={
+                                  done
+                                    ? "size-2 rounded-full bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]"
+                                    : isNext
+                                      ? "trail-beacon size-2 rounded-full bg-primary/70 ring-2 ring-primary/25"
+                                      : "size-1 rounded-full bg-white/15"
+                                }
+                              />
+                            );
+                          })}
+                        </span>
                       </span>
                       <span className="flex items-baseline justify-between gap-2">
                         {/* Вербальный фрейминг близости (goal-gradient,
@@ -860,7 +943,7 @@ export function HomeScreen() {
 
                     Бар остаётся скрытым намеренно: 10 серых пустых сегментов у
                     человека с нулём стартов — это визуализация нуля, она
-                    демотивирует (и врать зажжённым сегментом нельзя — данные
+                    демотивирует (и врать зажжённым сегментом нел��зя — данные
                     обязаны быть честными). Вместо бара тот же самый
                     двухколоночный baseline-ряд, что и у прогресса: слева счёт
                     ориентиров, справа «весь остров →». Анатомия карточки
@@ -1012,10 +1095,21 @@ export function HomeScreen() {
               МЕЖДУ действием и наградой, разрывала связку «сделай — и
               вырастет» лишним социальным решением (serial position +
               минимизация числа решений до действия) */}
+          {/* #24 · ГЕРОЙ ДНЯ. «Дизайн закончен, когда нечего убрать»: когда на
+              экране есть готовый первый шаг, единственное нужное действие —
+              нажать «Начинаю». Форма имени в этот момент — второе социальное
+              решение поверх первого, и она физически отодвигает кнопку от
+              большого пальца. Просьба об имени не исчезает, она ЖДЁТ момента,
+              когда экран свободен (нет плана на сегодня): тогда она и главное
+              событие кадра, и не конкурирует с действием.
+              Ночью тоже прячем: ночной экран должен вести в сон, а не
+              открывать новую ветку взаимодействия. */}
           {nameLoaded &&
             !companionName &&
             stats !== null &&
-            stats.totalStarts >= 1 && (
+            stats.totalStarts >= 1 &&
+            !firstWord?.actionStep &&
+            !firstWord?.nightMode && (
               <form
                 className="glass flex flex-col gap-2 rounded-2xl p-3"
                 onSubmit={(e) => {
@@ -1063,7 +1157,7 @@ export function HomeScreen() {
       {/* sr-only: без единого heading на экране скринридер не может
           перескочить сюда по заголовкам — визуально ничего не меняет. */}
       <h1 className="sr-only">Напарник — дом</h1>
-      {/* Единственная скролл-зона экрана: интро-карточки (header) + лента
+      {/* Единственная скролл-зона экра��а: интро-карточки (header) + лента
           переписки едут вместе, композер CompanionChat прижат внизу. */}
       <CompanionChat
         mode="companion"
@@ -1071,6 +1165,8 @@ export function HomeScreen() {
         onPlanSaved={refresh}
         showSuggestions={!firstWord?.showStarterChips}
         header={introHeader}
+        // #23 · Наверху ленты лежат карточки «Дома» — их и обновляем жестом.
+        onPullRefresh={refresh}
       />
     </div>
   );
