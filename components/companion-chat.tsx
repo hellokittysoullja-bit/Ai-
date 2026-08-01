@@ -577,7 +577,12 @@ export function CompanionChat({
                             вообще зарегистрировано, ещё до истечения таймера —
                             без него палец не понимает, держит он что-то или нет. */}
                         <motion.div
-                          className={`whitespace-pre-wrap rounded-2xl select-none ${
+                          // glass-shine: тот же одноразовый диагональный блик,
+                          // что на лендинге (Э4), раньше пузырей чата вообще
+                          // не касался. overflow-hidden внутри самого класса —
+                          // блик обрезается по скруглению пузыря, не вылезает
+                          // прямоугольником поверх него.
+                          className={`glass-shine whitespace-pre-wrap rounded-2xl select-none ${
                             isUser
                               ? `chat-bubble-user px-3 py-2 text-sm leading-relaxed ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
                               : `chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
