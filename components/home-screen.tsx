@@ -487,6 +487,10 @@ export function HomeScreen() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {/* sr-only: без единого heading на экране скринридер не может
+          перескочить сюда по заголовкам — визуально ничего не меняет,
+          мимо глаза, но не мимо доступности. */}
+      <h1 className="sr-only">Напарник — дом</h1>
       {/* max-h + overflow-y-auto: без потолка эта секция на невысоком
           экране (проверено на 700px) может толкать композер и нав-бар за
           пределы вьюпорта — карточка награды, форма имени и весточка могут
@@ -822,9 +826,11 @@ export function HomeScreen() {
                               ? ' · вырос сегодня'
                               : ''}
                         </span>
+                        {/* py-3.5 -my-3.5: расширяет тач-цель до 44px, не
+                            трогая визуальную высоту строки (WCAG 2.5.8) */}
                         <Link
                           href="/app/world"
-                          className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                          className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                         >
                           весь остров →
                         </Link>
@@ -865,7 +871,7 @@ export function HomeScreen() {
                       </span>
                       <Link
                         href="/app/world"
-                        className="shrink-0 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                        className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                       >
                         весь остров →
                       </Link>
@@ -899,7 +905,7 @@ export function HomeScreen() {
                   </span>
                   <Link
                     href="/app/world"
-                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                   >
                     она уже ждёт →
                   </Link>
@@ -916,7 +922,7 @@ export function HomeScreen() {
                   </span>
                   <Link
                     href="/app/world"
-                    className="font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-[11px] uppercase tracking-wider text-primary underline-offset-4 hover:underline"
                   >
                     весь остров →
                   </Link>
@@ -941,7 +947,7 @@ export function HomeScreen() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-10 self-center text-muted-foreground"
+                    className="h-11 self-center text-muted-foreground"
                     onClick={() => router.push("/app/session")}
                   >
                     Другое дело
@@ -978,7 +984,7 @@ export function HomeScreen() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="h-10 self-center text-muted-foreground"
+                        className="h-11 self-center text-muted-foreground"
                         onClick={() => router.push("/app/session")}
                       >
                         Другое дело

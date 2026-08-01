@@ -391,7 +391,12 @@ export function CompanionChat({
         }}
       />
       <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto">
-        <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 py-4">
+        {/* pb-24, не py-4: композер ниже — sticky и перекрывает своим
+            градиентом нижнюю часть ленты. Замерено рендером: без запаса
+            последний чип-подсказка целиком лежал под композером
+            (elementFromPoint в его центре возвращал textarea, не сам чип) —
+            реальному пальцу нечем было в него попасть без скролла. */}
+        <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 pt-4 pb-6">
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
@@ -443,7 +448,7 @@ export function CompanionChat({
                       stiffness: 300,
                       damping: 24,
                     }}
-                    className="glass glass-interactive press rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
                   >
                     {chip}
                   </motion.button>
@@ -735,7 +740,10 @@ export function CompanionChat({
             rows={1}
             placeholder={placeholder ?? 'Напиши напарнику…'}
             aria-label="Сообщение напарнику"
-            className="max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-sm leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+            // text-base, не text-sm: меньше 16px — Safari на iOS зумит всю
+            // страницу при фокусе на поле ввода, это ломает раскладку на
+            // каждое открытие клавиатуры.
+            className="max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
           <Button
             type="submit"
