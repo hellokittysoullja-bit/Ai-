@@ -296,13 +296,23 @@ export function HomeScreen() {
   const [nameLoaded, setNameLoaded] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
+  // nameBusy: saveCompanionName асинхронна, а форма до этого позволяла жать
+  // «Так и зовут» сколько угодно раз, пока запись идёт — тот самый «кнопку
+  // можно нажать несколько раз во время запроса». В чате такой гейт уже был
+  // (canSend), здесь его не было.
+  const [nameBusy, setNameBusy] = useState(false);
   async function giveName(name: string) {
     const trimmed = name.trim();
-    if (!trimmed) return;
-    await saveCompanionName(trimmed);
-    setCompanionName(trimmed);
-    // Дублируем имя в IndexedDB, чтобы весточки от напарника были персональными
-    void mirrorCompanionName(trimmed);
+    if (!trimmed || nameBusy) return;
+    setNameBusy(true);
+    try {
+      await saveCompanionName(trimmed);
+      setCompanionName(trimmed);
+      // Дублируем имя в IndexedDB, чтобы весточки от напарника были персональными
+      void mirrorCompanionName(trimmed);
+    } finally {
+      setNameBusy(false);
+    }
   }
 
   // Проактивные весточки: «он пишет первым», когда приложение закрыто.
@@ -1017,21 +1027,29 @@ export function HomeScreen() {
                   откликаться.
                 </p>
                 <div className="flex gap-2">
+                  {/* h-11 (44px), не h-10: замерено рендером — оба контрола
+                      были 40px, ниже минимума тач-цели. Прошлый скан их не
+                      поймал: в тестовом стейте имя уже было задано, и форма
+                      просто не рендерилась.
+                      text-base на инпуте: как и в композере чата, шрифт
+                      меньше 16px заставляет Safari на iOS зумить страницу
+                      при фокусе. */}
                   <input
                     value={nameDraft}
                     onChange={(e) => setNameDraft(e.target.value)}
                     placeholder="Как меня зовут?"
                     maxLength={24}
                     aria-label="Имя для напарника"
-                    className="glass h-10 min-w-0 flex-1 rounded-xl px-3 text-sm"
+                    disabled={nameBusy}
+                    className="glass h-11 min-w-0 flex-1 rounded-xl px-3 text-base disabled:opacity-60"
                   />
                   <Button
                     type="submit"
                     size="sm"
-                    className="h-10"
-                    disabled={!nameDraft.trim()}
+                    className="h-11"
+                    disabled={!nameDraft.trim() || nameBusy}
                   >
-                    Так и зовут
+                    {nameBusy ? "Запоминаю…" : "Так и зовут"}
                   </Button>
                 </div>
               </form>

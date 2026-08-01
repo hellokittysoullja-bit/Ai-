@@ -411,7 +411,16 @@ export function CompanionChat({
             'radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.2) 0%, transparent 70%)',
         }}
       />
-      <div ref={scrollRef} className="flex flex-1 flex-col overflow-y-auto">
+      {/* Мягкий верхний край ленты. Низ уже растворяется в градиенте
+          композера, а сверху реплики обрезались жёсткой линией о границу
+          секции «Дома» — «резкий стоп списка». mask-image гасит только
+          верхние 24px прокручиваемого содержимого: уходящее сообщение
+          именно РАСТВОРЯЕТСЯ, а не отрезается. Маска не влияет ни на
+          вёрстку, ни на попадание по элементам. */}
+      <div
+        ref={scrollRef}
+        className="flex flex-1 flex-col overflow-y-auto [mask-image:linear-gradient(to_bottom,transparent_0,black_24px)]"
+      >
         {/* pb-24, не py-4: композер ниже — sticky и перекрывает своим
             градиентом нижнюю часть ленты. Замерено рендером: без запаса
             последний чип-подсказка целиком лежал под композером
