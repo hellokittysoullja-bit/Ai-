@@ -420,7 +420,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    transform) рядом с отдельным transition-opacity/transition-shadow
    взаимно перекрывали друг друга — побеждал только один, вторая анимация
    молча не срабатывала. Эти два класса комбинируют transform с нужным
-   вторым свойством в одном объявлении. */
+   вторым ��войством в одном объявлении. */
 .press-warm {
   transition:
     transform 120ms ease,
@@ -851,6 +851,99 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
 /* А7 · Стекло у очага: ближний к сцене пузырь ловит тепло нижней кромкой —
    та же формула .glass + едва тёплый внутренний отсвет снизу. Свет мира
    касается материала (закон Р1), это не UI-glow. */
+/* ─────────────────────────────────────────────────────────────────
+   #29 · Скелетон первого кадра. Данные лежат в localStorage и читаются в
+   useEffect — первый кадр всегда шёл с stats === null, то есть пустотой
+   на месте приветствия и карточки награды. Медленно (2.4s) и слабо:
+   скелетон говорит «грузится», но не соревнуется с текстом за внимание.
+   ───────────────────────────────────────────────────────────────── */
+@keyframes skeleton-breathe {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+.skeleton-pulse {
+  animation: skeleton-breathe 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Форма остаётся, дыхание выключается — смысл скелетона не в движении. */
+  .skeleton-pulse { animation: none; opacity: 0.8; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   #18 · Северное сияние — награда за РЕДКУЮ находку, не декор по таймеру.
+   Живёт только когда на <body> висит data-aurora. Диегетично: это небо,
+   а не UI-поверхность, поэтому ему можно двигаться. Медленно (17s) —
+   контингентная награда не приедается, потому что заработана.
+   ───────────────────────────────────────────────────────────────── */
+@keyframes aurora-drift {
+  0%   { transform: translateX(-6%) skewX(-8deg) scaleY(1);    opacity: 0.45; }
+  50%  { transform: translateX(5%)  skewX(6deg)  scaleY(1.18); opacity: 0.8; }
+  100% { transform: translateX(-6%) skewX(-8deg) scaleY(1);    opacity: 0.45; }
+}
+.aurora-veil {
+  animation: aurora-drift 17s ease-in-out infinite;
+  transform-origin: 50% 0%;
+}
+.aurora-veil-2 {
+  animation-duration: 23s;
+  animation-delay: -9s;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Сияние остаётся видимым (заработанная награда), но замирает. */
+  .aurora-veil { animation: none; opacity: 0.65; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   #19 · Дыхание существа у костра. Двигается только грудная клетка, 7s.
+   Диегетично (живое дышит), медленно, и вне поля чтения — внизу сцены.
+   ───────────────────────────────────────────────────────────────── */
+@keyframes creature-breathe {
+  0%, 100% { transform: scaleY(1)     translateY(0); }
+  50%      { transform: scaleY(1.045) translateY(-0.6px); }
+}
+.creature-breathe {
+  animation: creature-breathe 7s ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .creature-breathe { animation: none; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   #22 · Живая тропа вместо сегментов: пунктир — след шагов, следующий
+   шаг — пульсирующая точка-цель (Goal Gradient: видимая близость цели
+   ускоряет действие).
+   ───────────────────────────────────────────────────────────────── */
+@keyframes trail-beacon {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%      { opacity: 1;   transform: scale(1.4); }
+}
+.trail-beacon {
+  animation: trail-beacon 2.8s ease-in-out infinite;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trail-beacon { animation: none; opacity: 1; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   #23 · Pull-to-refresh: кот потягивается. Реакция на ЗАВЕРШЁННЫЙ жест —
+   награда за действие, а не анимация по таймеру.
+   ───────────────────────────────────────────────────────────────── */
+@keyframes cat-stretch {
+  0%   { transform: scaleX(1)    scaleY(1)    rotate(0deg); }
+  35%  { transform: scaleX(1.14) scaleY(0.88) rotate(-5deg); }
+  70%  { transform: scaleX(0.94) scaleY(1.09) rotate(3deg); }
+  100% { transform: scaleX(1)    scaleY(1)    rotate(0deg); }
+}
+.cat-stretch {
+  animation: cat-stretch 0.85s cubic-bezier(0.34, 1.2, 0.64, 1);
+  transform-origin: 50% 85%;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-stretch { animation: none; }
+}
+
 .glass-hearthside {
   background: linear-gradient(
     155deg,

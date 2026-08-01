@@ -17,7 +17,9 @@ import {
   Sparkles,
   Sprout,
 } from 'lucide-react'
-import { hapticDone, hapticStart } from '@/lib/haptics'
+import { hapticStart } from '@/lib/haptics'
+import { ChatBubble, type Reaction } from '@/components/chat-bubble'
+import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
 import {
   addNote,
@@ -100,6 +102,58 @@ function formatClock(iso: string): string {
   })
 }
 
+/**
+ * #16 · Контекстные быстрые ответы вместо трёх фиксированных.
+ *
+ * Три вечных чипа («Не могу начать», «Раздроби задачу», «Тяжело сегодня») не
+ * попадают в момент: утром с готовым планом человеку нужно не «раздроби», а
+ * «поехали»; после недельной паузы — не «тяжело», а способ вернуться без
+ * объяснений. По Hick's Law промах по варианту стоит не лишнего чтения, а
+ * остановки: для СДВГ-аудитории это выход из приложения.
+ *
+ * Всегда ровно три (Хик), и первый — самый вероятный в этот момент.
+ */
+function buildSuggestions(memory: MemoryContext | null, hour: number): string[] {
+  const chips: string[] = []
+  const plan = memory?.plan ?? null
+  const daysAway = memory?.patterns?.daysAway ?? null
+  const totalStarts = memory?.patterns?.totalStarts ?? 0
+
+  // Вернулся после паузы — это главный контекст, важнее времени суток.
+  // Возврат без объяснений и без стыда: ровно то, чего проект не делает.
+  if (daysAway !== null && daysAway >= 3) {
+    chips.push('Меня не было — начнём заново')
+  }
+
+  // Есть незакрытый план: первый шаг уже сформулирован, нужен только толчок.
+  if (plan?.firstStep) {
+    chips.push(`Поехали: ${truncateChip(plan.firstStep)}`)
+  } else if (hour >= 20 || hour < 4) {
+    // Вечер — время положить план на утро, а не начинать спринт.
+    chips.push('Положим план на утро')
+  } else {
+    chips.push('Не могу заставить себя начать')
+  }
+
+  if (!plan) chips.push('Раздроби мне задачу')
+  if (hour >= 20 || hour < 4) chips.push('Не могу остановиться и лечь')
+  else chips.push('Просто тяжело сегодня')
+
+  // Новичку нужен самый маленький возможный вход.
+  if (totalStarts === 0) chips.push('С чего вообще начать')
+
+  return Array.from(new Set(chips)).slice(0, 3)
+}
+
+/** Чип должен читаться одним взглядом — длинный первый шаг режем по слову. */
+function truncateChip(s: string): string {
+  const t = s.trim()
+  if (t.length <= 22) return t
+  const cut = t.slice(0, 22)
+  const sp = cut.lastIndexOf(' ')
+  return `${(sp > 10 ? cut.slice(0, sp) : cut).trim()}…`
+}
+
 /** Ярлык дня для разделителя переписки: «Сегодня» / «Вчера» / дата */
 function formatDayLabel(iso: string): string {
   const d = new Date(iso)
@@ -129,29 +183,12 @@ export function CompanionChat({
   // (не команда с клавиатуры сотни раз в день — Эмиль здесь не запрещает).
   const [sendCount, setSendCount] = useState(0)
 
-  // Копирование по долгому нажатию — стандарт настоящих мессенджеров
-  // (iMessage/Telegram/WhatsApp), которого в этом чате не было вообще.
-  // Таймер в ref, не в state: сам факт нажатия не должен вызывать рендер.
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const longPressTimer = useRef<number | null>(null)
-  function startLongPress(key: string, text: string) {
-    longPressTimer.current = window.setTimeout(() => {
-      navigator.clipboard?.writeText(text).then(() => {
-        hapticDone()
-        setCopiedKey(key)
-        window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1200)
-      }).catch(() => {
-        // буфер обмена недоступен (не https, старый браузер) — тихо молчим,
-        // как и вся остальная хаптика/фоновая синхронизация в этом файле
-      })
-    }, 450)
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
-  }
+  // Долгое нажатие (копирование + реакции) переехало в ChatBubble вместе с
+  // остальными жестами реплики — держать таймер здесь, а меню там, значило
+  // бы разрывать один жест между двумя файлами.
 
   // Растущее поле ввода вместо однострочного input: длинная мысль не
-  // обрезается и не скроллится внутри крошечной строки — само поле
+  // обрезается и не скроллится внутр�� крошечной строки — само поле
   // раскрывается вверх, как в любом настоящем мессенджере.
   useEffect(() => {
     const el = textareaRef.current
@@ -375,15 +412,68 @@ export function CompanionChat({
   // Ушёл вверх по переписке — показываем возврат вниз. Стандартная
   // аффорданса чата, без неё длинная история становится ловушкой.
   const [atBottom, setAtBottom] = useState(true)
+
+  /*
+   * #13 · ГЛУБИНА ПО СКРОЛЛУ. Считаем не в CSS и не на каждый кадр скролла в
+   * state (это гнало бы рендер всей ленты на каждый пиксель), а по позициям
+   * DOM-узлов: сколько реплика уже ушла за верхнюю кромку вьюпорта ленты.
+   *
+   * scroll-timeline тут не подходит: у каждой реплики своя глубина, и она
+   * зависит от положения относительно контейнера, а контейнер — не сам
+   * документ. rAF-троттлинг: один пересчёт на кадр максимум.
+   */
+  const [depths, setDepths] = useState<Record<string, number>>({})
+  const rowsRef = useRef<Map<string, HTMLDivElement>>(new Map())
+  const rafRef = useRef<number | null>(null)
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const onScroll = () =>
+
+    const recompute = () => {
+      rafRef.current = null
+      const box = el.getBoundingClientRect()
+      const next: Record<string, number> = {}
+      for (const [id, node] of rowsRef.current) {
+        if (!node.isConnected) continue
+        const r = node.getBoundingClientRect()
+        // 0 — реплика ещё ниже верхней кромки; 1 — ушла на 220px выше неё.
+        // 220px ≈ две-три реплики: столько нужно, чтобы отъезд читался
+        // постепенным, а не мгновенным переключением состояния.
+        const past = box.top - r.bottom
+        next[id] = Math.max(0, Math.min(1, past / 220))
+      }
+      setDepths(next)
+    }
+
+    const onScroll = () => {
       setAtBottom(el.scrollHeight - el.clientHeight - el.scrollTop < 24)
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(recompute)
+    }
+
     onScroll()
+    recompute()
     el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
   }, [messages.length])
+
+  function depthOf(id: string): number {
+    return depths[id] ?? 0
+  }
+
+  // #11 · Реакции на реплику. Ключ — `${messageId}-${partIndex}`.
+  const [reactions, setReactions] = useState<Record<string, Reaction>>({})
+
+  // #12 · Цитата: что именно отвечаем. Живёт до отправки или отмены.
+  const [replyTo, setReplyTo] = useState<{ text: string; isUser: boolean } | null>(null)
+  useEffect(() => {
+    // Ответ на реплику — это приглашение писать: фокус в поле сразу, иначе
+    // жест требует второго действия и теряет смысл.
+    if (replyTo) textareaRef.current?.focus()
+  }, [replyTo])
 
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
@@ -483,13 +573,9 @@ export function CompanionChat({
                 можно просто нажать
               </span>
               <div className="flex flex-wrap gap-2">
-                {[
-                  'Не могу заставить себя начать',
-                  'Раздроби мне задачу',
-                  'Просто тяжело сегодня',
-                ].map((chip, ci) => (
+                {suggestionChips.map((chip, ci) => (
                   // Stagger 45мс — в стандартном диапазоне 20–80мс и только
-                  // при первом появлении списка: ряд «собирается», а не
+                  // при первом ��оявлении списка: ряд «собирается», а не
                   // выпрыгивает плитой. Дальше чипы исчезают навсегда, так
                   // что повторной ценой это не станет.
                   <motion.button
@@ -561,7 +647,15 @@ export function CompanionChat({
               todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
 
             return (
-            <div key={message.id} className="flex flex-col gap-2">
+            <div
+              key={message.id}
+              // Узел нужен для замера глубины (#13): реф-колбэк, а не querySelector
+              ref={(node) => {
+                if (node) rowsRef.current.set(message.id, node)
+                else rowsRef.current.delete(message.id)
+              }}
+              className="flex flex-col gap-2"
+            >
               {showDayDivider && (
                 <div className="my-1 flex items-center justify-center">
                   <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
@@ -608,47 +702,27 @@ export function CompanionChat({
                           // реплика группы уезжала под аватар и колонка «плыла»
                           <div className="size-9 shrink-0" aria-hidden="true" />
                         ))}
-                      <div className={`relative max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
-                        {/* Копирование по долгому нажатию (450мс — стандартный
-                            порог long-press, ниже читалось бы случайным тапом).
-                            whileTap: лёгкое сжатие ПОДТВЕРЖДАЕТ, что нажатие
-                            вообще зарегистрировано, ещё до истечения таймера —
-                            без него палец не понимает, держит он что-то или нет. */}
-                        <motion.div
-                          // glass-shine: тот же одноразовый диагональный блик,
-                          // что на лендинге (Э4), раньше пузырей чата вообще
-                          // не касался. overflow-hidden внутри самого класса —
-                          // блик обрезается по скруглению пузыря, не вылезает
-                          // прямоугольником поверх него.
-                          className={`glass-shine whitespace-pre-wrap rounded-2xl select-none ${
-                            isUser
-                              ? `chat-bubble-user px-3 py-2 text-sm leading-relaxed ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
-                              : `chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
-                          }`}
-                          whileTap={{ scale: 0.97 }}
-                          onPointerDown={() => startLongPress(`${message.id}-${i}`, part.text)}
-                          onPointerUp={cancelLongPress}
-                          onPointerLeave={cancelLongPress}
-                        >
-                          {part.text}
-                        </motion.div>
-                        <AnimatePresence>
-                          {copiedKey === `${message.id}-${i}` && (
-                            <motion.span
-                              initial={{ opacity: 0, y: 4, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-                              className={`absolute -top-7 flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-mono text-xs text-foreground shadow-[0_4px_14px_-6px_oklch(0_0_0/0.6)] ${
-                                isUser ? 'right-0' : 'left-0'
-                              }`}
-                            >
-                              <Check className="size-3 text-primary" aria-hidden="true" />
-                              Скопировано
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                      {/* Материал реплики вынесен в ChatBubble: там живут
+                          SVG-хвостик (#10), глубина по скроллу (#13), реакции
+                          долгим нажатием (#11) и swipe-to-reply (#12). */}
+                      <ChatBubble
+                        text={part.text}
+                        isUser={isUser}
+                        isFirstOfGroup={isFirstOfGroup}
+                        depth={depthOf(message.id)}
+                        reaction={reactions[`${message.id}-${i}`] ?? null}
+                        onReact={(r) =>
+                          setReactions((prev) => {
+                            const key = `${message.id}-${i}`
+                            const next = { ...prev }
+                            if (r) next[key] = r
+                            else delete next[key]
+                            return next
+                          })
+                        }
+                        onReply={() => setReplyTo({ text: part.text, isUser })}
+                        reduceMotion={!!reduceMotion}
+                      />
                     </motion.div>
                   )
                 }
@@ -863,7 +937,7 @@ export function CompanionChat({
             // страницу при фокусе на поле ввода, это ломает раскладку на
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
-            // минимума тач-цели 44px (замерено рендером).
+            // минимума тач-цели 44px (замерено рендеро��).
             className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
           <Button
