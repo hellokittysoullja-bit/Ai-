@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { useChat } from '@ai-sdk/react'
 import { DefaultChatTransport, lastAssistantMessageIsCompleteWithToolCalls } from 'ai'
@@ -13,11 +13,18 @@ import {
   ArrowUp,
   CalendarCheck,
   Check,
+  Mic,
   Play,
   Sparkles,
   Sprout,
+  Square,
+  X,
 } from 'lucide-react'
-import { hapticDone, hapticStart } from '@/lib/haptics'
+import { useDictation } from '@/hooks/use-dictation'
+import { PullToStretch } from '@/components/pull-to-stretch'
+import { hapticStart } from '@/lib/haptics'
+import { ChatBubble, type Reaction } from '@/components/chat-bubble'
+import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
 import {
   addNote,
@@ -42,6 +49,16 @@ type CompanionChatProps = {
       одинаковых ряда пилюль подряд, ведущих к разным действиям (мгновенный
       старт vs сообщение боту), путают сильнее, чем помогают. */
   showSuggestions?: boolean
+  /** Закреплённый контекст в начале ленты (карточки «Дома»): рендерится
+      ВНУТРИ скролл-контейнера над приветствием, так что весь экран —
+      единый скролл, а не две конкурирующие зоны. Когда header задан, лента
+      открывается СВЕРХУ (человек видит контекст и приветствие), а не
+      проматывается к последней реплике. */
+  header?: ReactNode
+  /** #23 · Обновление данных по pull-to-refresh. Передаётся только там, где
+      наверху ленты реально есть что обновлять (карточки «Дома») — в чистом
+      чате жест был бы пустым обещанием. */
+  onPullRefresh?: () => Promise<void> | void
 }
 
 function CompanionAvatar({
@@ -94,6 +111,58 @@ function formatClock(iso: string): string {
   })
 }
 
+/**
+ * #16 · Контекстные быстрые ответы вместо трёх фиксированных.
+ *
+ * Три вечных чипа («Не могу начать», «Раздроби задачу», «Тяжело сегодня») не
+ * попадают в момент: утром с готовым планом человеку нужно не «раздроби», а
+ * «поехали»; после недельной паузы — не «тяжело», а способ вернуться без
+ * объяснений. По Hick's Law промах по варианту стоит не лишнего чтения, а
+ * остановки: для СДВГ-аудитории это выход из приложения.
+ *
+ * Всегда ровно три (Хик), и первый — самый вероятный в этот момент.
+ */
+function buildSuggestions(memory: MemoryContext | null, hour: number): string[] {
+  const chips: string[] = []
+  const plan = memory?.plan ?? null
+  const daysAway = memory?.patterns?.daysAway ?? null
+  const totalStarts = memory?.patterns?.totalStarts ?? 0
+
+  // Вернулся после паузы — это главный контекст, важнее времени суток.
+  // Возврат без объяснений и без стыда: ровно то, чего проект не делает.
+  if (daysAway !== null && daysAway >= 3) {
+    chips.push('Меня не было — начнём заново')
+  }
+
+  // Есть незакрытый план: первый шаг уже сформулирован, нужен только толчок.
+  if (plan?.firstStep) {
+    chips.push(`Поехали: ${truncateChip(plan.firstStep)}`)
+  } else if (hour >= 20 || hour < 4) {
+    // Вечер — время положить план на утро, а не начинать спринт.
+    chips.push('Положим план на утро')
+  } else {
+    chips.push('Не могу заставить себя начать')
+  }
+
+  if (!plan) chips.push('Раздроби мне задачу')
+  if (hour >= 20 || hour < 4) chips.push('Не могу остановиться и лечь')
+  else chips.push('Просто тяжело сегодня')
+
+  // Новичку нужен самый маленький возможный вход.
+  if (totalStarts === 0) chips.push('С чего вообще начать')
+
+  return Array.from(new Set(chips)).slice(0, 3)
+}
+
+/** Чип должен читаться одним взглядом — длинный первый шаг режем по слову. */
+function truncateChip(s: string): string {
+  const t = s.trim()
+  if (t.length <= 22) return t
+  const cut = t.slice(0, 22)
+  const sp = cut.lastIndexOf(' ')
+  return `${(sp > 10 ? cut.slice(0, sp) : cut).trim()}…`
+}
+
 /** Ярлык дня для разделителя переписки: «Сегодня» / «Вчера» / дата */
 function formatDayLabel(iso: string): string {
   const d = new Date(iso)
@@ -111,6 +180,8 @@ export function CompanionChat({
   placeholder,
   onPlanSaved,
   showSuggestions = true,
+  header,
+  onPullRefresh,
 }: CompanionChatProps) {
   const router = useRouter()
   const [input, setInput] = useState('')
@@ -122,29 +193,12 @@ export function CompanionChat({
   // (не команда с клавиатуры сотни раз в день — Эмиль здесь не запрещает).
   const [sendCount, setSendCount] = useState(0)
 
-  // Копирование по долгому нажатию — стандарт настоящих мессенджеров
-  // (iMessage/Telegram/WhatsApp), которого в этом чате не было вообще.
-  // Таймер в ref, не в state: сам факт нажатия не должен вызывать рендер.
-  const [copiedKey, setCopiedKey] = useState<string | null>(null)
-  const longPressTimer = useRef<number | null>(null)
-  function startLongPress(key: string, text: string) {
-    longPressTimer.current = window.setTimeout(() => {
-      navigator.clipboard?.writeText(text).then(() => {
-        hapticDone()
-        setCopiedKey(key)
-        window.setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1200)
-      }).catch(() => {
-        // буфер обмена недоступен (не https, старый браузер) — тихо молчим,
-        // как и вся остальная хаптика/фоновая синхронизация в этом файле
-      })
-    }, 450)
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current) window.clearTimeout(longPressTimer.current)
-  }
+  // Долгое нажатие (копирование + реакции) переехало в ChatBubble вместе с
+  // остальными жестами реплики — держать таймер здесь, а меню там, значило
+  // бы разрывать один жест между двумя файлами.
 
   // Растущее поле ввода вместо однострочного input: длинная мысль не
-  // обрезается и не скроллится внутри крошечной строки — само поле
+  // обрезается и не скроллится внутр�� крошечной строки — само поле
   // раскрывается вверх, как в любом настоящем мессенджере.
   useEffect(() => {
     const el = textareaRef.current
@@ -153,11 +207,30 @@ export function CompanionChat({
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`
   }, [input])
 
+  // Контекст держим И в ref (тело запроса читает его без рендера), И в
+  // state: от него зависят быстрые ответы (#16), а ref перерисовку не
+  // вызывает. clientHour тоже в state — на сервере часа клиента нет, и
+  // расчёт чипов прямо в рендере дал бы расхождение гидратации.
+  const [memoryCtx, setMemoryCtx] = useState<MemoryContext | null>(null)
+  const [clientHour, setClientHour] = useState<number | null>(null)
+
   useEffect(() => {
+    setClientHour(new Date().getHours())
     buildMemoryContext().then((m) => {
       memoryRef.current = m
+      setMemoryCtx(m)
     })
   }, [])
+
+  const suggestionChips = useMemo(
+    () =>
+      clientHour === null
+        ? // До монтирования — нейтральный набор, совпадающий с серверной
+          // разметкой: подсказки не должны прыгать на первом кадре.
+          ['Не могу заставить себя начать', 'Раздроби мне задачу', 'Просто тяжело сегодня']
+        : buildSuggestions(memoryCtx, clientHour),
+    [memoryCtx, clientHour],
+  )
 
   const { messages, sendMessage, status, addToolOutput, setMessages } = useChat({
     transport: new DefaultChatTransport({
@@ -214,7 +287,11 @@ export function CompanionChat({
           startTime?: string
         }
         savePlan({ task, firstStep, startTime }).then(async () => {
-          memoryRef.current = await buildMemoryContext()
+          const fresh = await buildMemoryContext()
+          memoryRef.current = fresh
+          // Чипы читают память из state — без этого «Поехали: <первый шаг>»
+          // не появится до перезагрузки, хотя план уже сохранён.
+          setMemoryCtx(fresh)
           onPlanSaved?.()
           addToolOutput({
             tool: 'savePlan',
@@ -297,38 +374,84 @@ export function CompanionChat({
   // scrollIntoView на каждом токене дёргал ленту.
   //
   // Скроллим сам контейнер, а не через scrollIntoView на маркере: при
-  // восстановлении переписки из памяти лента открывалась на scrollTop 0 —
+  // восстановлении переписки из памяти лент�� открывалась на scrollTop 0 —
   // человек видел САМОЕ СТАРОЕ сообщение, а свежее было срезано нижней
   // кромкой. Обещание «он тебя помнит» встречало старым контекстом.
   // Первый скролл — мгновенный (это не анимация, это стартовая позиция),
   // последующие — плавные. rAF: к моменту эффекта шрифты могли ещё не
   // примениться, и высота ленты была занижена.
-  const didInitialScrollRef = useRef(false)
+  /*
+   * «Стартовая фаза» = первые 400 мс жизни экрана. Раньше признаком первого
+   * захода служил сам факт первого срабатывания эффекта, и на ЧИСТОМ старте
+   * это ломало главный сценарий: при пустой истории эффект на монтировании
+   * выходил досрочно (messages.length === 0), поэтому «первым» считался уже
+   * ответ на первое сообщение человека — и правило «с шапкой открываем
+   * сверху» глушило скролл к нему. Проверено в браузере: scrollTop оставался
+   * 0, до низа 305 px, ответ напарника целиком лежал под композером.
+   * Время разделяет два разных события честно: восстановление истории
+   * происходит на монтировании, новая реплика — всегда позже.
+   */
+  const initialPhaseOverRef = useRef(false)
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      initialPhaseOverRef.current = true
+    }, 400)
+    return () => window.clearTimeout(t)
+  }, [])
+
   useEffect(() => {
     if (messages.length === 0) return
     const el = scrollRef.current
     if (!el) return
-    const instant = !didInitialScrollRef.current
-    didInitialScrollRef.current = true
-    const run = () =>
-      el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'auto' : 'smooth' })
-    run()
-    if (!instant) return
-    // Первый заход требует нескольких точек синхронизации: на момент
-    // коммита рукописный Caveat ещё не применён, лента ниже вьюпорта не
-    // переполнена, и scrollTo молча схлопывается в ноль. Повторяем после
-    // кадра, после готовности шрифтов и с запасом по таймеру.
-    requestAnimationFrame(run)
-    let cancelled = false
-    const guarded = () => {
-      if (!cancelled) run()
+    const instant = !initialPhaseOverRef.current
+    // С закреплённой шапкой «Дома» экран открывается СВЕРХУ: человек должен
+    // увидеть карточку награды и приветствие, а не проскочить мимо всего
+    // контекста к последней реплике восстановленной истории.
+    if (instant && header) return
+    const run = (behavior: ScrollBehavior) =>
+      el.scrollTo({ top: el.scrollHeight, behavior })
+
+    if (instant) {
+      // Первый заход требует нескольких точек синхронизации: на момент
+      // коммита рукописный Caveat ещё не применён, лента ниже вьюпорта не
+      // переполнена, и scrollTo молча схлопывается в ноль. Повторяем после
+      // кадра, после готовности шрифтов и с запасом по таймеру.
+      run('auto')
+      requestAnimationFrame(() => run('auto'))
+      let cancelled = false
+      const guarded = () => {
+        if (!cancelled) run('auto')
+      }
+      document.fonts?.ready.then(guarded).catch(() => {})
+      const t = window.setTimeout(guarded, 300)
+      return () => {
+        cancelled = true
+        window.clearTimeout(t)
+      }
     }
-    document.fonts?.ready.then(guarded).catch(() => {})
-    const t = window.setTimeout(guarded, 300)
-    return () => {
-      cancelled = true
-      window.clearTimeout(t)
+
+    /*
+     * Новая реплика: одного scrollTo мало. Лента ПРОДОЛЖАЕТ расти после
+     * него — дорисовывается карточка первого шага, приезжают чипы, шрифт
+     * пересчитывает высоту абзаца. Единственный плавный скролл уезжал по
+     * старой высоте, и свежий ответ снова оказывался под кромкой.
+     * Поэтому держим низ ~900 мс: каждый кадр подтягиваем, пока контент
+     * устаканивается. Прерываемся сразу, как человек сам увёл ленту вверх —
+     * автоскролл, спорящий с рукой, хуже отсутствия автоскролла.
+     */
+    run('smooth')
+    let raf = 0
+    const until = performance.now() + 900
+    const follow = () => {
+      if (performance.now() > until) return
+      const distance = el.scrollHeight - el.clientHeight - el.scrollTop
+      // > 240 px — это не «контент подрос», это человек листает историю
+      if (distance > 240) return
+      if (distance > 1) el.scrollTop = el.scrollHeight
+      raf = requestAnimationFrame(follow)
     }
+    raf = requestAnimationFrame(follow)
+    return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, status])
 
@@ -362,26 +485,94 @@ export function CompanionChat({
   // Ушёл вверх по переписке — показываем возврат вниз. Стандартная
   // аффорданса чата, без неё длинная история становится ловушкой.
   const [atBottom, setAtBottom] = useState(true)
+
+  /*
+   * #13 · ГЛУБИНА ПО СКРОЛЛУ. Считаем не в CSS и не на каждый кадр скролла в
+   * state (это гнало бы рендер всей ленты на каждый пиксель), а по позициям
+   * DOM-узлов: сколько реплика уже ушла за верхнюю кромку вьюпорта ленты.
+   *
+   * scroll-timeline тут не подходит: у каждой реплики своя глубина, и она
+   * зависит от положения относительно контейнера, а контейнер — не сам
+   * документ. rAF-троттлинг: один пересчёт на кадр максимум.
+   */
+  const [depths, setDepths] = useState<Record<string, number>>({})
+  const rowsRef = useRef<Map<string, HTMLDivElement>>(new Map())
+  const rafRef = useRef<number | null>(null)
+
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
-    const onScroll = () =>
+
+    const recompute = () => {
+      rafRef.current = null
+      const box = el.getBoundingClientRect()
+      const next: Record<string, number> = {}
+      for (const [id, node] of rowsRef.current) {
+        if (!node.isConnected) continue
+        const r = node.getBoundingClientRect()
+        // 0 — реплика ещё ниже верхней кромки; 1 — ушла на 220px выше неё.
+        // 220px ≈ две-три реплики: столько нужно, чтобы отъезд читался
+        // постепенным, а не мгновенным переключением состояния.
+        const past = box.top - r.bottom
+        next[id] = Math.max(0, Math.min(1, past / 220))
+      }
+      setDepths(next)
+    }
+
+    const onScroll = () => {
       setAtBottom(el.scrollHeight - el.clientHeight - el.scrollTop < 24)
+      if (rafRef.current === null) rafRef.current = requestAnimationFrame(recompute)
+    }
+
     onScroll()
+    recompute()
     el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
+    return () => {
+      el.removeEventListener('scroll', onScroll)
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
+    }
   }, [messages.length])
+
+  function depthOf(id: string): number {
+    return depths[id] ?? 0
+  }
+
+  // #11 · Реакции на реплику. Ключ — `${messageId}-${partIndex}`.
+  const [reactions, setReactions] = useState<Record<string, Reaction>>({})
+
+  // #12 · Цитата: что именно отвечаем. Живёт до отправки или отмены.
+  const [replyTo, setReplyTo] = useState<{ text: string; isUser: boolean } | null>(null)
+  useEffect(() => {
+    // Ответ на реплику — это приглашение писать: фокус в поле сразу, иначе
+    // жест требует второго действия и теряет смысл.
+    if (replyTo) textareaRef.current?.focus()
+  }, [replyTo])
+
+  // #15 · Диктовка дописывает распознанное в конец поля, а не заменяет его:
+  // человек мог начать печатать, потом переключиться на голос.
+  const dictation = useDictation((text) => {
+    setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
+  })
 
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
   function submit() {
     if (!input.trim() || !canSend) return
+    // Диктовка активна — отправка её закрывает: иначе микрофон продолжает
+    // писать в уже опустевшее поле.
+    if (dictation.listening) dictation.stop()
     // Подтверждение телом в момент отправки: действие получает отклик
     // раньше, чем придёт ответ по сети.
     hapticStart()
-    sendMessage({ text: input })
+    // #12 · Цитату передаём модели как контекст, а не как украшение в UI:
+    // ответ «на это» бессмысленен, если напарник не знает, на что именно.
+    const text = replyTo
+      ? `> ${replyTo.text.replace(/\n/g, ' ')}\n\n${input}`
+      : input
+    sendMessage({ text })
     setInput('')
+    setReplyTo(null)
     setSendCount((c) => c + 1)
   }
 
@@ -411,15 +602,23 @@ export function CompanionChat({
             'radial-gradient(ellipse at center, oklch(0.72 0.17 55 / 0.2) 0%, transparent 70%)',
         }}
       />
-      {/* Мягкий верхний край ленты. Низ уже растворяется в градиенте
-          композера, а сверху реплики обрезались жёсткой линией о границу
-          секции «Дома» — «резкий стоп списка». mask-image гасит только
-          верхние 24px прокручиваемого содержимого: уходящее сообщение
-          именно РАСТВОРЯЕТСЯ, а не отрезается. Маска не влияет ни на
-          вёрстку, ни на попадание по элементам. */}
+      {/* #23 · Кот потягивается при pull-to-refresh. Рендерим только там, где
+          наверху ленты реально есть что обновлять (передан onPullRefresh):
+          жест без результата хуже, чем отсутствие жеста. */}
+      {onPullRefresh && (
+        <PullToStretch scrollRef={scrollRef} onRefresh={onPullRefresh} />
+      )}
       <div
         ref={scrollRef}
-        className="flex flex-1 flex-col overflow-y-auto [mask-image:linear-gradient(to_bottom,transparent_0,black_24px)]"
+        // Верхняя маска-затухание — только БЕЗ шапки. С закреплённым
+        // контекстом «Дома» верх ленты в покое (scrollTop 0) — это маскот и
+        // приветствие: гасить их первые пиксели нельзя. Шапка и так открывает
+        // ленту с чистого края (pt-4), растворять там нечего.
+        className={`flex flex-1 flex-col overflow-y-auto ${
+          header
+            ? ""
+            : "[mask-image:linear-gradient(to_bottom,transparent_0,black_24px)]"
+        }`}
       >
         {/* pb-24, не py-4: композер ниже — sticky и перекрывает своим
             градиентом нижнюю часть ленты. Замерено рендером: без запаса
@@ -427,11 +626,19 @@ export function CompanionChat({
             (elementFromPoint в его центре возвращал textarea, не сам чип) —
             реальному пальцу нечем было в него попасть без скролла. */}
         <div className="mx-auto flex w-full max-w-md flex-col gap-3 px-4 pt-4 pb-6">
+          {/* Закреплённый контекст «Дома»: карточки едут в общем скролле над
+              перепиской. Отделён от разговора крупной паузой (pb-2 + hairline),
+              чтобы «контекст» и «беседа» читались как разные слои. */}
+          {header ? (
+            <div className="flex flex-col gap-5 border-b border-white/[0.06] pb-5">
+              {header}
+            </div>
+          ) : null}
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 22 }}
+            transition={SPRING_ITEM}
           >
             <CompanionAvatar />
             {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
@@ -448,19 +655,15 @@ export function CompanionChat({
               className="ml-10 flex flex-col gap-2"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35, type: 'spring', stiffness: 260, damping: 22 }}
+              transition={{ ...SPRING_ITEM, delay: 0.35 }}
             >
               <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
                 можно просто нажать
               </span>
               <div className="flex flex-wrap gap-2">
-                {[
-                  'Не могу заставить себя начать',
-                  'Раздроби мне задачу',
-                  'Просто тяжело сегодня',
-                ].map((chip, ci) => (
+                {suggestionChips.map((chip, ci) => (
                   // Stagger 45мс — в стандартном диапазоне 20–80мс и только
-                  // при первом появлении списка: ряд «собирается», а не
+                  // при первом ��оявлении списка: ряд «собирается», а не
                   // выпрыгивает плитой. Дальше чипы исчезают навсегда, так
                   // что повторной ценой это не станет.
                   <motion.button
@@ -472,12 +675,9 @@ export function CompanionChat({
                     }}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{
-                      delay: 0.4 + ci * 0.045,
-                      type: 'spring',
-                      stiffness: 300,
-                      damping: 24,
-                    }}
+                    // #27 · Чипы приходят лестницей после приветствия:
+                    // stagger из lib/motion — один шаг ритма на весь продукт.
+                    transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
                     className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
                   >
                     {chip}
@@ -532,7 +732,15 @@ export function CompanionChat({
               todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
 
             return (
-            <div key={message.id} className="flex flex-col gap-2">
+            <div
+              key={message.id}
+              // Узел нужен для замера глубины (#13): реф-колбэк, а не querySelector
+              ref={(node) => {
+                if (node) rowsRef.current.set(message.id, node)
+                else rowsRef.current.delete(message.id)
+              }}
+              className="flex flex-col gap-2"
+            >
               {showDayDivider && (
                 <div className="my-1 flex items-center justify-center">
                   <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
@@ -565,7 +773,7 @@ export function CompanionChat({
                       transition={
                         reduceMotion
                           ? { duration: 0.15 }
-                          : { type: 'spring', stiffness: 300, damping: 24 }
+                          : SPRING_SNAPPY
                       }
                     >
                       {!isUser &&
@@ -579,47 +787,27 @@ export function CompanionChat({
                           // реплика группы уезжала под аватар и колонка «плыла»
                           <div className="size-9 shrink-0" aria-hidden="true" />
                         ))}
-                      <div className={`relative max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
-                        {/* Копирование по долгому нажатию (450мс — стандартный
-                            порог long-press, ниже читалось бы случайным тапом).
-                            whileTap: лёгкое сжатие ПОДТВЕРЖДАЕТ, что нажатие
-                            вообще зарегистрировано, ещё до истечения таймера —
-                            без него палец не понимает, держит он что-то или нет. */}
-                        <motion.div
-                          // glass-shine: тот же одноразовый диагональный блик,
-                          // что на лендинге (Э4), раньше пузырей чата вообще
-                          // не касался. overflow-hidden внутри самого класса —
-                          // блик обрезается по скруглению пузыря, не вылезает
-                          // прямоугольником поверх него.
-                          className={`glass-shine whitespace-pre-wrap rounded-2xl select-none ${
-                            isUser
-                              ? `chat-bubble-user px-3 py-2 text-sm leading-relaxed ${isFirstOfGroup ? 'rounded-tr-sm' : ''}`
-                              : `chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground ${isFirstOfGroup ? 'rounded-tl-sm' : ''}`
-                          }`}
-                          whileTap={{ scale: 0.97 }}
-                          onPointerDown={() => startLongPress(`${message.id}-${i}`, part.text)}
-                          onPointerUp={cancelLongPress}
-                          onPointerLeave={cancelLongPress}
-                        >
-                          {part.text}
-                        </motion.div>
-                        <AnimatePresence>
-                          {copiedKey === `${message.id}-${i}` && (
-                            <motion.span
-                              initial={{ opacity: 0, y: 4, scale: 0.95 }}
-                              animate={{ opacity: 1, y: 0, scale: 1 }}
-                              exit={{ opacity: 0, transition: { duration: 0.12 } }}
-                              transition={{ type: 'spring', stiffness: 400, damping: 26 }}
-                              className={`absolute -top-7 flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-mono text-xs text-foreground shadow-[0_4px_14px_-6px_oklch(0_0_0/0.6)] ${
-                                isUser ? 'right-0' : 'left-0'
-                              }`}
-                            >
-                              <Check className="size-3 text-primary" aria-hidden="true" />
-                              Скопировано
-                            </motion.span>
-                          )}
-                        </AnimatePresence>
-                      </div>
+                      {/* Материал реплики вынесен в ChatBubble: там живут
+                          SVG-хвостик (#10), глубина по скроллу (#13), реакции
+                          долгим нажатием (#11) и swipe-to-reply (#12). */}
+                      <ChatBubble
+                        text={part.text}
+                        isUser={isUser}
+                        isFirstOfGroup={isFirstOfGroup}
+                        depth={depthOf(message.id)}
+                        reaction={reactions[`${message.id}-${i}`] ?? null}
+                        onReact={(r) =>
+                          setReactions((prev) => {
+                            const key = `${message.id}-${i}`
+                            const next = { ...prev }
+                            if (r) next[key] = r
+                            else delete next[key]
+                            return next
+                          })
+                        }
+                        onReply={() => setReplyTo({ text: part.text, isUser })}
+                        reduceMotion={!!reduceMotion}
+                      />
                     </motion.div>
                   )
                 }
@@ -738,7 +926,7 @@ export function CompanionChat({
               initial={{ opacity: 0, y: 6, scale: 0.97 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              transition={{ type: 'spring', stiffness: 300, damping: 24 }}
+              transition={SPRING_SNAPPY}
             >
               <CompanionAvatar />
               {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
@@ -794,7 +982,7 @@ export function CompanionChat({
       {/* Плавающая "капсула" вместо сплошной панели во весь экран: градиент
           растворяет уходящие вверх реплики в фон ДО композера — та же
           маска-затухание, что у премиальных чатов (Linear, iMessage), а
-          не жёсткий обрез бордером. items-end: поле растёт вверх, кнопка
+          не ж��сткий обрез бордером. items-end: поле растёт вверх, кнопка
           остаётся прижатой к низу строки, как у любого настоящего мессенджера.
           Просто докнутый flex-сосед, не sticky: теперь, когда родительский
           <main> реально ограничен по высоте (h-dvh), лента над ним скроллится
@@ -807,6 +995,40 @@ export function CompanionChat({
         }}
         className="z-10 bg-gradient-to-t from-background via-background/85 to-transparent px-4 pt-6 pb-3"
       >
+        {/* #12 · Цитата отвечаемой реплики. Появляется над полем, а не внутри
+            него: текст ответа не должен смешиваться с текстом цитаты. Крестик
+            обязателен — жест, из которого нет выхода, ощущается ловушкой. */}
+        <AnimatePresence>
+          {replyTo && (
+            <motion.div
+              initial={{ opacity: 0, y: 8, height: 0 }}
+              animate={{ opacity: 1, y: 0, height: 'auto' }}
+              exit={{ opacity: 0, y: 6, height: 0 }}
+              transition={reduceMotion ? { duration: 0 } : SPRING_SNAPPY}
+              className="mx-auto mb-2 max-w-md overflow-hidden"
+            >
+              <div className="glass flex items-start gap-2 rounded-xl border-l-2 border-l-primary/70 px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  <span className="font-mono text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                    {replyTo.isUser ? 'Твоя реплика' : 'Напарник'}
+                  </span>
+                  <p className="truncate text-xs leading-relaxed text-foreground/85">
+                    {replyTo.text}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyTo(null)}
+                  aria-label="Отменить ответ на реплику"
+                  className="press -mr-1 -mt-1 flex size-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
             рассеянный свет (тонкий контур + вынесенное свечение), а не
             сплошная неоновая обводка — так фокус читается премиально, а
@@ -834,9 +1056,37 @@ export function CompanionChat({
             // страницу при фокусе на поле ввода, это ломает раскладку на
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
-            // минимума тач-цели 44px (замерено рендером).
+            // минимума тач-цели 44px (замерено рендеро��).
             className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
+          {/* #15 · Диктовка. Рендерится только там, где Web Speech реально
+              есть — кнопка, которая ничего не делает, хуже её отсутствия.
+              Во время записи иконка меняется на «стоп»: одна кнопка, два
+              состояния, без второго элемента управления. */}
+          {dictation.supported && (
+            <button
+              type="button"
+              onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+              aria-label={dictation.listening ? 'Остановить диктовку' : 'Диктовать голосом'}
+              aria-pressed={dictation.listening}
+              className={`press flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
+                dictation.listening
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {dictation.listening ? (
+                <span className="relative flex items-center justify-center">
+                  {/* Пульс — контингентный сигнал «идёт запись», ровно на
+                      время жеста, а не бесконечная анимация в интерфейсе. */}
+                  <span className="absolute size-7 animate-ping rounded-full bg-primary/25 motion-reduce:animate-none" />
+                  <Square className="relative size-4 fill-current" aria-hidden="true" />
+                </span>
+              ) : (
+                <Mic className="size-5" aria-hidden="true" />
+              )}
+            </button>
+          )}
           <Button
             type="submit"
             size="icon"

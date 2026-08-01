@@ -66,10 +66,39 @@ function isBrowser() {
 
 function read<T>(key: string, fallback: T): T {
   if (!isBrowser()) return fallback
+  const raw = isBrowser() ? window.localStorage.getItem(key) : null
+  if (raw === null) return fallback
   try {
-    const raw = window.localStorage.getItem(key)
-    return raw ? (JSON.parse(raw) as T) : fallback
+    return JSON.parse(raw) as T
   } catch {
+    /*
+     * Битая запись НЕ должна навсегда обнулять память.
+     * Найдено в браузере: в ключе имени лежала строка `Тень` без кавычек —
+     * невалидный JSON. JSON.parse падал, read() молча отдавал null, и
+     * напарник до конца жизни устройства звался «Я» при живом имени
+     * рядом. Починить это человек не может: интерфейса для правки
+     * localStorage нет, а данные вроде бы на месте.
+     *
+     * Причины реальны и вне нашего контроля: прерванная запись при
+     * закрытии вкладки, старый формат ключа, ручная правка, чужой скрипт
+     * на том же домене. Для продукта про доверие «тихо забыл имя» —
+     * дорогая поломка.
+     *
+     * Поэтому: если fallback строковый, а в ключе лежит непустая строка —
+     * принимаем её как есть (ровно случай сырого имени). Иначе стираем
+     * мусор, чтобы следующая запись легла чисто и поломка не повторялась.
+     */
+    if (typeof fallback === 'string' || fallback === null) {
+      const bare = raw.trim()
+      if (bare && !bare.startsWith('{') && !bare.startsWith('[')) {
+        return bare as unknown as T
+      }
+    }
+    try {
+      window.localStorage.removeItem(key)
+    } catch {
+      /* приватный режим — просто живём с fallback */
+    }
     return fallback
   }
 }

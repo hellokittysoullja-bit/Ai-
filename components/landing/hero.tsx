@@ -13,7 +13,7 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import { GroundPool, HeroScene, Moon } from "@/components/hero-scene";
 import { Button } from "@/components/ui/button";
-import { SPRING_SNAPPY } from "@/lib/motion";
+import { SPRING_PARALLAX, SPRING_SNAPPY } from "@/lib/motion";
 import { playPurr } from "@/lib/reward-sound";
 
 /**
@@ -188,10 +188,10 @@ export function Hero() {
   // А6 · Глубина за курсором (десктоп): слои сцены едва смещаются за
   // мышью с ленивой пружиной — кадр получает объём (приём tvOS/дорогих
   // лендингов). Луна дальше — двигается сильнее (обратный параллакс дали).
-  const sceneX = useSpring(0, { stiffness: 40, damping: 18 });
-  const sceneY = useSpring(0, { stiffness: 40, damping: 18 });
-  const moonX = useSpring(0, { stiffness: 40, damping: 18 });
-  const moonY = useSpring(0, { stiffness: 40, damping: 18 });
+  const sceneX = useSpring(0, SPRING_PARALLAX);
+  const sceneY = useSpring(0, SPRING_PARALLAX);
+  const moonX = useSpring(0, SPRING_PARALLAX);
+  const moonY = useSpring(0, SPRING_PARALLAX);
   useEffect(() => {
     if (reduceMotion) return;
     if (!window.matchMedia("(pointer: fine)").matches) return;

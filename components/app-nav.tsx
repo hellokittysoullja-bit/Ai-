@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { House, Timer, Sprout } from "lucide-react";
 import { getActiveSession, getUnseenWorldCount } from "@/lib/memory";
+import { SPRING_GESTURE } from "@/lib/motion";
 
 /**
  * Нижний nav — только навигация ВНУТРИ приложения.
@@ -84,7 +85,7 @@ export function AppNav() {
               {active && (
                 <motion.span
                   layoutId="nav-pill"
-                  transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  transition={SPRING_GESTURE}
                   className="absolute inset-0 rounded-2xl bg-primary/10"
                   style={{
                     boxShadow:
