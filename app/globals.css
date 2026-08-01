@@ -636,6 +636,14 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
   );
   backdrop-filter: blur(20px) saturate(165%);
   border: 1px solid var(--glass-border, oklch(1 0 0 / 0.16));
+  /* Асимметрия по умолчанию — верх ярче, низ темнее (свет очага сцены идёт
+     снизу-справа, см. AppBackdrop). Каждый компонент, задающий --glass-border
+     напрямую (карточка старта в чате, разблокированный ориентир на острове),
+     первым делом падает в саму переменную --glass-border, а не в этот
+     дефолт — акцентная подсветка остаётся РОВНОЙ по кругу, как задумано,
+     асимметрия трогает только неоформленное стекло. */
+  border-top-color: var(--glass-border-top, var(--glass-border, oklch(1 0 0 / 0.24)));
+  border-bottom-color: var(--glass-border-bottom, var(--glass-border, oklch(1 0 0 / 0.09)));
   box-shadow:
     inset 0 1px 0 oklch(1 0 0 / 0.2),
     inset 0 0 24px oklch(1 0 0 / 0.025),
