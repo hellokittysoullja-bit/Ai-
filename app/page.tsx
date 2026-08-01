@@ -13,9 +13,38 @@ import { Footer } from "@/components/footer";
 // с CDN в первом же байте, без промежуточного состояния загрузки.
 export const dynamic = "force-static";
 
+// Structured data (schema.org) — Google строит рич-сниппет из этого:
+// имя, назначение, «бесплатно», аудитория. Топ-сайты держат JSON-LD
+// на каждой ключевой странице.
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Напарник",
+  applicationCategory: "ProductivityApplication",
+  operatingSystem: "Web",
+  description:
+    "Существо, которое пишет тебе первым, помогает начать дело и растит свой мир из твоих фокус-сессий. Для людей с СДВГ и прокрастинацией. Без стриков и стыда.",
+  url: "https://ai-rc-one.vercel.app",
+  inLanguage: "ru-RU",
+  offers: {
+    "@type": "Offer",
+    price: "0",
+    priceCurrency: "RUB",
+  },
+  audience: {
+    "@type": "Audience",
+    audienceType: "Люди с СДВГ и прокрастинацией",
+  },
+};
+
 export default function LandingPage() {
   return (
     <div className="flex min-h-svh flex-col">
+      {/* Structured data для поисковиков — не рендерится визуально */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Деградация без JS: секции с моушн-скрытием становятся видимыми */}
       <noscript>
         <style>{`[style*="opacity:0"], [style*="opacity: 0"] { opacity: 1 !important; transform: none !important; }`}</style>
