@@ -670,7 +670,7 @@ export function HomeScreen() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-10 gap-2 self-center text-muted-foreground"
+                  className="h-11 gap-2 self-center text-muted-foreground"
                   onClick={() => {
                     const quick = queuedStep ?? lastStepLabel;
                     return quick
@@ -721,10 +721,14 @@ export function HomeScreen() {
                   раз, без спама — и никаких «ты пропал».
                 </p>
               </div>
+              {/* h-11, не h-10: 40px — не смог отрендерить это состояние в
+                  headless-браузере (Notification.permission там всегда
+                  'denied', даже после grantPermissions), проверил размер
+                  по коду напрямую. */}
               <Button
                 size="sm"
                 variant="secondary"
-                className="h-10 self-start"
+                className="h-11 self-start"
                 onClick={turnOnCheckins}
                 disabled={checkinBusy}
               >
