@@ -347,14 +347,26 @@ export function HomeScreen() {
     stats.daysAway !== null && stats.daysAway >= 1;
 
   // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
-  // есть шаг — собран, поздний вечер — сонный, иначе спокоен
+  // есть шаг — собран, поздний вечер — сонный, иначе спокоен.
+  // mounted-гейт на "sleepy": страница статически пререндерена один раз при
+  // сборке — new Date().getHours() в серверном HTML почти всегда отличается
+  // от часа реального визита. Без гейта это расходится с SSR-версией уже на
+  // первом рендере (до всяких stats/firstWord, оба ещё null) — настоящий
+  // hydration mismatch (найден рендером с виртуальными часами, не по коду):
+  // React откатывает и перестраивает всё поддерево с нуля, и клики рядом
+  // теряются на те же мгновения. Тот же приём, что и у nameLoaded/stats
+  // выше — реальные данные приходят только после mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const hour = new Date().getHours();
   const mascotExpression: MascotExpression =
     stats?.daysAway !== null && stats !== null && stats.daysAway >= 2
       ? "happy"
       : firstWord?.actionStep
         ? "focused"
-        : hour >= 22 || hour < NIGHT_UNTIL_HOUR
+        : mounted && (hour >= 22 || hour < NIGHT_UNTIL_HOUR)
           ? "sleepy"
           : "calm";
 
