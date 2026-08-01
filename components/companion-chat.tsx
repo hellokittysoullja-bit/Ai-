@@ -824,14 +824,17 @@ export function CompanionChat({
             // text-base, не text-sm: меньше 16px — Safari на iOS зумит всю
             // страницу при фокусе на поле ввода, это ломает раскладку на
             // каждое открытие клавиатуры.
-            className="max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+            // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
+            // минимума тач-цели 44px (замерено рендером).
+            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
           <Button
             type="submit"
             size="icon"
             disabled={!canSend || !input.trim()}
             aria-label="Отправить"
-            className="size-10 shrink-0 rounded-xl"
+            // size-11, не size-10: 40px — тоже ниже минимума 44px
+            className="size-11 shrink-0 rounded-xl"
           >
             {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
                 {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
