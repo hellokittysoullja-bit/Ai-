@@ -420,7 +420,7 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    transform) рядом с отдельным transition-opacity/transition-shadow
    взаимно перекрывали друг друга — побеждал только один, вторая анимация
    молча не срабатывала. Эти два класса комбинируют transform с нужным
-   вторым ��войством в одном объявлении. */
+   вторым свойством в одном объявлении. */
 .press-warm {
   transition:
     transform 120ms ease,
