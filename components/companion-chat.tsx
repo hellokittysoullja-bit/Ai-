@@ -895,8 +895,15 @@ export function CompanionChat({
                   Галочка — только у своих и только когда реплика ушла
                   (не во время стриминга: секунду назад это было бы ложью). */}
               {isLastOfGroup && thisTime && (
+                // text-muted-foreground БЕЗ доп. /70: сам токен уже даёт
+                // 6.63:1 на фоне сцены (замерено попиксельно через canvas),
+                // а «/70» поверх него утапливал 12px-текст до 3.81:1 — ниже
+                // порога 4.5:1 для обычного текста (WCAG 1.4.3; исключение
+                // 3:1 тут не действует, это не крупный текст). Приглушение
+                // уже заложено в самом токене, второй слой альфы его просто
+                // проваливал.
                 <span
-                  className={`flex items-center gap-1 px-1 font-mono text-xs text-muted-foreground/70 ${
+                  className={`flex items-center gap-1 px-1 font-mono text-xs text-muted-foreground ${
                     isUser ? 'justify-end' : 'justify-start'
                   }`}
                 >
