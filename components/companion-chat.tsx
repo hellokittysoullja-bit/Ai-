@@ -554,6 +554,23 @@ export function CompanionChat({
     setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
   })
 
+  // ОЧАГ ОТВЕЧАЕТ НА РЕЧЬ. Пока напарник думает или только что заговорил,
+  // костёр в сцене разгорается (.app-hearth в globals.css) — принцип
+  // контингентности сцены, применённый к её главному источнику света.
+  // Флаг на <body>, а не проп: AppBackdrop живёт в layout и о существовании
+  // чата не знает (и не должен). Тот же механизм уже используется для
+  // data-focus-immersive, так что это язык проекта, а не новая конвенция.
+  // reactingId в условии обязателен: скриптовый мозг отвечает мгновенно и
+  // фазу 'streaming' не проходит вообще — без него очаг молчал бы ровно там,
+  // где чат работает без ключа к модели, то есть в большинстве случаев.
+  const speaking =
+    status === 'submitted' || status === 'streaming' || reactingId !== null
+  useEffect(() => {
+    if (speaking) document.body.setAttribute('data-companion-speaking', '')
+    else document.body.removeAttribute('data-companion-speaking')
+    return () => document.body.removeAttribute('data-companion-speaking')
+  }, [speaking])
+
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 

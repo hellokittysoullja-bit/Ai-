@@ -959,3 +959,35 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     inset 0 0 24px oklch(1 0 0 / 0.025),
     0 10px 28px -14px oklch(0 0 0 / 0.5);
 }
+
+/* ОЧАГ РЕАГИРУЕТ НА РЕЧЬ (см. components/app-backdrop.tsx).
+   Механизм тот же, что у body[data-focus-immersive]: состояние экрана
+   публикуется атрибутом на <body>, сцена слушает его чистым CSS — без
+   прокидывания пропов через layout, который о чате ничего не знает и знать
+   не должен.
+   Это самое заметное движение всей сцены, и оно ЗАРАБОТАНО: очаг
+   разгорается ровно тогда, когда существо говорит. 1.4s на разгорание,
+   2.4s на затухание — вдох быстрее выдоха, как у настоящего огня, в который
+   подбросили. */
+.app-hearth {
+  transition:
+    opacity 1200ms ease,
+    transform 2400ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 2400ms ease;
+}
+body[data-companion-speaking] .app-hearth {
+  transform: translate(-50%, 50%) scale(1.13);
+  filter: brightness(1.45);
+  transition:
+    opacity 1200ms ease,
+    transform 1400ms cubic-bezier(0.22, 1, 0.36, 1),
+    filter 1400ms ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .app-hearth,
+  body[data-companion-speaking] .app-hearth {
+    transition: opacity 200ms ease;
+    transform: translate(-50%, 50%);
+    filter: none;
+  }
+}
