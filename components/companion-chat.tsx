@@ -198,7 +198,7 @@ export function CompanionChat({
   // бы разрывать один жест между двумя файлами.
 
   // Растущее поле ввода вместо однострочного input: длинная мысль не
-  // обрезается и не скроллится внутр�� крошечной строки — само поле
+  // обрезается и не скроллится внутри крошечной строки — само поле
   // раскрывается вверх, как в любом настоящем мессенджере.
   useEffect(() => {
     const el = textareaRef.current
@@ -374,7 +374,7 @@ export function CompanionChat({
   // scrollIntoView на каждом токене дёргал ленту.
   //
   // Скроллим сам контейнер, а не через scrollIntoView на маркере: при
-  // восстановлении переписки из памяти лент�� открывалась на scrollTop 0 —
+  // восстановлении переписки из памяти лента открывалась на scrollTop 0 —
   // человек видел САМОЕ СТАРОЕ сообщение, а свежее было срезано нижней
   // кромкой. Обещание «он тебя помнит» встречало старым контекстом.
   // Первый скролл — мгновенный (это не анимация, это стартовая позиция),
@@ -461,6 +461,12 @@ export function CompanionChat({
   const [reactingId, setReactingId] = useState<string | null>(null)
   const lastAssistantIdRef = useRef<string | null>(null)
   const seenHistoryRef = useRef(false)
+  // Экранный диктор молчал про новые реплики целиком (aria-live нигде не
+  // стоял) — человек с диктором не узнавал, что напарник ответил, пока не
+  // ощупает ленту вручную. Тот же гейт «это только что пришло, а не старая
+  // история», что уже отделяет реакцию кота от простого рендера.
+  const [announceText, setAnnounceText] = useState('')
+  const pendingAnnounceIdRef = useRef<string | null>(null)
   useEffect(() => {
     let lastAssistant: (typeof messages)[number] | undefined
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -477,10 +483,34 @@ export function CompanionChat({
     }
     if (lastAssistant.id === lastAssistantIdRef.current) return
     lastAssistantIdRef.current = lastAssistant.id
+    // Помечаем как «ждём объявления» — само объявление уходит диктору
+    // ниже, только когда текст этой реплики перестанет меняться. ID
+    // появляется в ленте ДО того, как стриминг долетит до конца: объявить
+    // прямо здесь значило бы читать диктору одно первое слово навсегда.
+    pendingAnnounceIdRef.current = lastAssistant.id
     setReactingId(lastAssistant.id)
     const t = window.setTimeout(() => setReactingId(null), 1600)
     return () => window.clearTimeout(t)
   }, [messages])
+
+  // Фиксируем текст объявления, когда обмен реально завершился (не во время
+  // streaming/submitted — тот же признак «устаканилось», что уже использует
+  // эффект сохранения в память чуть ниже). pendingAnnounceIdRef гасится сразу
+  // после — при восстановленной истории он просто никогда не выставлен.
+  useEffect(() => {
+    if (!pendingAnnounceIdRef.current) return
+    if (status === 'streaming' || status === 'submitted') return
+    const id = pendingAnnounceIdRef.current
+    const msg = messages.find((m) => m.id === id)
+    pendingAnnounceIdRef.current = null
+    if (!msg) return
+    setAnnounceText(
+      msg.parts
+        .filter((p) => p.type === 'text')
+        .map((p) => (p.type === 'text' ? p.text : ''))
+        .join(' '),
+    )
+  }, [messages, status])
 
   // Ушёл вверх по переписке — показываем возврат вниз. Стандартная
   // аффорданса чата, без неё длинная история становится ловушкой.
@@ -554,6 +584,23 @@ export function CompanionChat({
     setInput((prev) => (prev ? `${prev.trimEnd()} ${text}` : text))
   })
 
+  // ОЧАГ ОТВЕЧАЕТ НА РЕЧЬ. Пока напарник думает или только что заговорил,
+  // костёр в сцене разгорается (.app-hearth в globals.css) — принцип
+  // контингентности сцены, применённый к её главному источнику света.
+  // Флаг на <body>, а не проп: AppBackdrop живёт в layout и о существовании
+  // чата не знает (и не должен). Тот же механизм уже используется для
+  // data-focus-immersive, так что это язык проекта, а не новая конвенция.
+  // reactingId в условии обязателен: скриптовый мозг отвечает мгновенно и
+  // фазу 'streaming' не проходит вообще — без него очаг молчал бы ровно там,
+  // где чат работает без ключа к модели, то есть в большинстве случаев.
+  const speaking =
+    status === 'submitted' || status === 'streaming' || reactingId !== null
+  useEffect(() => {
+    if (speaking) document.body.setAttribute('data-companion-speaking', '')
+    else document.body.removeAttribute('data-companion-speaking')
+    return () => document.body.removeAttribute('data-companion-speaking')
+  }, [speaking])
+
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
@@ -578,6 +625,12 @@ export function CompanionChat({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Диктор молчал про новые реплики целиком — announceText обновляется
+          только на СВОЮ, только что завершённую реплику (см. эффекты выше),
+          восстановленная история и статус «печатает» сюда не попадают. */}
+      <div aria-live="polite" className="sr-only">
+        {announceText}
+      </div>
       {/* justify-end на мобильном: сообщения примыкают к полю ввода, короткий
           чат (1-2 реплики) выглядит обжитым, а не оборванным. На десктопе
           (md:justify-start) высота вьюпорта велика — при justify-end единственная
@@ -663,7 +716,7 @@ export function CompanionChat({
               <div className="flex flex-wrap gap-2">
                 {suggestionChips.map((chip, ci) => (
                   // Stagger 45мс — в стандартном диапазоне 20–80мс и только
-                  // при первом ��оявлении списка: ряд «собирается», а не
+                  // при первом появлении списка: ряд «собирается», а не
                   // выпрыгивает плитой. Дальше чипы исчезают навсегда, так
                   // что повторной ценой это не станет.
                   <motion.button
@@ -895,8 +948,15 @@ export function CompanionChat({
                   Галочка — только у своих и только когда реплика ушла
                   (не во время стриминга: секунду назад это было бы ложью). */}
               {isLastOfGroup && thisTime && (
+                // text-muted-foreground БЕЗ доп. /70: сам токен уже даёт
+                // 6.63:1 на фоне сцены (замерено попиксельно через canvas),
+                // а «/70» поверх него утапливал 12px-текст до 3.81:1 — ниже
+                // порога 4.5:1 для обычного текста (WCAG 1.4.3; исключение
+                // 3:1 тут не действует, это не крупный текст). Приглушение
+                // уже заложено в самом токене, второй слой альфы его просто
+                // проваливал.
                 <span
-                  className={`flex items-center gap-1 px-1 font-mono text-xs text-muted-foreground/70 ${
+                  className={`flex items-center gap-1 px-1 font-mono text-xs text-muted-foreground ${
                     isUser ? 'justify-end' : 'justify-start'
                   }`}
                 >
@@ -982,7 +1042,7 @@ export function CompanionChat({
       {/* Плавающая "капсула" вместо сплошной панели во весь экран: градиент
           растворяет уходящие вверх реплики в фон ДО композера — та же
           маска-затухание, что у премиальных чатов (Linear, iMessage), а
-          не ж��сткий обрез бордером. items-end: поле растёт вверх, кнопка
+          не жёсткий обрез бордером. items-end: поле растёт вверх, кнопка
           остаётся прижатой к низу строки, как у любого настоящего мессенджера.
           Просто докнутый flex-сосед, не sticky: теперь, когда родительский
           <main> реально ограничен по высоте (h-dvh), лента над ним скроллится
@@ -1056,7 +1116,7 @@ export function CompanionChat({
             // страницу при фокусе на поле ввода, это ломает раскладку на
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
-            // минимума тач-цели 44px (замерено рендеро��).
+            // минимума тач-цели 44px (замерено рендером).
             className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
           {/* #15 · Диктовка. Рендерится только там, где Web Speech реально

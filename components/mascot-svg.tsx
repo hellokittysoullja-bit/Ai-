@@ -176,8 +176,23 @@ export function MascotSvg({
           fill={EYE}
         />
         <g clipPath={`url(#${clipId})`}>
-          {/* кошачий зрачок + блики, следят за курсором */}
-          <motion.g style={reduceMotion ? undefined : { x: px, y: py }}>
+          {/* кошачий зрачок + блики, следят за курсором.
+              style передаётся ВСЕГДА, без ветвления по reduceMotion: на
+              сервере useReducedMotion() ещё не знает системную настройку и
+              возвращает falsy, поэтому в серверном HTML появлялся transform,
+              а клиент с включённым «уменьшить движение» рендерил
+              style={undefined} и transform снимал. Расхождение деревьев
+              ровно того же класса, что уже описано у стрелки отправки в
+              companion-chat (React #418, «воспроизводилось только в режиме
+              уменьшить движение») — и оно било по самой чувствительной части
+              аудитории продукта: этот режим чаще всех включают именно люди с
+              СДВГ и сенсорной чувствительностью, а React в ответ сносил и
+              пересобирал поддерево на каждой загрузке.
+              Ветвить нечего: оба эффекта ниже сами держат px/py на нуле при
+              reduceMotion — разметка одинаковая, разное только поведение
+              пружин. Проверено рендером с prefers-reduced-motion: с ветвлением
+              ошибка падала на каждой загрузке, без него консоль чистая. */}
+          <motion.g style={{ x: px, y: py }}>
             <ellipse
               cx={x}
               cy={y}
@@ -550,23 +565,37 @@ export function MascotSvg({
             { x: 156, y: 46, s: 17, d: 0.5 },
             { x: 172, y: 28, s: 22, d: 1 },
           ].map((z) => (
+            /* initial — БЕЗ ветвления по reduceMotion (второй случай того же
+               React #418 в этом файле, найден рендером /app с включённым
+               «уменьшить движение»): на сервере хук возвращает falsy, поэтому
+               в HTML попадал transform: translateY(4px), а клиент с включённым
+               режимом рендерил initial={undefined} и трансформ снимал —
+               расхождение на каждой загрузке.
+               initial одинаков всегда, различается только animate: при
+               reduced-motion «z» просто стоит на месте видимой, вместо
+               бесконечного всплывания. Тот же смысл (кот спит), нулевое
+               движение. */
             <motion.text
               key={z.x}
               x={z.x}
               y={z.y}
               fontSize={z.s}
-              initial={reduceMotion ? undefined : { opacity: 0, y: 4 }}
+              initial={{ opacity: 0, y: 4 }}
               animate={
                 reduceMotion
-                  ? undefined
+                  ? { opacity: 0.6, y: 0 }
                   : { opacity: [0, 0.9, 0], y: [4, -4, -10] }
               }
-              transition={{
-                duration: 2.4,
-                repeat: Infinity,
-                delay: z.d,
-                ease: "easeInOut",
-              }}
+              transition={
+                reduceMotion
+                  ? { duration: 0 }
+                  : {
+                      duration: 2.4,
+                      repeat: Infinity,
+                      delay: z.d,
+                      ease: "easeInOut",
+                    }
+              }
             >
               z
             </motion.text>
