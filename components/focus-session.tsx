@@ -746,116 +746,151 @@ export function FocusSession() {
 
   if (phase === 'running') {
     return (
-      <motion.div
-        className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-6 px-4 py-8"
-        initial={reducedMotion ? false : { opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.6 }}
-      >
-        {/* Существо — центр сцены: дышит, радуется четвертям, встречает из отвлечения */}
-        {/* #10 · Кольцо вместо линейного бара под существом: время сессии
-            читается на самом объекте, за которым и так следит взгляд, а не
-            в отдельной полоске ниже — тот же вес внимания, один якорь
-            вместо двух. -inset-4: кольцо на 16px шире мяскота (130px), не
-            задевая его контур. rotate(-90deg): прогресс стартует с 12
-            часов — там же, где начинается любой аналоговый таймер. */}
-        <div className="relative flex items-center justify-center">
-          <svg
-            className="pointer-events-none absolute -inset-4"
-            viewBox="0 0 156 156"
-            aria-hidden="true"
-          >
-            <circle cx="78" cy="78" r="72" fill="none" stroke="var(--secondary)" strokeWidth="4" />
-            <circle
-              cx="78"
-              cy="78"
-              r="72"
-              fill="none"
-              stroke="var(--primary)"
-              strokeWidth="4"
-              strokeLinecap="round"
-              strokeDasharray={2 * Math.PI * 72}
-              style={{
-                strokeDashoffset: 2 * Math.PI * 72 * (1 - progress),
-                transform: 'rotate(-90deg)',
-                transformOrigin: '78px 78px',
-                transition: reducedMotion ? 'none' : 'stroke-dashoffset 1s linear',
-              }}
-            />
-          </svg>
-          <motion.div
-            animate={
-              reducedMotion
-                ? undefined
-                : { y: [0, -4, 0], rotate: [0, 0, -1.5, 0, 1.5, 0, 0] }
-            }
-            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-          >
-            <MascotSvg
-              expression={cheering || backFromDrift ? 'happy' : 'focused'}
-              label="Напарник работает рядом"
-              size={130}
-            />
-          </motion.div>
-        </div>
-        <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
-          {backFromDrift
-            ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
-            : cheering
-              ? 'Четверть пути позади. Идём.'
-              : voice}
-        </p>
-        <div className="flex flex-col items-center gap-3">
-          <p className="text-center font-mono text-xs uppercase tracking-widest text-muted-foreground">
-            {task}
-          </p>
-          {hideDigits ? (
-            <p className="font-hand text-3xl text-muted-foreground">время идёт — я слежу</p>
-          ) : (
-            // U1: без aria-live — role="timer" имеет implicit "off";
-            // polite означал объявление КАЖДОЙ секунды скринридером
-            <div
-              role="timer"
-              className="text-7xl font-bold tabular-nums tracking-tight"
+      <>
+        {/* Подложка-скрим под подвал экрана: горизонт в фоне (AppBackdrop)
+            общий на все три экрана и сам по себе ничего не гасит под собой —
+            карточки Дома отделяются от него своим glass-фоном, а здесь
+            сноска висела голым текстом прямо на силуэтах ростка/ёлки/фонаря.
+            Скрим только у Фокуса, потому что только тут текст ничем не
+            подложен. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background/85 to-transparent"
+        />
+        <motion.div
+          className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5 px-4 py-8"
+          initial={reducedMotion ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6 }}
+        >
+          {/* Существо — центр сцены: дышит, радуется четвертям, встречает из отвлечения */}
+          {/* #10 · Кольцо вместо линейного бара под существом: время сессии
+              читается на самом объекте, за которым и так следит взгляд, а не
+              в отдельной полоске ниже — тот же вес внимания, один якорь
+              вместо двух. -inset-4: кольцо на 16px шире мяскота (130px), не
+              задевая его контур. rotate(-90deg): прогресс стартует с 12
+              часов — там же, где начинается любой аналоговый таймер.
+              Трек и дуга: на живой ночной сцене var(--secondary) почти не
+              отличим от фона (замерено на реальном скрине) — трек поднят до
+              полупрозрачного foreground, а дуга получила мягкое лаймовое
+              свечение (тот же язык, что у очага/сияния), иначе на малом
+              прогрессе она читается не как кольцо, а как случайный блик. */}
+          <div className="relative flex items-center justify-center">
+            <svg
+              className="pointer-events-none absolute -inset-4"
+              viewBox="0 0 156 156"
+              aria-hidden="true"
             >
-              {mm}:{ss}
-            </div>
-          )}
-          <div className="flex items-center gap-4">
-            {/* U2: min-h-11 + padding — честная тап-зона 44px (Fitts) */}
-            <button
-              type="button"
-              onClick={toggleDigits}
-              className="min-h-11 px-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
+              <circle
+                cx="78"
+                cy="78"
+                r="72"
+                fill="none"
+                stroke="color-mix(in oklab, var(--foreground) 16%, transparent)"
+                strokeWidth="5"
+              />
+              <circle
+                cx="78"
+                cy="78"
+                r="72"
+                fill="none"
+                stroke="var(--primary)"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={2 * Math.PI * 72}
+                style={{
+                  strokeDashoffset: 2 * Math.PI * 72 * (1 - progress),
+                  transform: 'rotate(-90deg)',
+                  transformOrigin: '78px 78px',
+                  transition: reducedMotion ? 'none' : 'stroke-dashoffset 1s linear',
+                  filter: 'drop-shadow(0 0 5px color-mix(in oklab, var(--primary) 70%, transparent))',
+                }}
+              />
+            </svg>
+            <motion.div
+              animate={
+                reducedMotion
+                  ? undefined
+                  : { y: [0, -4, 0], rotate: [0, 0, -1.5, 0, 1.5, 0, 0] }
+              }
+              transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
             >
-              {hideDigits ? 'показать цифры' : 'спрятать цифры'}
-            </button>
-            <button
-              type="button"
-              onClick={toggleAmbient}
-              aria-pressed={ambientOn}
-              className={`min-h-11 px-2 font-mono text-[11px] uppercase tracking-widest underline-offset-2 hover:underline ${
-                ambientOn ? 'text-primary' : 'text-muted-foreground'
-              }`}
-            >
-              {ambientOn ? 'костёр горит' : 'зажечь костёр'}
-            </button>
+              <MascotSvg
+                expression={cheering || backFromDrift ? 'happy' : 'focused'}
+                label="Напарник работает рядом"
+                size={130}
+              />
+            </motion.div>
           </div>
-        </div>
-        <div className="flex flex-col items-center gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => finish(true)}
-            className="h-11 px-5 text-sm text-muted-foreground"
-          >
-            Закончить раньше
-          </Button>
-          <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-            старт уже засчитан · полная сессия повышает шанс редкой находки
+          <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
+            {backFromDrift
+              ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
+              : cheering
+                ? 'Четверть пути позади. Идём.'
+                : voice}
           </p>
-        </div>
-      </motion.div>
+          <div className="flex flex-col items-center gap-2">
+            {/* Название дела — контекст «чем я занят», не утилитарная кнопка:
+                чуть плотнее и светлее ряда переключателей ниже, плюс кавычки
+                — та же пунктуация, что и в карточке Дома («Следующий шаг:
+                «X»»), а не голый капс без каких-либо знаков препинания. */}
+            <p className="text-center font-mono text-xs font-semibold uppercase tracking-widest text-foreground/80">
+              «{task}»
+            </p>
+            {hideDigits ? (
+              <p className="font-hand text-2xl text-muted-foreground">время идёт — я слежу</p>
+            ) : (
+              // U1: без aria-live — role="timer" имеет implicit "off";
+              // polite означал объявление КАЖДОЙ секунды скринридером
+              <div
+                role="timer"
+                className="text-7xl font-bold tabular-nums tracking-tight"
+              >
+                {mm}:{ss}
+              </div>
+            )}
+            <div className="flex items-center gap-3">
+              {/* U2: min-h-11 + padding — честная тап-зона 44px (Fitts) */}
+              <button
+                type="button"
+                onClick={toggleDigits}
+                className="min-h-11 px-2 font-mono text-[11px] uppercase tracking-widest text-muted-foreground underline-offset-2 hover:underline"
+              >
+                {hideDigits ? 'показать цифры' : 'спрятать цифры'}
+              </button>
+              {/* Разделитель: два независимых переключателя рядом иначе
+                  читаются как один составной контрол (закон близости) */}
+              <span aria-hidden="true" className="h-3 w-px bg-border" />
+              <button
+                type="button"
+                onClick={toggleAmbient}
+                aria-pressed={ambientOn}
+                className={`min-h-11 px-2 font-mono text-[11px] uppercase tracking-widest underline-offset-2 hover:underline ${
+                  ambientOn ? 'text-primary' : 'text-muted-foreground'
+                }`}
+              >
+                {ambientOn ? 'костёр горит' : 'зажечь костёр'}
+              </button>
+            </div>
+          </div>
+          <div className="flex flex-col items-center gap-2 pt-1">
+            {/* Выход из сессии — секондари-действие, но не строка того же
+                веса, что переключатели выше: glass-пилюля даёт ему
+                собственную форму, не сливаясь с текстовым списком над ним. */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => finish(true)}
+              className="h-11 rounded-full px-5 text-sm text-muted-foreground"
+            >
+              Закончить раньше
+            </Button>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
+              старт уже засчитан · полная сессия повышает шанс редкой находки
+            </p>
+          </div>
+        </motion.div>
+      </>
     )
   }
 
