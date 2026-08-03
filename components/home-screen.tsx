@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, Play, Sparkles } from "lucide-react";
+import { ArrowRight, CalendarCheck, Play, Sparkles } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
@@ -979,7 +979,7 @@ export function HomeScreen() {
                             трогая визуальную высоту строки (WCAG 2.5.8) */}
                         <Link
                           href="/app/world"
-                          className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                          className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
                         >
                           весь остров →
                         </Link>
@@ -1020,7 +1020,7 @@ export function HomeScreen() {
                       </span>
                       <Link
                         href="/app/world"
-                        className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                        className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
                       >
                         весь остров →
                       </Link>
@@ -1054,7 +1054,7 @@ export function HomeScreen() {
                   </span>
                   <Link
                     href="/app/world"
-                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
                   >
                     она уже ждёт →
                   </Link>
@@ -1071,7 +1071,7 @@ export function HomeScreen() {
                   </span>
                   <Link
                     href="/app/world"
-                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-primary underline-offset-4 hover:underline"
+                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
                   >
                     весь остров →
                   </Link>
@@ -1129,7 +1129,16 @@ export function HomeScreen() {
                           : router.push("/app/session");
                       }}
                     >
-                      <Play className="size-4" aria-hidden="true" />
+                      {/* Продолжение раздробленной задачи (Zeigarnik) и
+                          повтор прошлой — разные по смыслу действия, но до
+                          сих пор рендерились с одной и той же иконкой Play.
+                          Стрелка вперёд честнее говорит «дальше», а не
+                          «сначала». */}
+                      {queuedStep ? (
+                        <ArrowRight className="size-4" aria-hidden="true" />
+                      ) : (
+                        <Play className="size-4" aria-hidden="true" />
+                      )}
                       {(() => {
                         const quick = queuedStep ?? lastStepLabel;
                         if (!quick) return "Начать сессию";
