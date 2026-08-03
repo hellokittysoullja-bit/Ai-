@@ -755,10 +755,10 @@ export function FocusSession() {
             подложен. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none fixed inset-x-0 bottom-0 h-36 bg-gradient-to-t from-background/85 to-transparent"
+          className="pointer-events-none fixed inset-x-0 bottom-0 h-[34vh] bg-gradient-to-t from-background/85 to-transparent"
         />
         <motion.div
-          className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5 px-4 py-8"
+          className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-5 px-4 pt-8 pb-[32vh]"
           initial={reducedMotion ? false : { opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.6 }}
