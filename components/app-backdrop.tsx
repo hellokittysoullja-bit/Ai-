@@ -448,10 +448,18 @@ export function AppBackdrop() {
             return (
               <g
                 key={i}
-                className={i === grownIndex ? "island-grow island-new-element" : undefined}
                 transform={`translate(${p.x} ${p.y}) scale(${p.s}) translate(${-a.x} ${-a.y})`}
               >
-                {landmarkNodes[i]}
+                {/* island-grow анимирует CSS transform: на одном узле с
+                    SVG-атрибутом transform (позиционирование выше) браузер
+                    отдаёт приоритет анимации и молча теряет translate —
+                    ориентир прорастал бы за пределами гряды. Вложенный g без
+                    своего атрибута transform ловит анимацию без конфликта:
+                    та же развязка, что уже в island.tsx (landmark.render
+                    живёт в родителе, а не на анимируемом узле). */}
+                <g className={i === grownIndex ? "island-grow island-new-element" : undefined}>
+                  {landmarkNodes[i]}
+                </g>
               </g>
             );
           })}
