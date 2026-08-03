@@ -244,6 +244,73 @@ export async function clearActiveSession(): Promise<void> {
   write(KEYS.activeSession, null)
 }
 
+// ---------- Итог последней сессии (состояние «человек вернулся») ----------
+
+/**
+ * След только что завершённой сессии. Нужен ровно для одного: «Дом» должен
+ * уметь встретить человека, который вернулся с Фокуса, — показать, что
+ * выросло, и чем этот заход отличался от простого открытия приложения.
+ *
+ * Почему отдельный ключ, а не вывод из getStarts(): по массиву стартов
+ * нельзя отличить «сессия закончилась минуту назад, человек идёт сюда за
+ * наградой» от «сессия была утром, человек зашёл вечером поболтать». Разница
+ * между этими двумя визитами — это разница между состоянием экрана
+ * «результат» и обычным «что сделать сейчас». Флаг живёт до первого показа
+ * и гасится (consumeSessionResult) — награда, которую показывают дважды,
+ * перестаёт быть наградой.
+ */
+export type SessionResult = {
+  /** Что человек делал */
+  task: string
+  /** Реально отработанные минуты */
+  minutes: number
+  /** Заказанная длительность — нужна, чтобы честно назвать сессию полной */
+  plannedMinutes: number
+  /** Человек сам подтвердил, что первое движение сделано */
+  movementConfirmed: boolean
+  /** Что выросло на острове */
+  grownName: string | null
+  grownRarity: 'landmark' | 'common' | 'uncommon' | 'rare' | null
+  /** Unix ms завершения */
+  finishedAt: number
+}
+
+const SESSION_RESULT_KEY = 'naparnik:lastResult'
+
+/** Итог «свежий» два часа: дольше — это уже не возвращение, а новый визит. */
+const RESULT_FRESH_MS = 2 * 60 * 60 * 1000
+
+export async function getSessionResult(): Promise<SessionResult | null> {
+  const r = read<SessionResult | null>(SESSION_RESULT_KEY, null)
+  if (!r) return null
+  if (Date.now() - r.finishedAt > RESULT_FRESH_MS) return null
+  return r
+}
+
+export async function saveSessionResult(result: SessionResult): Promise<void> {
+  write(SESSION_RESULT_KEY, result)
+}
+
+/** Итог показан — гасим, чтобы он не встречал человека на каждом заходе. */
+export async function consumeSessionResult(): Promise<void> {
+  write(SESSION_RESULT_KEY, null)
+}
+
+// ---------- Окружающий звук (три состояния, выбор запоминается) ----------
+
+export type AmbientLevel = 'off' | 'quiet' | 'normal'
+
+const AMBIENT_LEVEL_KEY = 'naparnik:ambientLevel'
+
+export function readAmbientLevel(): AmbientLevel {
+  const v = read<AmbientLevel | null>(AMBIENT_LEVEL_KEY, null)
+  return v === 'quiet' || v === 'normal' ? v : 'off'
+}
+
+export function writeAmbientLevel(level: AmbientLevel): void {
+  write(AMBIENT_LEVEL_KEY, level)
+}
+
 // ---------- Очередь дробления (продукт помнит невыполненные шаги) ----------
 
 export type StepQueue = {

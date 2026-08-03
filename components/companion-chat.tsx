@@ -18,12 +18,13 @@ import {
   Sparkles,
   Sprout,
   Square,
+  WifiOff,
   X,
 } from 'lucide-react'
 import { useDictation } from '@/hooks/use-dictation'
 import { PullToStretch } from '@/components/pull-to-stretch'
-import { hapticStart } from '@/lib/haptics'
-import { ChatBubble, type Reaction } from '@/components/chat-bubble'
+import { hapticSelection } from '@/lib/haptics'
+import { ChatBubble, type GroupPosition, type Reaction } from '@/components/chat-bubble'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
 import {
@@ -59,7 +60,18 @@ type CompanionChatProps = {
       наверху ленты реально есть что обновлять (карточки «Дома») — в чистом
       чате жест был бы пустым обещанием. */
   onPullRefresh?: () => Promise<void> | void
+  /** Закреплено НАД композером: док живой сессии (#6). Не часть ленты —
+      лента прокручивается, док стоит. */
+  dock?: ReactNode
+  /** Идёт фокус-сессия: чат перестаёт предлагать новое и просто ждёт (#6). */
+  quiet?: boolean
+  /** Поле в фокусе / есть черновик — «Дом» ужимает sticky-контекст (#5),
+      а сцена останавливает фоновые циклы (#13). */
+  onComposingChange?: (composing: boolean) => void
 }
+
+/** Черновик переживает уход с экрана и ошибку отправки (#15). */
+const DRAFT_KEY = 'naparnik:draft'
 
 function CompanionAvatar({
   reacting = false,
@@ -141,12 +153,17 @@ function buildSuggestions(memory: MemoryContext | null, hour: number): string[] 
     // Вечер — время положить план на утро, а не начинать спринт.
     chips.push('Положим план на утро')
   } else {
-    chips.push('Не могу заставить себя начать')
+    chips.push('Не могу начать')
   }
 
-  if (!plan) chips.push('Раздроби мне задачу')
+  // Формулировки — от состояния человека, не от функции продукта.
+  // «Раздроби мне задачу» — это название фичи; «Задача слишком большая» —
+  // то, что человек про себя думает. Узнавание вместо припоминания
+  // работает только тогда, когда узнавать предлагают собственное чувство,
+  // а не пункт меню.
+  if (!plan) chips.push('Задача слишком большая')
   if (hour >= 20 || hour < 4) chips.push('Не могу остановиться и лечь')
-  else chips.push('Просто тяжело сегодня')
+  else chips.push('Просто тяжело')
 
   // Новичку нужен самый маленький возможный вход.
   if (totalStarts === 0) chips.push('С чего вообще начать')
@@ -182,9 +199,13 @@ export function CompanionChat({
   showSuggestions = true,
   header,
   onPullRefresh,
+  dock,
+  quiet = false,
+  onComposingChange,
 }: CompanionChatProps) {
   const router = useRouter()
   const [input, setInput] = useState('')
+  const [focused, setFocused] = useState(false)
   const memoryRef = useRef<MemoryContext | null>(null)
   const reduceMotion = useReducedMotion()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -517,6 +538,43 @@ export function CompanionChat({
   const [atBottom, setAtBottom] = useState(true)
 
   /*
+   * #23 · Счётчик непрочитанного на кнопке возврата. Без него кнопка
+   * говорит только «низ там», но не «там есть НОВОЕ» — а именно второе
+   * решает, стоит ли отрываться от чтения истории. Считаем реплики,
+   * пришедшие с момента, когда человек увёл ленту вверх.
+   */
+  const [unread, setUnread] = useState(0)
+  const unreadBaseRef = useRef(0)
+  useEffect(() => {
+    if (atBottom) {
+      unreadBaseRef.current = messages.length
+      setUnread(0)
+    } else {
+      setUnread(Math.max(0, messages.length - unreadBaseRef.current))
+    }
+  }, [messages.length, atBottom])
+
+  /*
+   * #22 · Индикатор набора показывается только после ~450мс ожидания.
+   *
+   * Скриптовый мозг отвечает мгновенно, а модель по хорошей сети — за
+   * пару сотен миллисекунд. Индикатор, мигнувший на 150мс и исчезнувший,
+   * читается как дефект отрисовки, а не как «он думает»: глаз ловит
+   * вспышку и не успевает присвоить ей смысл. Порог отсекает ровно эти
+   * случаи, ничего при этом не задерживая — готовый ответ никогда не
+   * ждёт индикатора.
+   */
+  const [showTyping, setShowTyping] = useState(false)
+  useEffect(() => {
+    if (status !== 'submitted') {
+      setShowTyping(false)
+      return
+    }
+    const t = window.setTimeout(() => setShowTyping(true), 450)
+    return () => window.clearTimeout(t)
+  }, [status])
+
+  /*
    * #13 · ГЛУБИНА ПО СКРОЛЛУ. Считаем не в CSS и не на каждый кадр скролла в
    * state (это гнало бы рендер всей ленты на каждый пиксель), а по позициям
    * DOM-узлов: сколько реплика уже ушла за верхнюю кромку вьюпорта ленты.
@@ -603,25 +661,178 @@ export function CompanionChat({
 
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
+  const sending = status === 'submitted' || status === 'streaming'
+
+  /* ==================== ЧЕРНОВИК, ОТПРАВКА, СЕТЬ ==================== */
+
+  /*
+   * #15 · АВТОСОХРАНЕНИЕ ЧЕРНОВИКА.
+   *
+   * Человек с плохим фокусом уходит из приложения на середине фразы — это
+   * не край, это норма сценария. До сих пор недописанная мысль исчезала
+   * при любом уходе с экрана, и цена была не «придётся перепечатать», а
+   * «я уже не помню, что хотел сказать»: рабочая память — ровно то, что у
+   * этой аудитории подводит первым. Черновик её и подменяет.
+   *
+   * Дебаунс 300мс: писать в localStorage на каждый символ значит дёргать
+   * синхронный API в обработчике ввода — на длинной мысли это заметно.
+   */
+  const draftLoadedRef = useRef(false)
+  useEffect(() => {
+    if (draftLoadedRef.current) return
+    draftLoadedRef.current = true
+    try {
+      const saved = window.localStorage.getItem(DRAFT_KEY)
+      if (saved) setInput(saved)
+    } catch {
+      /* приватный режим — просто без черновика */
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!draftLoadedRef.current) return
+    const t = window.setTimeout(() => {
+      try {
+        if (input.trim()) window.localStorage.setItem(DRAFT_KEY, input)
+        else window.localStorage.removeItem(DRAFT_KEY)
+      } catch {
+        /* приватный режим */
+      }
+    }, 300)
+    return () => window.clearTimeout(t)
+  }, [input])
+
+  /*
+   * #18 · OFFLINE. Композер остаётся полностью доступным: человек не обязан
+   * сначала починить интернет, чтобы сформулировать мысль. Заблокированное
+   * поле в этот момент — не защита от ошибки, а потеря той единственной
+   * фразы, ради которой он открыл приложение.
+   */
+  const [online, setOnline] = useState(true)
+  useEffect(() => {
+    const sync = () => setOnline(navigator.onLine)
+    sync()
+    window.addEventListener('online', sync)
+    window.addEventListener('offline', sync)
+    return () => {
+      window.removeEventListener('online', sync)
+      window.removeEventListener('offline', sync)
+    }
+  }, [])
+
+  /*
+   * #16, #17 · СОСТОЯНИЕ ОТПРАВКИ.
+   *
+   * failedText — текст, который не ушёл. Держим его отдельно от input:
+   * человек мог начать печатать следующую мысль, пока первая падала, и
+   * затирать новое старым — худшее, что можно сделать с полем ввода.
+   */
+  const [failedText, setFailedText] = useState<string | null>(null)
+  const [copiedFailed, setCopiedFailed] = useState(false)
+  const sendingRef = useRef(false)
+
+  /*
+   * Ошибка транспорта приходит в onError выше, где чат подставляет
+   * скриптовый ответ. Настоящая «не отправилось» — это когда сети нет
+   * ФИЗИЧЕСКИ: тогда даже скриптовый мозг не спасает смысл, потому что
+   * реплика человека не сохранится в переписке на другом устройстве.
+   */
+  function doSend(text: string) {
+    if (sendingRef.current) return
+    sendingRef.current = true
+    // Отправка сообщения НЕ даёт хаптики (#24): это самое частое действие
+    // в продукте, и отклик на него за день превращает вибрацию в фон —
+    // после чего отклик на редкое событие перестаёт читаться как сигнал.
+    if (!navigator.onLine) {
+      setFailedText(text)
+      sendingRef.current = false
+      return
+    }
+    sendMessage({ text })
+    setFailedText(null)
+    setSendCount((c) => c + 1)
+    // Отпускаем замок в следующем тике: он нужен только против двойного
+    // тапа по кнопке, а не как долгоживущее состояние.
+    window.setTimeout(() => {
+      sendingRef.current = false
+    }, 400)
+  }
 
   function submit() {
-    if (!input.trim() || !canSend) return
+    if (!input.trim() || !canSend || sendingRef.current) return
     // Диктовка активна — отправка её закрывает: иначе микрофон продолжает
     // писать в уже опустевшее поле.
     if (dictation.listening) dictation.stop()
-    // Подтверждение телом в момент отправки: действие получает отклик
-    // раньше, чем придёт ответ по сети.
-    hapticStart()
     // #12 · Цитату передаём модели как контекст, а не как украшение в UI:
     // ответ «на это» бессмысленен, если напарник не знает, на что именно.
     const text = replyTo
       ? `> ${replyTo.text.replace(/\n/g, ' ')}\n\n${input}`
       : input
-    sendMessage({ text })
+    doSend(text)
     setInput('')
     setReplyTo(null)
-    setSendCount((c) => c + 1)
+    try {
+      window.localStorage.removeItem(DRAFT_KEY)
+    } catch {
+      /* приватный режим */
+    }
   }
+
+  function retryFailed() {
+    if (!failedText) return
+    const text = failedText
+    setFailedText(null)
+    doSend(text)
+  }
+
+  async function copyFailed() {
+    if (!failedText) return
+    try {
+      await navigator.clipboard?.writeText(failedText)
+      setCopiedFailed(true)
+      window.setTimeout(() => setCopiedFailed(false), 1400)
+    } catch {
+      /* буфер недоступен — молчим, текст всё равно на экране */
+    }
+  }
+
+  /*
+   * #10 · Выбранный быстрый ответ. Задержка перед отправкой не
+   * искусственная: за 190мс успевает отыграть подсветка выбранного чипа и
+   * приглушение остальных, и человек ВИДИТ, что система приняла именно
+   * его вариант, — до того, как список схлопнется. Без этой паузы блок
+   * исчезал в тот же кадр, и подтверждения выбора не существовало.
+   */
+  const [chosenChip, setChosenChip] = useState<string | null>(null)
+  function chooseChip(chip: string) {
+    if (chosenChip) return
+    hapticSelection()
+    setChosenChip(chip)
+    window.setTimeout(() => doSend(chip), 190)
+  }
+
+  /* #11 · Четвёртый контрол вместо четвёртого варианта. Хик не требует
+     удалить выбор — он требует перестать вываливать весь склад решений
+     сразу. «Другой ответ» открывает поле, а не ещё три чипа. */
+  const [otherOpen, setOtherOpen] = useState(false)
+  useEffect(() => {
+    if (otherOpen) textareaRef.current?.focus()
+  }, [otherOpen])
+
+  /*
+   * #13 · Состояние «человек формулирует». Публикуем и наружу («Дом» ужимает
+   * sticky-контекст), и на <body> — сцена по этому атрибуту останавливает
+   * медленные фоновые циклы. Клавиатура занимает половину экрана, и
+   * оставшийся мир, который в покое читается как «здесь живут», рядом с
+   * курсором становится единственным движущимся объектом.
+   */
+  const composing = focused || input.trim().length > 0
+  useEffect(() => {
+    onComposingChange?.(composing)
+    if (composing) document.body.setAttribute('data-composing', '')
+    else document.body.removeAttribute('data-composing')
+    return () => document.body.removeAttribute('data-composing')
+  }, [composing, onComposingChange])
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -703,46 +914,78 @@ export function CompanionChat({
             </div>
           </motion.div>
 
-          {messages.length === 0 && showSuggestions && (
+          {/*
+            #10, #11 · БЫСТРЫЕ ОТВЕТЫ — ПОД ВОПРОСОМ, ВЕРТИКАЛЬНО, РОВНО ТРИ.
+            Ряд «облаком» из flex-wrap выглядел как набор тегов: варианты
+            разной длины вставали в две неровные строки, и глазу приходилось
+            сканировать их зигзагом. Столбец читается сверху вниз одним
+            движением, и все три цели одинаковой ширины — по Фиттсу это
+            три равнодоступных ответа, а не «первый удобный и два неудобных».
+            Четвёртый вариант не показываем никогда: вместо него — контрол,
+            открывающий поле.
+          */}
+          {messages.length === 0 && showSuggestions && !quiet && (
             <motion.div
-              className="ml-10 flex flex-col gap-2"
+              className="ml-11 flex flex-col gap-2"
               initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ ...SPRING_ITEM, delay: 0.35 }}
+              animate={
+                chosenChip
+                  ? // Схлопывание без скачка скролла: высота уходит в 0
+                    // анимацией, а не удалением узла из потока — иначе лента
+                    // дёргается ровно в тот момент, когда человек смотрит на
+                    // свой выбор.
+                    { opacity: 0, height: 0, marginTop: 0, y: 0 }
+                  : { opacity: 1, y: 0 }
+              }
+              style={{ overflow: 'hidden' }}
+              transition={
+                chosenChip
+                  ? { duration: 0.24, ease: [0.22, 1, 0.36, 1], delay: 0.19 }
+                  : { ...SPRING_ITEM, delay: 0.35 }
+              }
             >
-              <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                можно просто нажать
-              </span>
-              <div className="flex flex-wrap gap-2">
-                {suggestionChips.map((chip, ci) => (
-                  // Stagger 45мс — в стандартном диапазоне 20–80мс и только
-                  // при первом появлении списка: ряд «собирается», а не
-                  // выпрыгивает плитой. Дальше чипы исчезают навсегда, так
-                  // что повторной ценой это не станет.
-                  <motion.button
-                    key={chip}
+              <span className="t-eyebrow">Что сейчас мешает?</span>
+              <div className="flex flex-col items-start gap-2">
+                {suggestionChips.map((chip, ci) => {
+                  const isChosen = chosenChip === chip
+                  const isDimmed = chosenChip !== null && !isChosen
+                  return (
+                    <motion.button
+                      key={chip}
+                      type="button"
+                      onClick={() => chooseChip(chip)}
+                      disabled={chosenChip !== null}
+                      initial={{ opacity: 0, y: 6 }}
+                      animate={{ opacity: isDimmed ? 0.35 : 1, y: 0 }}
+                      // Лестница входа 60мс — ряд «собирается», а не
+                      // выпрыгивает плитой. Чипы исчезают навсегда после
+                      // первого выбора, так что повторной ценой это не станет.
+                      transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
+                      className={`press-state inline-flex min-h-11 w-full items-center rounded-[16px] px-4 py-2.5 t-secondary text-foreground ${
+                        isChosen ? 'surface-active chip-selected chip-sweep' : 'surface-quiet'
+                      }`}
+                    >
+                      {chip}
+                    </motion.button>
+                  )
+                })}
+                {/* #11 · Четвёртый контрол, а не четвёртый вариант. */}
+                {!chosenChip && !otherOpen && (
+                  <button
                     type="button"
-                    onClick={() => {
-                      hapticStart()
-                      sendMessage({ text: chip })
-                    }}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    // #27 · Чипы приходят лестницей после приветствия:
-                    // stagger из lib/motion — один шаг ритма на весь продукт.
-                    transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
-                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
+                    onClick={() => setOtherOpen(true)}
+                    className="press-state inline-flex min-h-11 items-center px-1 t-secondary underline-offset-4 hover:underline"
+                    style={{ color: 'var(--ivory-500)' }}
                   >
-                    {chip}
-                  </motion.button>
-                ))}
+                    Другой ответ
+                  </button>
+                )}
               </div>
-              {/* min-h-11: цель была 143×17px — ниже минимума 24px по
-                  WCAG 2.5.8, при том что это единственный быстрый выход
-                  из чата прямо к сессии */}
+              {/* min-h-11: цель была 143×17px — ниже минимума по WCAG 2.5.8,
+                  при том что это единственный быстрый выход прямо к сессии */}
               <Link
                 href="/app/session"
-                className="mt-1 inline-flex min-h-11 w-fit items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
+                className="mt-1 inline-flex min-h-11 w-fit items-center gap-1.5 t-meta font-mono uppercase tracking-widest text-primary transition-opacity hover:opacity-80"
               >
                 или сразу к делу
                 <ArrowRight className="size-3.5" aria-hidden="true" />
@@ -761,6 +1004,14 @@ export function CompanionChat({
             const isFirstOfGroup = !prev || prev.role !== message.role
             const isLastOfGroup = !next || next.role !== message.role
             const isUser = message.role === 'user'
+            const groupPosition: GroupPosition =
+              isFirstOfGroup && isLastOfGroup
+                ? 'single'
+                : isFirstOfGroup
+                  ? 'first'
+                  : isLastOfGroup
+                    ? 'last'
+                    : 'middle'
 
             // Мимика существа — из содержимого ЕГО ЖЕ реплики, ноль
             // дополнительного состояния (тот же приём, что у героя
@@ -801,33 +1052,28 @@ export function CompanionChat({
                   </span>
                 </div>
               )}
+              {/* Расстояние ВНУТРИ группы 5px, между группами — 16px (#8).
+                  Раньше и то и другое было gap-2/-mt-2, то есть группа
+                  ничем не отличалась от соседства двух разных реплик, и
+                  гештальт-группировка существовала только в комментарии.
+                  Тройное сообщение подряд читалось как три отдельных
+                  события, хотя это одна мысль в три абзаца. */}
               <div
-                className={`flex flex-col gap-2 ${isFirstOfGroup ? '' : '-mt-2'} ${
+                className={`flex flex-col gap-[5px] ${isFirstOfGroup ? '' : '-mt-[11px]'} ${
                   isUser ? 'items-end' : 'items-start'
                 }`}
               >
               {message.parts.map((part, i) => {
                 if (part.type === 'text') {
                   return (
-                    <motion.div
+                    <div
                       key={i}
-                      className="flex w-full items-start gap-2"
-                      // Нюанс «своей стороны» (iMessage/Telegram): реплика
-                      // едва подъезжает СО СТОРОНЫ своего отправителя (8px —
-                      // в пределах 4-8px нормы для входа элемента, не рывок),
-                      // а не одинаково всплывает снизу вне зависимости от
-                      // того, чья это реплика.
-                      initial={
-                        reduceMotion
-                          ? { opacity: 0 }
-                          : { opacity: 0, y: 10, scale: 0.97, x: isUser ? 8 : -8 }
-                      }
-                      animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
-                      transition={
-                        reduceMotion
-                          ? { duration: 0.15 }
-                          : SPRING_SNAPPY
-                      }
+                      /* #21 · Вход реплики: opacity + 6px вверх, 200мс.
+                         Без scale и без сдвига «со своей стороны» —
+                         прежний вход был заметен КАК АНИМАЦИЯ, а появление
+                         текста в чате не должно быть событием само по себе:
+                         событие — это то, что в тексте написано. */
+                      className={`flex w-full items-start gap-2 ${reduceMotion ? '' : 'msg-in'}`}
                     >
                       {!isUser &&
                         (isFirstOfGroup ? (
@@ -846,7 +1092,7 @@ export function CompanionChat({
                       <ChatBubble
                         text={part.text}
                         isUser={isUser}
-                        isFirstOfGroup={isFirstOfGroup}
+                        groupPosition={groupPosition}
                         depth={depthOf(message.id)}
                         reaction={reactions[`${message.id}-${i}`] ?? null}
                         onReact={(r) =>
@@ -861,7 +1107,7 @@ export function CompanionChat({
                         onReply={() => setReplyTo({ text: part.text, isUser })}
                         reduceMotion={!!reduceMotion}
                       />
-                    </motion.div>
+                    </div>
                   )
                 }
 
@@ -979,31 +1225,33 @@ export function CompanionChat({
               вообще (exit требует контекста AnimatePresence) — пузырь просто
               обрывался кадром, пока настоящий ответ не появлялся рядом. */}
           <AnimatePresence>
-          {status === 'submitted' && (
+          {showTyping && (
             <motion.div
               key="typing"
               className="flex items-center gap-2"
-              initial={{ opacity: 0, y: 6, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
-              transition={SPRING_SNAPPY}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, transition: { duration: 0.12 } }}
+              transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
             >
               <CompanionAvatar />
-              {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
-                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней. */}
+              {/* #22 · Тот же материал, что у реплик: ожидание — это форма
+                  реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней.
+                  Три СВЕТОВЫХ СЕМЕНИ: работает в основном прозрачность,
+                  движение — 2px. Прыгающая точка была бы единственным
+                  движущимся объектом на экране ожидания, и глаз залипал бы
+                  на ней вместо того, чтобы отдохнуть перед чтением. */}
               <span
-                className="glass flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
+                className="chat-bubble-cat flex items-center gap-1.5 rounded-[22px] rounded-tl-[8px] px-4 py-3"
                 aria-label="Напарник печатает"
               >
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.3s' }}
-                />
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.15s' }}
-                />
-                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="typing-seed size-1.5 rounded-full bg-primary/70"
+                    style={{ animationDelay: `${i * 0.18}s` }}
+                  />
+                ))}
               </span>
             </motion.div>
           )}
@@ -1032,9 +1280,17 @@ export function CompanionChat({
             // пропускало текст сообщения насквозь и читалось как дефект.
             // Край вместо центра — тот же выбор, что в мессенджерах: не
             // закрывает середину реплики, куда смотрят при чтении.
-            className="press pointer-events-auto absolute bottom-28 right-4 z-20 flex size-11 items-center justify-center rounded-full border border-white/12 bg-secondary shadow-[0_6px_18px_-6px_oklch(0_0_0/0.7)]"
+            className="press-state pointer-events-auto absolute bottom-28 right-4 z-20 flex size-11 items-center justify-center rounded-full border border-white/12 bg-secondary shadow-[0_6px_18px_-6px_oklch(0_0_0/0.7)]"
           >
             <ArrowDown className="size-4 text-foreground" aria-hidden="true" />
+            {/* #23 · Бейдж непрочитанного. Без него кнопка сообщает только
+                «низ там», но не «там есть новое», а решение оторваться от
+                чтения истории принимается именно по второму. */}
+            {unread > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-primary px-1 t-micro font-semibold tabular-nums text-primary-foreground">
+                {unread > 9 ? '9+' : unread}
+              </span>
+            )}
           </motion.button>
         )}
       </AnimatePresence>
@@ -1048,13 +1304,71 @@ export function CompanionChat({
           <main> реально ограничен по высоте (h-dvh), лента над ним скроллится
           по-настоящему внутри себя — композеру не нужно цепляться за скролл
           всей страницы, он и так всегда внизу колонки. */}
+      {/* #13 · Маска-затухание 22px НАД композером: реплика растворяется в
+          панели, а не обрезается её кромкой. Отдельным узлом, а не
+          градиентом на самой форме — так высота маски не зависит от того,
+          насколько вырос композер под длинной мыслью. */}
+      <div aria-hidden="true" className="composer-veil pointer-events-none z-10 -mb-px" />
+
       <form
         onSubmit={(e) => {
           e.preventDefault()
           submit()
         }}
-        className="z-10 bg-gradient-to-t from-background via-background/85 to-transparent px-4 pt-6 pb-3"
+        /* pb-3 + safe-area: на iPhone с домашней полосой композер иначе
+           упирается в системный индикатор, и нижние 34px кнопки отправки
+           физически не нажимаются. */
+        className="surface-float z-10 px-4 pt-2.5"
+        style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}
       >
+        {/* Док живой сессии — над композером и над цитатой (#6). */}
+        <AnimatePresence>{dock}</AnimatePresence>
+
+        {/* #18 · OFFLINE. Строка над композером, поле остаётся рабочим. */}
+        {!online && (
+          <div className="mx-auto mb-2 flex max-w-md items-start gap-2 rounded-[16px] px-3 py-2 surface-quiet">
+            <WifiOff
+              className="mt-0.5 size-3.5 shrink-0"
+              style={{ color: 'var(--ivory-500)' }}
+              aria-hidden="true"
+            />
+            <p className="t-meta" style={{ color: 'var(--ivory-500)' }}>
+              Сейчас без связи. Сообщение отправится после подключения.
+            </p>
+          </div>
+        )}
+
+        {/*
+          #17 · ОШИБКА ОТПРАВКИ. Без кода ошибки, без красной стены и без
+          исчезнувшего текста — три вещи, которые превращают сбой сети в
+          потерю мысли. Человек видит, что именно не ушло, и получает два
+          выхода: повторить или забрать текст себе. Второй выход важен не
+          меньше первого: он работает даже тогда, когда сеть не вернётся.
+        */}
+        {failedText && (
+          <div className="mx-auto mb-2 flex max-w-md flex-col gap-2 rounded-[16px] p-3 surface-quiet">
+            <p className="t-secondary font-medium text-foreground">Не отправилось.</p>
+            <p className="t-meta" style={{ color: 'var(--ivory-500)' }}>
+              Твоя мысль сохранена: «{failedText.length > 64 ? `${failedText.slice(0, 64)}…` : failedText}»
+            </p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={retryFailed}
+                className="press-state surface-active flex h-11 flex-1 items-center justify-center rounded-[16px] t-secondary font-semibold text-foreground"
+              >
+                Повторить
+              </button>
+              <button
+                type="button"
+                onClick={copyFailed}
+                className="press-state surface-quiet flex h-11 flex-1 items-center justify-center rounded-[16px] t-secondary text-foreground"
+              >
+                {copiedFailed ? 'Скопировано' : 'Скопировать'}
+              </button>
+            </div>
+          </div>
+        )}
         {/* #12 · Цитата отвечаемой реплики. Появляется над полем, а не внутри
             него: текст ответа не должен смешиваться с текстом цитаты. Крестик
             обязателен — жест, из которого нет выхода, ощущается ловушкой. */}
@@ -1089,15 +1403,22 @@ export function CompanionChat({
           )}
         </AnimatePresence>
 
-        {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
-            рассеянный свет (тонкий контур + вынесенное свечение), а не
-            сплошная неоновая обводка — так фокус читается премиально, а
-            не как игровой хайлайт. */}
-        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1.5px_oklch(0.86_0.22_130/0.4),0_0_22px_-4px_oklch(0.86_0.22_130/0.4),0_10px_30px_-12px_oklch(0_0_0/0.55)]">
+        {/*
+          #12 · ТРИ РАЗДЕЛЁННЫЕ ЗОНЫ. Раньше диктовка и отправка стояли
+          вплотную (gap-2 = 8px между иконками размером 44px, но их
+          визуальные границы соприкасались), и на ходу палец регулярно
+          попадал в микрофон вместо отправки. Зазор 8px между зонами — это
+          минимум, ниже которого две соседние цели 44×44 перестают быть
+          двумя целями.
+          Радиус 22px — по системе: композер, не карточка и не чип.
+        */}
+        <div className="surface-quiet mx-auto flex max-w-md items-end gap-2 rounded-[22px] px-2.5 py-2 transition-shadow duration-200 focus-within:shadow-[inset_0_0_0_1.5px_color-mix(in_oklab,var(--lime-400)_38%,transparent)]">
           <textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
             onKeyDown={(e) => {
               if (
                 e.key === 'Enter' &&
@@ -1117,7 +1438,9 @@ export function CompanionChat({
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
             // минимума тач-цели 44px (замерено рендером).
-            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+            // max-h 7.5rem ≈ пять строк: дальше растёт скролл внутри поля,
+            // а не композер во весь экран.
+            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent px-1.5 py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-[var(--ivory-500)]"
           />
           {/* #15 · Диктовка. Рендерится только там, где Web Speech реально
               есть — кнопка, которая ничего не делает, хуже её отсутствия.
@@ -1147,40 +1470,79 @@ export function CompanionChat({
               )}
             </button>
           )}
-          <Button
+          {/*
+            #16 · СОСТОЯНИЕ ОТПРАВКИ. Кнопка блокируется на время полёта
+            (повторный тап физически невозможен — sendingRef держит замок и
+            до перерисовки), сжимается до 0.96 и возвращается за 140мс, а
+            стрелка на время ожидания превращается в короткую дугу
+            прогресса. Дуга, а не спиннер: спиннер обещает «долго», дуга
+            говорит «уже идёт».
+          */}
+          <motion.button
             type="submit"
-            size="icon"
-            disabled={!canSend || !input.trim()}
-            aria-label="Отправить"
-            // size-11, не size-10: 40px — тоже ниже минимума 44px
-            className="size-11 shrink-0 rounded-xl"
+            disabled={!canSend || !input.trim() || sending}
+            aria-label={sending ? 'Отправляется' : 'Отправить'}
+            whileTap={reduceMotion || !input.trim() ? undefined : { scale: 0.96 }}
+            transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
+            // size-11, не size-10: 40px — ниже минимума 44px
+            className="press-state flex size-11 shrink-0 items-center justify-center rounded-[16px] bg-primary text-primary-foreground disabled:opacity-40"
           >
-            {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
+            {/* Разметка НЕ ветвится по reduceMotion: раньше здесь было
                 {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
                 разное дерево на сервере (useReducedMotion → null) и на клиенте
                 при гидратации (→ true) — React #418, воспроизводилось только
-                в режиме «уменьшить движение». Структура теперь одна и та же,
-                варьируется лишь длительность: при reduced-motion стрелка
-                меняется мгновенно, без полёта. */}
+                в режиме «уменьшить движение». */}
             <span className="relative flex size-5 items-center justify-center overflow-hidden">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={sendCount}
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -14, opacity: 0 }}
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-                  }
-                  className="absolute inset-0 flex items-center justify-center"
-                >
-                  <ArrowUp className="size-5" />
-                </motion.span>
-              </AnimatePresence>
+              {sending ? (
+                <svg viewBox="0 0 20 20" className="size-5" aria-hidden="true">
+                  <circle
+                    cx="10"
+                    cy="10"
+                    r="7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeOpacity="0.3"
+                    strokeWidth="2"
+                  />
+                  <path
+                    d="M10 3 a7 7 0 0 1 7 7"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    {!reduceMotion && (
+                      <animateTransform
+                        attributeName="transform"
+                        type="rotate"
+                        from="0 10 10"
+                        to="360 10 10"
+                        dur="0.9s"
+                        repeatCount="indefinite"
+                      />
+                    )}
+                  </path>
+                </svg>
+              ) : (
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={sendCount}
+                    initial={{ y: 10, opacity: 0 }}
+                    animate={{ y: 0, opacity: 1 }}
+                    exit={{ y: -14, opacity: 0 }}
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                    }
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <ArrowUp className="size-5" />
+                  </motion.span>
+                </AnimatePresence>
+              )}
             </span>
-          </Button>
+          </motion.button>
         </div>
       </form>
     </div>

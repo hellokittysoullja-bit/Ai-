@@ -1,32 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CalendarCheck, Play, Sparkles } from "lucide-react";
+import { CalendarCheck } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
+  getActiveSession,
   getCompanionName,
   getFinds,
   getPatterns,
   getPlan,
+  getSessionResult,
+  consumeSessionResult,
   getStarts,
   getStepQueue,
   saveCompanionName,
   savePlan,
   todayKey,
+  type ActiveSession,
   type Patterns,
   type Plan,
+  type SessionResult,
 } from "@/lib/memory";
-import {
-  ISLAND_ELEMENT_NAMES,
-  ISLAND_POOL,
-  LANDMARK_COUNT,
-} from "@/lib/island-elements";
-import { landmarkAnchors, landmarkNodes } from "@/lib/island-sprites";
+import { LANDMARK_COUNT } from "@/lib/island-elements";
 import {
   enableCheckins,
   getCheckinState,
@@ -34,10 +34,18 @@ import {
   registerServiceWorker,
   type CheckinState,
 } from "@/lib/checkin";
-import { trimLabel } from "@/lib/utils";
 import { Bell } from "lucide-react";
-import { GreetingSkeleton, RewardCardSkeleton } from "@/components/skeletons";
+import { GreetingSkeleton } from "@/components/skeletons";
 import { SPRING_GESTURE } from "@/lib/motion";
+import { recommendDuration, type DurationAdvice } from "@/lib/duration";
+import { hapticStart } from "@/lib/haptics";
+import {
+  FirstMovementCard,
+  type MovementSource,
+} from "@/components/home/first-movement-card";
+import { SessionDock, StickyContext } from "@/components/home/session-dock";
+import { IslandDisclosure } from "@/components/home/island-disclosure";
+import { ReturnResult } from "@/components/home/return-result";
 
 type FirstWord = {
   greeting: string;
@@ -112,8 +120,6 @@ function buildFirstWord(
   const today = todayKey(now);
 
   // М3 · Ночная весточка: новый день должен приносить новизну (R1).
-  // Вчера был — сегодня кот рассказывает, что было ночью. Вариативно
-  // (по дню и числу стартов), привязано к реальному острову.
   const dayN = Math.floor(now.getTime() / 86_400_000);
   const nightTales = [
     lastFindName
@@ -126,15 +132,15 @@ function buildFirstWord(
       : "К утру на берегу прибавилось ракушек. Остров живёт. ",
   ];
   const nightLine =
-    patterns.daysAway === 1 ? nightTales[(patterns.totalStarts + dayN) % nightTales.length] : "";
+    patterns.daysAway === 1
+      ? nightTales[(patterns.totalStarts + dayN) % nightTales.length]
+      : "";
 
-  // Прощение как дефолт (механика Duolingo без её кнута): пауза — это
-  // просто пауза. Длинная — дневник острова, короткая — тихая радость.
+  // Прощение как дефолт: пауза — это просто пауза.
   const awayLine =
     patterns.daysAway !== null && patterns.daysAway >= 3
-      ? awayDiary[
-          (patterns.totalStarts + patterns.daysAway) % awayDiary.length
-        ] + " "
+      ? awayDiary[(patterns.totalStarts + patterns.daysAway) % awayDiary.length] +
+        " "
       : patterns.daysAway !== null && patterns.daysAway === 2
         ? "Ты пришёл. Два дня — это просто два дня, остров всё помнит. "
         : "";
@@ -147,28 +153,14 @@ function buildFirstWord(
       ? ` Сейчас ${hour}:00 — обычно именно в это время ты реально начинаешь.`
       : "";
 
-  // ГЛУБОКАЯ НОЧЬ (0:00–4:59) — ветка, которой раньше не существовало.
-  // Что было: в 04:14 (реальный скриншот с прода) продукт говорил
-  // «Выбери одно крошечное действие ПРЯМО СЕЙЧАС». Для СДВГ-аудитории это
-  // прицельный удар в revenge bedtime procrastination — самый дорогой
-  // паттерн этой группы: недосып → исполнительные функции ещё слабее →
-  // больше прокрастинации завтра. Приложение, обещавшее разорвать цикл,
-  // становилось его соучастником.
-  //
-  // ПОЧЕМУ ЭТА ВЕТКА СТОИТ ВЫШЕ ПРОВЕРКИ ПЛАНА. Ночной договор кладёт план
-  // на СЕГОДНЯШНЮЮ дату (человек ляжет и встанет в тот же календарный день,
-  // см. sealEveningPlan). Пока эта ветка стояла ниже, сразу после тапа
-  // срабатывала ветка «план на сегодня» — и экран, только что сказавший
-  // «иди спать», подсовывал лаймовую кнопку «Начинаю». Тап по собственному
-  // договору отменял его смысл; порядок ветвей здесь и есть механика.
-  //
-  // Новичок (totalStarts === 0) сюда не попадает намеренно: он пришёл с
-  // лендинга попробовать, привычку защищать ещё нечего, а нулевое трение до
-  // первого старта — само обещание продукта. Осознанная жертва один раз.
+  // ГЛУБОКАЯ НОЧЬ (0:00–4:59). В 04:14 продукт раньше говорил «начни прямо
+  // сейчас» — прицельный удар в revenge bedtime procrastination, самый
+  // дорогой паттерн этой аудитории. Ветка стоит ВЫШЕ проверки плана
+  // намеренно: ночной договор кладёт план на сегодняшнюю дату, и без этого
+  // порядка экран, только что сказавший «иди спать», сразу подсовывал бы
+  // кнопку старта. Порядок ветвей здесь и есть механика.
   if (isNight && patterns.totalStarts > 0) {
     const clock = `${hour}:${String(now.getMinutes()).padStart(2, "0")}`;
-    // Договор уже лежит (только что тапнул или положил вечером) — ночью
-    // остаётся только подтвердить и отпустить. Никакого призыва к старту.
     if (plan) {
       return {
         greeting: `Договорились: когда встанешь — ${plan.firstStep.toLowerCase()}. Больше от тебя сейчас ничего не нужно. Спи, я посторожу остров.`,
@@ -185,19 +177,18 @@ function buildFirstWord(
     };
   }
 
-  // План, положенный на сегодня (вчера вечером) или прямо сегодня на сегодня
+  // План, положенный на сегодня
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine}`,
       actionStep: plan.firstStep,
     };
   }
 
-  // План на завтра уже положен, сейчас день — подтверждение
   if (plan && !isLate) {
     return {
-      greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
+      greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать.`,
       actionStep: null,
     };
   }
@@ -209,17 +200,11 @@ function buildFirstWord(
     };
   }
 
-  // Первый визит — ВСЕГДА раньше общей вечерней ветки, вне зависимости от
-  // часа. Баг, который чинит эта строка: план физически не может
-  // существовать на первом визите, поэтому раньше isEvening-проверка ниже
-  // перехватывала любого новичка, зашедшего вечером/ночью — он не видел
-  // ни приветствия, ни стартер-чипов, а сразу получал «давай распланируем
-  // завтра». Для человека, который только что пришёл с лендинга, это
-  // рвёт обещание «попробуй одно крошечное дело — увидишь» и убивает
-  // весь эффект нулевого трения до первого старта.
+  // Первый визит — ВСЕГДА раньше общей вечерней ветки: план физически не
+  // может существовать на первом визите, поэтому раньше вечерняя проверка
+  // перехватывала любого новичка, зашедшего вечером, и он не видел ни
+  // приветствия, ни стартер-чипов.
   if (patterns.totalStarts === 0) {
-    // К-В · Тёплый старт: выбор, сделанный в диалоге на лендинге, продолжает
-    // разговор здесь — раньше он сохранялся и никогда не читался
     if (intro === "procrastinate") {
       return {
         greeting:
@@ -249,17 +234,15 @@ function buildFirstWord(
 
   if (isEvening) {
     return {
-      // Короче прежней реплики: рядом появляется однотаповая карточка
-      // договора — 4 строки рукописного текста + карточка = перегруз
       greeting:
-        "Вечер — время договориться с завтрашним собой. Один тап ниже — и можно спать спокойно. Или напиши своё.",
+        "Вечер — время договориться с завтрашним собой. Один тап ниже — и можно спать спокойно.",
       actionStep: null,
       offerEveningPlan: true,
     };
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль.${hourLine}`,
     actionStep: null,
   };
 }
@@ -267,10 +250,7 @@ function buildFirstWord(
 /**
  * Первая реплика чата. На нулевом старте — объясняет механику: чат ещё
  * не прожит, объяснение уместно. С первого же старта эта же строка
- * продолжала звучать как онбординг для человека, который её давно знает —
- * лендинг обещает «сообщение от живого существа», а не диктофонную запись.
- * totalStarts и имя уже приходят в HomeScreen из того же refresh(),
- * здесь только выбор реплики, не новый источник данных.
+ * продолжала звучать как онбординг для человека, который её давно знает.
  */
 function buildChatGreeting(
   totalStarts: number,
@@ -287,6 +267,25 @@ function buildChatGreeting(
   return `${who} тут. Помню ${totalStarts} твоих ${startsWord} — пиши, что нужно.`;
 }
 
+/**
+ * СОСТОЯНИЕ ЭКРАНА (#1) — не одна композиция на все случаи жизни.
+ *
+ * Раньше «Дом» рендерил все свои блоки разом и глушил лишние условиями по
+ * месту: приветствие, договор на завтра, стартер-чипы, весточки, карточка
+ * награды с CTA внутри, форма имени. Условий было девять штук, они
+ * пересекались, и реальные комбинации никто целиком не держал в голове —
+ * отсюда кадры, где на экране одновременно жили три просьбы с тремя
+ * кнопками.
+ *
+ * Четыре состояния отвечают на четыре разных вопроса, и в каждом ровно
+ * одно главное действие:
+ *   focus    — «мой таймер ещё жив?»      → док возврата
+ *   returned — «что я заработал?»          → результат и рост острова
+ *   task     — «что мне сделать сейчас?»   → карточка первого движения
+ *   open     — «а я вообще не знаю»        → короткая реплика и разговор
+ */
+type HomeState = "focus" | "returned" | "task" | "open";
+
 export function HomeScreen() {
   const router = useRouter();
   const [firstWord, setFirstWord] = useState<FirstWord | null>(null);
@@ -298,10 +297,6 @@ export function HomeScreen() {
   const [nameLoaded, setNameLoaded] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
 
-  // nameBusy: saveCompanionName асинхронна, а форма до этого позволяла жать
-  // «Так и зовут» сколько угодно раз, пока запись идёт — тот самый «кнопку
-  // можно нажать несколько раз во время запроса». В чате такой гейт уже был
-  // (canSend), здесь его не было.
   const [nameBusy, setNameBusy] = useState(false);
   async function giveName(name: string) {
     const trimmed = name.trim();
@@ -310,21 +305,14 @@ export function HomeScreen() {
     try {
       await saveCompanionName(trimmed);
       setCompanionName(trimmed);
-      // Дублируем имя в IndexedDB, чтобы весточки от напарника были персональными
       void mirrorCompanionName(trimmed);
     } finally {
       setNameBusy(false);
     }
   }
 
-  // Проактивные весточки: «он пишет первым», когда приложение закрыто.
-  // Работает только там, где браузер это умеет (установленная PWA на Chrome).
   const [checkinState, setCheckinState] = useState<CheckinState>("unsupported");
   const [checkinBusy, setCheckinBusy] = useState(false);
-
-  // U5: enableCheckins может вернуть "available" при выданном разрешении —
-  // это значит, что нужна установка PWA. Без подсказки кнопка была тупиком:
-  // тап → ничего не меняется → тап → ничего.
   const [checkinHint, setCheckinHint] = useState(false);
   async function turnOnCheckins() {
     setCheckinBusy(true);
@@ -340,34 +328,16 @@ export function HomeScreen() {
     }
   }
 
-  // reduceMotion объявляем первым — используется ниже
   const reduceMotion = useReducedMotion();
 
   // Маскот оживает ТОЛЬКО при возвращении после паузы (daysAway ≥ 1).
   // На каждый mount — НЕ анимируем: habituation убивает дофамин к 5-му визиту.
-  // Событийный триггер (вернулся!) = surprise = дофамин. Variable Reward.
   const shouldAnimateMascot =
     !reduceMotion &&
     stats !== null &&
-    // Событийный триггер: вернулся после паузы ИЛИ первый визит.
-    // Первый визит: peak moment bond-formation — маскот должен отреагировать.
-    // Возвращение после паузы: Variable Reward — дофамин от surprise.
-    // ONLY return after real pause (daysAway≥1) = Variable Reward.
-    // totalStarts===0 REMOVED: HomeScreen remounts on every tab switch →
-    // bounce would fire 3x/session → habituation → dopamine dies by visit 5.
-    // Rare event = dopamine peak. Frequent = background noise.
-    stats.daysAway !== null && stats.daysAway >= 1;
+    stats.daysAway !== null &&
+    stats.daysAway >= 1;
 
-  // Выражение маскота по контексту: вернулся после паузы — искренняя радость,
-  // есть шаг — собран, поздний вечер — сонный, иначе спокоен.
-  // mounted-гейт на "sleepy": страница статически пререндерена один раз при
-  // сборке — new Date().getHours() в серверном HTML почти всегда отличается
-  // от часа реального визита. Без гейта это расходится с SSR-версией уже на
-  // первом рендере (до всяких stats/firstWord, оба ещё null) — настоящий
-  // hydration mismatch (найден рендером с виртуальными часами, не по коду):
-  // React откатывает и перестраивает всё поддерево с нуля, и клики рядом
-  // теряются на те же мгновения. Тот же приём, что и у nameLoaded/stats
-  // выше — реальные данные приходят только после mount.
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     setMounted(true);
@@ -386,34 +356,58 @@ export function HomeScreen() {
   // Очередь дробления приоритетнее повтора: «следующий шаг той же задачи» —
   // это продолжение работы, а не её повторение (Zeigarnik на самой работе)
   const [queuedStep, setQueuedStep] = useState<string | null>(null);
-  // Задача, из которой раздроблен queuedStep, — для честного заголовка плана
   const [queuedTask, setQueuedTask] = useState<string | null>(null);
-  // Однотаповый вечерний договор: мгновенный оптимистичный отклик до refresh
   const [eveningPlanBusy, setEveningPlanBusy] = useState(false);
   const [rareFound, setRareFound] = useState(0);
-  // Pity дозрел (5+ обычных находок подряд): следующая гарантированно
-  // необычная+ (см. drawFind) — утренний триггер вправе это знать
   const [pityRipe, setPityRipe] = useState(false);
 
-  async function refresh() {
-    const [plan, patterns, name, starts, finds, queue] = await Promise.all([
-      getPlan(),
-      getPatterns(),
-      getCompanionName(),
-      getStarts(),
-      getFinds(),
-      getStepQueue(),
-    ]);
+  // Новое: живая сессия, свежий итог и рекомендация длительности из истории
+  const [activeSession, setActiveSession] = useState<ActiveSession | null>(null);
+  const [sessionResult, setSessionResult] = useState<SessionResult | null>(null);
+  const [resultShown, setResultShown] = useState(false);
+  const [advice, setAdvice] = useState<DurationAdvice>({
+    minutes: 15,
+    reason: null,
+  });
+  const [startBusy, setStartBusy] = useState(false);
+
+  const refresh = useCallback(async () => {
+    const [plan, patterns, name, starts, finds, queue, active, result] =
+      await Promise.all([
+        getPlan(),
+        getPatterns(),
+        getCompanionName(),
+        getStarts(),
+        getFinds(),
+        getStepQueue(),
+        getActiveSession(),
+        getSessionResult(),
+      ]);
     const lastStart = starts.length > 0 ? starts[starts.length - 1] : null;
     setLastStepLabel(lastStart?.label ?? null);
     setQueuedStep(queue?.steps[0] ?? null);
     setQueuedTask(queue?.task ?? null);
     setRareFound(finds.filter((f) => f.rarity === "rare").length);
+    setAdvice(recommendDuration(starts));
     let pity = 0;
     for (let i = finds.length - 1; i >= 0 && finds[i].rarity === "common"; i--)
       pity++;
     setPityRipe(pity >= 5);
     const lastFind = finds.length > 0 ? finds[finds.length - 1].name : null;
+
+    /*
+     * Живая сессия считается живой, только пока её время не вышло. Иначе
+     * док показывал бы «00:00» и звал вернуться в фокус, который уже
+     * закончился, — а вкладка Фокуса, восстановив ту же запись, сразу
+     * ушла бы в финал. Два экрана рассказывали бы про одну сессию разное.
+     */
+    if (active && Date.now() - active.startedAt < active.minutes * 60_000) {
+      setActiveSession(active);
+    } else {
+      setActiveSession(null);
+    }
+    setSessionResult(result);
+
     let intro: IntroChoice = null;
     try {
       const saved = window.localStorage.getItem("naparnik:intro");
@@ -427,34 +421,38 @@ export function HomeScreen() {
     setStats(patterns);
     setCompanionName(name);
     setNameLoaded(true);
-  }
+  }, []);
 
   useEffect(() => {
     refresh();
-    // Тихо ставим service worker и узнаём, доступны ли весточки
     void registerServiceWorker();
     void getCheckinState().then(setCheckinState);
-  }, []);
+  }, [refresh]);
 
-  function startNow(step: string) {
-    router.push(`/app/session?step=${encodeURIComponent(step)}&plan=1`);
-  }
+  /*
+   * Возврат во вкладку перечитывает состояние. Без этого человек, ушедший
+   * из «Дома» в Фокус и вернувшийся кнопкой «назад», видел бы док уже
+   * завершённой сессии или не видел бы дока начатой — экран рассказывал бы
+   * про мир версию получасовой давности.
+   */
+  useEffect(() => {
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
 
   // Однотаповый вечерний договор (implementation intentions, Gollwitzer):
   // решение принимается сейчас, на пике вечернего намерения, действие —
-  // завтра. Ноль печати: шаг берётся из очереди дробления или последнего
-  // старта. После сохранения refresh() сам переключает приветствие на
-  // «План на завтра уже готов … можешь спать спокойно» — петля замыкается
-  // видимым откликом кота, не тостом.
+  // завтра. Ноль печати: шаг берётся из очереди дробления или последнего старта.
   async function sealEveningPlan() {
     const step = queuedStep ?? lastStepLabel;
     if (!step || eveningPlanBusy) return;
     setEveningPlanBusy(true);
-    // Ночью «завтра» календарное и человеческое расходятся на целые сутки.
-    // savePlan по умолчанию ставит tomorrowKey(): в 4:14 30-го числа это
-    // 31-е — а человек ляжет и встанет всё ещё 30-го. План оказался бы
-    // невидим весь предстоящий день (проверка `plan.forDate === today` не
-    // сработала бы), и однотаповый договор молча промахнулся бы на сутки.
+    // Ночью «завтра» календарное и человеческое расходятся на целые сутки:
+    // в 4:14 30-го tomorrowKey() даёт 31-е, а человек ляжет и встанет всё
+    // ещё 30-го — план оказался бы невидим весь предстоящий день.
     await savePlan({
       task: queuedTask ?? step,
       firstStep: step,
@@ -466,8 +464,7 @@ export function HomeScreen() {
 
   // Приветствие — голос персонажа, вырезать нельзя. Но с третьего визита
   // это уже не знакомство, а стена текста перед единственной нужной
-  // кнопкой — сворачиваем до трёх строк (не двух: первая фраза часто несёт
-  // сам план) с «Дочитать», и только когда голос уже узнан.
+  // кнопкой — сворачиваем до трёх строк с «Дочитать».
   const [greetingExpanded, setGreetingExpanded] = useState(false);
   const [greetingOverflows, setGreetingOverflows] = useState(false);
   const greetingRef = useRef<HTMLParagraphElement>(null);
@@ -484,7 +481,7 @@ export function HomeScreen() {
       if (el) setGreetingOverflows(el.scrollHeight - el.clientHeight > 2);
     };
     measure();
-    // Рукописный Caveat на момент коммита мог ещё не примениться — высота
+    // Рукописный шрифт на момент коммита мог ещё не примениться — высота
     // была бы посчитана по подменному шрифту.
     let cancelled = false;
     document.fonts?.ready
@@ -498,38 +495,17 @@ export function HomeScreen() {
   }, [firstWord?.greeting, greetingClamped]);
 
   /**
-   * ОДНА ПРОСЬБА ЗА ВИЗИТ.
-   *
-   * Условия показа второстепенных блоков пересекаются, а не исключают друг
-   * друга. Проверено рендером (1 авг, 20:20, 3 старта, имя не дано): на
-   * экране одновременно оказывались договор на завтра И форма имени — поверх
-   * карточки награды с её собственным CTA. Три обращения к человеку в одном
-   * кадре, каждое со своей кнопкой: у экрана переставала существовать одна
-   * точка фокуса, а для СДВГ-аудитории лишнее решение — это не «чуть больше
-   * текста», это цена входа.
-   *
-   * Правило #24 уже частично введено ниже (весточки уступают готовому
-   * первому шагу), но оно закрывало только пару «весточки vs actionStep» и
-   * не ловило реальное столкновение — договор против формы имени. Здесь тот
-   * же принцип доведён до конца одним слотом с фиксированным приоритетом:
-   *   1) вечерний/ночной договор — привязан к часу, второго шанса сегодня
-   *      не будет, поэтому выигрывает всегда;
-   *   2) имя — момент присвоения (endowment), откладывать дальше некуда;
+   * ОДНА ПРОСЬБА ЗА ВИЗИТ. Условия показа второстепенных блоков
+   * пересекаются, а не исключают друг друга — на экране одновременно
+   * оказывались договор на завтра И форма имени поверх карточки с её
+   * собственным CTA. Один слот с фиксированным приоритетом:
+   *   1) вечерний/ночной договор — привязан к часу, второго шанса не будет;
+   *   2) имя — момент присвоения, откладывать дальше некуда;
    *   3) весточки — единственное, что спокойно доживёт до следующего визита.
-   *
-   * Имя и весточки и так взаимоисключены (одно требует !companionName,
-   * другое — companionName), так что фактически приоритет разводит договор
-   * против остальных. Ничего не выбрасывается: непоказанное всплывёт при
-   * следующем открытии, когда слот освободится.
    */
   const eveningOffer = Boolean(
     firstWord?.offerEveningPlan && (queuedStep ?? lastStepLabel),
   );
-  // Два последних условия — не мои: их ввёл предыдущий проход (просьба об
-  // имени ждёт, пока на экране лежит готовый первый шаг, и молчит ночью,
-  // потому что ночной экран обязан вести в сон, а не открывать новую ветку).
-  // Они верные, поэтому перенесены сюда как есть — чтобы у слота был один
-  // источник правды, а не половина правил в JSX и половина здесь.
   const nameOffer =
     !eveningOffer &&
     nameLoaded &&
@@ -544,698 +520,410 @@ export function HomeScreen() {
     !!companionName &&
     !firstWord?.actionStep;
 
-  // Интро-карточки «Дома» — закреплённый контекст в начале ленты чата.
-  // Раньше это была отдельная секция max-h-[60svh] overflow-y-auto НАД
-  // чатом: две независимые скролл-зоны в одном мобильном вьюпорте. Верхняя
-  // резала последнюю карточку посреди строки (её потолок), нижняя (чат)
-  // ужималась в тонкую полоску — человек воевал сразу с двумя скроллами.
-  // Теперь всё едет ОДНИМ скроллом: карточки прокручиваются вместе с
-  // перепиской, композер остаётся прижатым внизу (canonical companion-app
-  // pattern — контекст в начале треда, разговор ниже, ввод закреплён).
-  // gap-5: крупные паузы между смысловыми блоками — визуальная теснота =
-  // когнитивная теснота для СДВГ. Ширину/боковые поля даёт скролл-контейнер
-  // чата (max-w-md px-4), поэтому здесь их нет — иначе двойной padding.
+  /* ---------- Что за движение предлагаем и в каком мы состоянии ---------- */
+
+  const movement: { task: string; source: MovementSource } | null =
+    firstWord?.actionStep
+      ? { task: firstWord.actionStep, source: "plan" }
+      : queuedStep
+        ? { task: queuedStep, source: "queue" }
+        : lastStepLabel
+          ? { task: lastStepLabel, source: "repeat" }
+          : null;
+
+  const homeState: HomeState = activeSession
+    ? "focus"
+    : sessionResult && !resultShown
+      ? "returned"
+      : // Ночная инверсия и первый визит намеренно НЕ попадают в состояние
+        // «task»: у обоих своё целевое действие, и лаймовая карточка старта
+        // в них — ровно то, чего быть не должно. Ночью цель экрана — сон,
+        // у новичка — мгновенный старт из чипа без выбора длительности.
+        movement && !firstWord?.nightMode && !firstWord?.showStarterChips
+        ? "task"
+        : "open";
+
+  function startMovement() {
+    if (!movement || startBusy) return;
+    setStartBusy(true);
+    // Хаптика — на СОБЫТИЕ старта, не на тап по любой кнопке.
+    hapticStart();
+    router.push(
+      `/app/session?step=${encodeURIComponent(movement.task)}&d=${advice.minutes}${
+        movement.source === "plan" ? "&plan=1" : ""
+      }`,
+    );
+  }
+
+  /*
+   * STICKY-КОНТЕКСТ появляется, когда карточка первого движения физически
+   * ушла из вида. Наблюдаем сам узел, а не считаем скролл: карточка живёт
+   * внутри ленты чата, её позиция зависит от высоты приветствия, числа
+   * реплик и того, развернул ли человек «Дочитать», — любой расчёт по
+   * пикселям здесь рассыпался бы на первом же изменении контента.
+   */
+  const movementCardRef = useRef<HTMLDivElement>(null);
+  const [cardOutOfView, setCardOutOfView] = useState(false);
+  const [composing, setComposing] = useState(false);
+
+  useEffect(() => {
+    const el = movementCardRef.current;
+    if (!el || homeState !== "task") {
+      setCardOutOfView(false);
+      return;
+    }
+    /*
+     * threshold: [0, 1] + intersectionRatio, не threshold: 0 + isIntersecting:
+     * isIntersecting истинно уже при ЛЮБОМ ненулевом пересечении, то есть
+     * карточка, обрезанная краем ленты до узкой полоски в несколько
+     * процентов высоты, всё ещё считалась бы «видимой» — sticky-контекст
+     * не появился бы ровно тогда, когда он нужнее всего (см. тот же баг,
+     * пойманный рендером на аналогичном наблюдателе в focus-session.tsx).
+     */
+    const io = new IntersectionObserver(
+      ([entry]) => setCardOutOfView(entry.intersectionRatio < 0.98),
+      { threshold: [0, 1] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [homeState, movement?.task]);
+
+  /* ------------------------------- Разметка ------------------------------ */
+
   const introHeader = (
     <div className="flex flex-col gap-5">
-          <div className="flex items-start gap-3">
-            {/*
-              Mascot: bounce ТОЛЬКО при событии «вернулся после паузы» (daysAway ≥ 1).
-              На каждый mount — статичен. Habituation убивает дофамин к 5-му визиту.
-              Событийный триггер = Variable Reward = настоящий дофамин.
-              keyframes [1, 1.14, 0.95, 1.05, 1] = радостный прыжок, не угроза.
-
-              Тёплое пятно света позади — тот же очаг, что на лендинге, только
-              статичный: существо живёт в своём мире и на этом экране, не в
-              списке иконок. Continuity без анимационной цены.
-            */}
-            <div className="relative shrink-0">
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.16)_0%,transparent_70%)]"
-              />
-              <motion.div
-                className="relative"
-                animate={
-                  shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
-                }
-                transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
-              >
-                <MascotSvg
-                  expression={mascotExpression}
-                  label={companionName ?? "Напарник"}
-                  size={52}
-                />
-              </motion.div>
-            </div>
-            {/*
-              Greeting: iMessage pattern — появляется ТОЛЬКО когда данные загружены.
-              Не на mount (иначе «…» fade-in = jank = negative prediction error).
-              AnimatePresence ждёт firstWord, потом slide-up 0.25s.
-            */}
-            <AnimatePresence>
-              {firstWord ? (
-                <motion.div
-                  key="greeting"
-                  className="flex flex-col gap-1 pt-1"
-                  initial={reduceMotion ? false : { opacity: 0, y: 5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : SPRING_GESTURE
-                  }
-                >
-                  <p
-                    ref={greetingRef}
-                    className={`font-hand text-xl leading-snug ${
-                      greetingClamped ? "line-clamp-3" : ""
-                    }`}
-                  >
-                    {firstWord.greeting}
-                  </p>
-                  {greetingClamped && greetingOverflows && (
-                    <button
-                      type="button"
-                      onClick={() => setGreetingExpanded(true)}
-                      className="inline-flex min-h-11 w-fit items-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                    >
-                      Дочитать
-                    </button>
-                  )}
-                  {/* Инструкция — системным шрифтом: голос кота и указание
-                      интерфейса разделены типографически */}
-                  {firstWord.hint && (
-                    <p className="text-sm leading-relaxed text-muted-foreground">
-                      {firstWord.hint}
-                    </p>
-                  )}
-                </motion.div>
-              ) : (
-                /* #29 · Первый кадр: firstWord приходит из localStorage в
-                   useEffect, и до этого здесь была ПУСТОТА рядом с маскотом —
-                   экран выглядел сломанным именно в тот момент, когда человек
-                   решает, доверять ли продукту. Скелетон повторяет форму
-                   реплики (три строки рукописной высоты), поэтому появление
-                   текста не сдвигает раскладку. */
-                <GreetingSkeleton key="greeting-skeleton" />
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Вечерний договор в один тап: шаг уже известен продукту
-              (очередь дробления или последний старт) — человеку остаётся
-              только согласиться. Приоритет очереди: продолжение начатой
-              задачи (Zeigarnik) сильнее повтора.
-              Стоит ВЫШЕ ghost-кнопки старта ниже намеренно (порядок в
-              разметке, не CSS order): раньше здесь была пара order-1/
-              order-2 — но order сортирует ВСЕ flex-сиблинги колонки, а не
-              только эти два блока, поэтому оба реально уезжали в конец
-              экрана, за карточку награды и форму имени. Простой порядок в
-              JSX не ломается соседними order:0 элементами. */}
-          {eveningOffer && (
-            <button
-              type="button"
-              onClick={sealEveningPlan}
-              disabled={eveningPlanBusy}
-              className={
-                firstWord?.nightMode
-                  ? // Ночью карточка — единственный акцент экрана, получает
-                    // кольцо primary: тот же вес, что днём у кнопки-героя
-                    "glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left ring-1 ring-primary/30 disabled:opacity-60"
-                  : "glass glass-interactive press flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3 text-left disabled:opacity-60"
-              }
+      <div className="flex items-start gap-3">
+        <div className="relative shrink-0">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.16)_0%,transparent_70%)]"
+          />
+          <motion.div
+            className="relative"
+            animate={
+              shouldAnimateMascot ? { scale: [1, 1.14, 0.95, 1.05, 1] } : {}
+            }
+            transition={{ duration: 0.55, ease: "easeInOut", delay: 0.3 }}
+          >
+            <MascotSvg
+              expression={mascotExpression}
+              label={companionName ?? "Напарник"}
+              size={52}
+            />
+          </motion.div>
+        </div>
+        <AnimatePresence>
+          {firstWord ? (
+            <motion.div
+              key="greeting"
+              className="flex flex-col gap-1 pt-1"
+              initial={reduceMotion ? false : { opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={reduceMotion ? { duration: 0 } : SPRING_GESTURE}
             >
-              <span className="flex min-w-0 items-start gap-2.5">
-                <CalendarCheck
-                  className="mt-0.5 size-4 shrink-0 text-primary"
-                  aria-hidden="true"
-                />
-                <span className="flex min-w-0 flex-col">
-                    <span className="text-sm font-semibold">
-                      {/* Ночью «завтра» звучит как «через сутки» — человек
-                          ляжет и встанет в тот же календарный день.
-                          «Когда встанешь» совпадает с его моделью времени
-                          и с forDate, который кладёт sealEveningPlan. */}
-                      {firstWord?.nightMode
-                        ? queuedStep
-                          ? "Когда встанешь — следующий шаг"
-                          : "Когда встанешь — это же дело"
-                        : queuedStep
-                          ? "Завтра — следующий шаг"
-                          : "Завтра — это же дело"}
-                    </span>
-                  <span className="truncate text-sm text-muted-foreground">
-                    «{queuedStep ?? lastStepLabel}»
-                  </span>
-                </span>
-              </span>
-              <span className="shrink-0 font-mono text-xs uppercase tracking-widest text-primary">
-                {eveningPlanBusy ? "кладу…" : "один тап"}
-              </span>
-            </button>
-          )}
-
-          {/* М2 fused: действие обычно живёт ВНУТРИ карточки награды ниже
-              (действие и его награда в одной рамке). Ночью — исключение:
-              здесь остаётся тихая ghost-строка вне карточки, потому что
-              весь смысл ночного режима — НЕ привлекать взгляд к старту, а
-              карточка награды сама по себе яркая точка притяжения. */}
-          {stats &&
-            stats.totalStarts > 0 &&
-            !firstWord?.actionStep &&
-            !firstWord?.showStarterChips &&
-            firstWord?.nightMode && (
-              <div className="flex flex-col gap-2">
-                {/*
-                  НОЧНАЯ ИНВЕРСИЯ АКЦЕНТА (уникальная механика этого экрана).
-                  Днём это кнопка-герой: лаймовая заливка, size lg, полная
-                  ширина — намеренно самый тяжёлый объект экрана.
-                  В 4:14 та же кнопка кричала «Повторить: «…»» ровно поверх
-                  реплики «ночь — не время начинать»: два взаимоисключающих
-                  приказа в одном кадре, и побеждал более контрастный —
-                  визуальный вес важнее текста.
-                  Ночью она становится тихой ghost-строкой: путь к старту
-                  сохранён полностью (никакой блокировки — запрет породил бы
-                  реактивное сопротивление), но перестаёт быть точкой
-                  притяжения взгляда. Закон Фиттса, применённый наоборот:
-                  трение до действия повышается осознанно, потому что
-                  вредное в этот час действие — именно старт.
-                */}
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-11 gap-2 self-center text-muted-foreground"
-                  onClick={() => {
-                    const quick = queuedStep ?? lastStepLabel;
-                    return quick
-                      ? router.push(
-                          `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                        )
-                      : router.push("/app/session");
-                  }}
-                >
-                  {/* Ночью — честная формулировка выбора, а не приглашение,
-                      вне зависимости от того, есть ли известный шаг */}
-                  Всё равно начать сейчас
-                </Button>
-              </div>
-            )}
-
-          {firstWord?.showStarterChips && (
-            <div className="flex flex-col gap-2">
-              <p className="text-xs leading-relaxed text-muted-foreground">
-                Первый старт за 15 минут — тап и всё:
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {starterChips.map((chip) => (
-                  <Link
-                    key={chip}
-                    href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
-                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-4 py-2 text-sm font-semibold text-foreground hover:text-primary"
-                  >
-                    {chip}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Весточки от напарника: предлагаем один раз, после того как
-              человек уже назвал существо. Только там, где браузер их умеет.
-              Ни спама, ни давления — «один тихий раз в день». */}
-          {/* #24 · Тот же принцип: предложение весточек — не срочное дело.
-              Пока на экране лежит готовый первый шаг, оно ждёт свободного
-              кадра, иначе человек читает две просьбы вместо одного действия. */}
-          {checkinOffer && (
-            <div className="glass flex flex-col gap-2 rounded-2xl p-3">
-              <div className="flex items-start gap-2">
-                <Bell
-                  className="mt-0.5 size-4 shrink-0 text-primary"
-                  aria-hidden="true"
-                />
-                <p className="font-hand text-lg leading-snug">
-                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
-                  раз, без спама — и никаких «ты пропал».
-                </p>
-              </div>
-              {/* h-11, не h-10: 40px — не смог отрендерить это состояние в
-                  headless-браузере (Notification.permission там всегда
-                  'denied', даже после grantPermissions), проверил размер
-                  по коду напрямую. */}
-              <Button
-                size="sm"
-                variant="secondary"
-                className="h-11 self-start"
-                onClick={turnOnCheckins}
-                disabled={checkinBusy}
+              {/* Реплика ужата до двух-трёх строк (#7): эмоциональная
+                  первая строка — голосом существа, всё остальное, что
+                  нужно СДЕЛАТЬ, живёт в карточке ниже, а не в пузыре.
+                  Пузырь, из которого торчит инструкция, — это уже не
+                  персонаж, а системное сообщение в рукописном шрифте. */}
+              <p
+                ref={greetingRef}
+                className={`t-voice ${greetingClamped ? "line-clamp-3" : ""}`}
               >
-                {checkinBusy ? "Секунду…" : "Да, махай мне"}
-              </Button>
-              {checkinHint && (
-                <p className="text-xs leading-relaxed text-muted-foreground">
-                  Почти получилось: чтобы я мог писать первым, добавь меня на
-                  экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
-                  раз.
+                {firstWord.greeting}
+              </p>
+              {greetingClamped && greetingOverflows && (
+                <button
+                  type="button"
+                  onClick={() => setGreetingExpanded(true)}
+                  className="inline-flex min-h-11 w-fit items-center t-meta underline-offset-4 hover:underline"
+                  style={{ color: "var(--ivory-500)" }}
+                >
+                  Дочитать
+                </button>
+              )}
+              {firstWord.hint && (
+                <p className="t-secondary" style={{ color: "var(--ivory-500)" }}>
+                  {firstWord.hint}
                 </p>
               )}
-            </div>
+            </motion.div>
+          ) : (
+            <GreetingSkeleton key="greeting-skeleton" />
           )}
+        </AnimatePresence>
+      </div>
 
-          {checkinState === "enabled" && !!companionName && (
-            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
-              <Bell
-                className="size-3.5 shrink-0 text-primary"
-                aria-hidden="true"
-              />
-              {companionName} будет тихо махать тебе с острова раз в день.
+      {/* ═══ СОСТОЯНИЕ «ВЕРНУЛСЯ» ═══ */}
+      {homeState === "returned" && sessionResult && stats && (
+        <ReturnResult
+          result={sessionResult}
+          landmarksBefore={Math.min(
+            Math.max(0, stats.totalStarts - 1),
+            LANDMARK_COUNT - 1,
+          )}
+          onCollapsed={() => {
+            // Гасим флаг в памяти, а не только в state: иначе тот же итог
+            // встречал бы человека при каждом открытии «Дома» ближайшие два
+            // часа, и награда за одну сессию превратилась бы в баннер.
+            setResultShown(true);
+            void consumeSessionResult();
+          }}
+        />
+      )}
+
+      {/* ═══ СОСТОЯНИЕ «ДЕЛО НАЙДЕНО» — главная карточка экрана ═══ */}
+      {homeState === "task" && movement && (
+        <FirstMovementCard
+          ref={movementCardRef}
+          task={movement.task}
+          source={movement.source}
+          minutes={advice.minutes}
+          busy={startBusy}
+          onStart={startMovement}
+          onOther={() => router.push("/app/session")}
+        />
+      )}
+
+      {/* Вечерний договор в один тап: шаг уже известен продукту (очередь
+          дробления или последний старт) — человеку остаётся согласиться.
+          Ночью получает кольцо primary: это единственный акцент экрана. */}
+      {eveningOffer && (
+        <button
+          type="button"
+          onClick={sealEveningPlan}
+          disabled={eveningPlanBusy}
+          className={`press-state flex w-full items-center justify-between gap-3 px-4 py-3 text-left disabled:opacity-60 ${
+            firstWord?.nightMode ? "surface-active rounded-[18px]" : "surface-quiet"
+          }`}
+        >
+          <span className="flex min-w-0 items-start gap-2.5">
+            <CalendarCheck
+              className="mt-0.5 size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <span className="flex min-w-0 flex-col">
+              <span className="t-secondary font-semibold text-foreground">
+                {/* Ночью «завтра» звучит как «через сутки» — человек ляжет и
+                    встанет в тот же календарный день. «Когда встанешь»
+                    совпадает и с его моделью времени, и с forDate. */}
+                {firstWord?.nightMode
+                  ? queuedStep
+                    ? "Когда встанешь — следующий шаг"
+                    : "Когда встанешь — это же дело"
+                  : queuedStep
+                    ? "Завтра — следующий шаг"
+                    : "Завтра — это же дело"}
+              </span>
+              <span
+                className="truncate t-secondary"
+                style={{ color: "var(--ivory-500)" }}
+              >
+                «{queuedStep ?? lastStepLabel}»
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 t-micro font-mono uppercase tracking-widest text-primary">
+            {eveningPlanBusy ? "кладу…" : "один тап"}
+          </span>
+        </button>
+      )}
+
+      {/* НОЧНАЯ ИНВЕРСИЯ АКЦЕНТА. Днём старт — самый тяжёлый объект экрана.
+          В 4:14 та же кнопка кричала «Повторить» поверх реплики «ночь — не
+          время начинать»: два взаимоисключающих приказа в одном кадре, и
+          побеждал более контрастный. Ночью путь к старту сохранён целиком
+          (запрет породил бы сопротивление), но перестаёт быть точкой
+          притяжения взгляда — закон Фиттса, применённый наоборот. */}
+      {firstWord?.nightMode && stats && stats.totalStarts > 0 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-11 gap-2 self-center"
+          style={{ color: "var(--ivory-500)" }}
+          onClick={() => {
+            const quick = queuedStep ?? lastStepLabel;
+            return quick
+              ? router.push(
+                  `/app/session?step=${encodeURIComponent(quick)}&d=15`,
+                )
+              : router.push("/app/session");
+          }}
+        >
+          Всё равно начать сейчас
+        </Button>
+      )}
+
+      {/* Новичок: мгновенный старт из чипа, ноль решений до первого действия.
+          Длительность не спрашиваем вовсе — 15 минут и вперёд. */}
+      {firstWord?.showStarterChips && (
+        <div className="flex flex-col gap-2">
+          <span className="t-eyebrow">Первый старт за 15 минут — тап и всё</span>
+          <div className="flex flex-wrap gap-2">
+            {starterChips.map((chip) => (
+              <Link
+                key={chip}
+                href={`/app/session?step=${encodeURIComponent(chip)}&d=15`}
+                className="press-state surface-quiet inline-flex min-h-11 items-center rounded-[16px] px-4 py-2 t-secondary font-semibold text-foreground"
+              >
+                {chip}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Коллекция — под раскрытием, ниже действия. Скрыта у новичка: «0 из
+          10» на первом экране визуализирует ноль, а не обещание. */}
+      {stats && stats.totalStarts > 0 && homeState !== "focus" && (
+        <IslandDisclosure
+          stats={stats}
+          rareFound={rareFound}
+          pityRipe={pityRipe}
+        />
+      )}
+
+      {/* Весточки от напарника: предлагаем один раз, после того как человек
+          уже назвал существо, и только пока экран свободен от готового шага. */}
+      {checkinOffer && (
+        <div className="surface-quiet flex flex-col gap-2 p-3.5">
+          <div className="flex items-start gap-2">
+            <Bell
+              className="mt-0.5 size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <p className="t-voice-sm">
+              Хочешь, я буду махать тебе с острова раз в день? Один тихий раз,
+              без спама — и никаких «ты пропал».
+            </p>
+          </div>
+          <Button
+            size="sm"
+            variant="secondary"
+            className="h-11 self-start"
+            onClick={turnOnCheckins}
+            disabled={checkinBusy}
+          >
+            {checkinBusy ? "Секунду…" : "Да, махай мне"}
+          </Button>
+          {checkinHint && (
+            <p className="t-meta" style={{ color: "var(--ivory-500)" }}>
+              Почти получилось: чтобы я мог писать первым, добавь меня на экран
+              «Домой» (Поделиться → На экран «Домой») — и нажми ещё раз.
             </p>
           )}
+        </div>
+      )}
 
-          {/* М2 · Goal gradient: слитая карточка — действие и его награда в
-              одной рамке. Раньше здесь стояли два раздельных объекта (кнопка
-              сверху, карточка награды снизу); слитые — карточка перестаёт быть
-              целиком-Link (внутри неё теперь живёт кнопка со своим переходом:
-              кнопка внутри <a> кликалась бы одновременно с переходом самой
-              ссылки — невалидно). Вместо этого «весь остров →» — свои
-              маленькие ссылки в каждой ветке ниже. */}
-          {/* #29 · Карточка награды — самый крупный объект экрана; её
-              отсутствие на первом кадре роняло всю раскладку вверх, а потом
-              она въезжала и толкала контент вниз. Скелетон держит место. */}
-          {!stats && <RewardCardSkeleton />}
-          {/* Без .press на карточке: своего onClick у неё нет — действие
-              живёт в кнопке и ссылках внутри. CSS :active срабатывает на
-              любом предке нажатого элемента, поэтому .press давал ложный
-              отклик: палец жал на текст статистики или пустой отступ,
-              карточка сжималась, и не происходило ничего. А при нажатии на
-              настоящий CTA внутри её scale(0.97) складывался с собственным
-              active:translate-y-px кнопки (components/ui/button.tsx) — два
-              трансформа на один тап. Док самого класса .press это прямо
-              запрещает: «только на CTA без собственного active-transform». */}
-          {stats && (
-            <div className="glass relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
-              {stats.totalStarts < LANDMARK_COUNT ? (
-                <>
-                  {/* Аура за силуэтом: холодный лунный свет из угла карты.
-                      Средняя дозировка (0.16): v3 с 0.22 читался
-                      «затмением», финальный откат до 0.1 гасил награду
-                      в чёрный блин — обещание обязано манить (reward
-                      anticipation, Schultz), холодный оттенок оправдан
-                      сюжетно: луна — единственный холодный свет сцены */}
-                  <span
-                    aria-hidden="true"
-                    className="pointer-events-none absolute -left-6 -top-8 size-30 rounded-full bg-[radial-gradient(circle,oklch(0.9_0.05_240/0.16)_0%,transparent_64%)]"
-                  />
-                  <span className="relative flex items-center gap-3.5">
-                    {/* #14 · МИНИ-СЦЕНА вместо плоской иконки. Ориентир
-                        вырезался из карты без земли под ним — «иконка
-                        предмета», хотя обещание карточки в том, что на
-                        острове появится МЕСТО. Здесь тот же спрайт получает
-                        свой клочок мира: горизонт, две звезды и холодный
-                        лунный свет — награда читается как кадр из будущего
-                        острова, а не как ассет в списке. Всё внутри одного
-                        SVG с клипом по скруглению: ни одного лишнего узла в
-                        DOM и ни одного нового цвета в палитре. */}
-                    <svg
-                      viewBox="0 0 48 48"
-                      className="size-16 shrink-0"
-                      aria-hidden="true"
-                    >
-                      <defs>
-                        <clipPath id="mini-scene-clip">
-                          <rect x="0" y="0" width="48" height="48" rx="12" />
-                        </clipPath>
-                        <radialGradient id="mini-moonlight" cx="22%" cy="16%" r="72%">
-                          <stop offset="0%" stopColor="oklch(0.9 0.05 240 / 0.3)" />
-                          <stop offset="100%" stopColor="oklch(0.9 0.05 240 / 0)" />
-                        </radialGradient>
-                      </defs>
-                      <g clipPath="url(#mini-scene-clip)">
-                        {/* Ночное небо кадра — на полтона светлее стекла
-                            карточки, чтобы сцена читалась как окно, а не
-                            как дырка */}
-                        <rect x="0" y="0" width="48" height="48" fill="oklch(0.2 0.02 140)" />
-                        <rect x="0" y="0" width="48" height="48" fill="url(#mini-moonlight)" />
-                        <circle cx="37" cy="9" r="0.9" fill="oklch(0.92 0.01 210 / 0.5)" />
-                        <circle cx="30" cy="15" r="0.6" fill="oklch(0.92 0.01 210 / 0.32)" />
-                        {/* Земля: тот же силуэт холмов, что в сцене фона */}
-                        <path
-                          d="M0 34 Q 12 29 24 32 T 48 30 L 48 48 L 0 48 Z"
-                          fill="oklch(0.17 0.018 138)"
-                        />
-                        {/* Сам ориентир — стоит НА земле, не висит в пустоте.
-                            brightness-150: ассеты нарисованы под тёмную сцену
-                            Мира, без осветления силуэт читался чёрным блином. */}
-                        <g
-                          transform={`translate(${24 - landmarkAnchors[stats.totalStarts].x * 0.58}, ${30 - landmarkAnchors[stats.totalStarts].y * 0.58}) scale(0.58)`}
-                          className="brightness-150 saturate-[0.75]"
-                          style={{
-                            filter:
-                              "drop-shadow(0 0 5px oklch(0.9 0.06 240 / 0.45))",
-                          }}
-                        >
-                          {landmarkNodes[stats.totalStarts]}
-                        </g>
-                      </g>
-                    </svg>
-                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <span className="font-mono text-xs uppercase tracking-widest text-muted-foreground">
-                        Следующий старт вырастит
-                      </span>
-                      <span className="text-lg font-semibold leading-snug text-foreground text-balance">
-                        «{ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
-                      </span>
-                    </span>
-                  </span>
-                  {/* Endowed progress (Nunes & Drèze, 2006): видимая
-                      заполненная часть пути к находке. Только при
-                      totalStarts > 0 — пустой бар у новичка демотивирует */}
-                  {stats.totalStarts > 0 && (
-                    <span
-                      className="flex flex-col gap-1.5"
-                      role="progressbar"
-                      aria-valuenow={stats.totalStarts}
-                      aria-valuemin={0}
-                      aria-valuemax={LANDMARK_COUNT}
-                      aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
-                    >
-                      {/* #22 · ЖИВАЯ ТРОПА вместо сегментов прогресса.
-                          Сегменты честно считали старты (unit bias), но
-                          говорили языком загрузки файла — «системный
-                          индикатор», к тому же неотличимый от прогресс-бара
-                          в любом приложении. Здесь прогресс — это ПУТЬ по
-                          острову, и тропа говорит это буквально: пройденные
-                          шаги — следы на земле, следующий — пульсирующая
-                          точка-цель (Goal Gradient: видимая близость цели
-                          ускоряет действие), непройденные — бледный пунктир
-                          уходящей вдаль дороги.
-                          Семантика progressbar сохранена на родителе: для
-                          скринридера ничего не изменилось. */}
-                      <span className="relative flex h-4 items-center">
-                        {/* Земля под следами — тонкая линия тропы */}
-                        <span
-                          aria-hidden="true"
-                          className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/[0.07]"
-                        />
-                        {/* Пройденная часть тропы — тёплая, заработанная */}
-                        <span
-                          aria-hidden="true"
-                          className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-primary/45"
-                          style={{
-                            width: `${(Math.max(0, stats.totalStarts - 1) / (LANDMARK_COUNT - 1)) * 100}%`,
-                          }}
-                        />
-                        <span className="relative flex w-full items-center justify-between">
-                          {Array.from({ length: LANDMARK_COUNT }, (_, i) => {
-                            const done = i < stats.totalStarts;
-                            const isNext = i === stats.totalStarts;
-                            return (
-                              <span
-                                key={i}
-                                className={
-                                  done
-                                    ? "size-2 rounded-full bg-primary shadow-[0_0_6px_oklch(0.86_0.22_130/0.5)]"
-                                    : isNext
-                                      ? "trail-beacon size-2 rounded-full bg-primary/70 ring-2 ring-primary/25"
-                                      : "size-1 rounded-full bg-white/15"
-                                }
-                              />
-                            );
-                          })}
-                        </span>
-                      </span>
-                      <span className="flex items-baseline justify-between gap-2">
-                        {/* Вербальный фрейминг близости (goal-gradient,
-                            Kivetz 2006): «остался последний» сильнее голого
-                            счёта */}
-                        <span className="font-mono text-xs uppercase tracking-wider tabular-nums text-muted-foreground">
-                          {stats.totalStarts} из {LANDMARK_COUNT}
-                          {LANDMARK_COUNT - stats.totalStarts === 1
-                            ? ' · остался последний'
-                            : stats.lastStartDate === todayKey(new Date())
-                              ? ' · вырос сегодня'
-                              : ''}
-                        </span>
-                        {/* py-3.5 -my-3.5: расширяет тач-цель до 44px, не
-                            трогая визуальную высоту строки (WCAG 2.5.8) */}
-                        <Link
-                          href="/app/world"
-                          className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                        >
-                          весь остров →
-                        </Link>
-                      </span>
-                    </span>
-                  )}
-                  {/*
-                    ПУСТОЕ СОСТОЯНИЕ КАРТОЧКИ (0 стартов) — было спроектировано
-                    как «просто убрать блок», и это ломало анатомию.
-                    Что видно на реальном скриншоте: у новичка под иконкой h-14
-                    и двумя строками текста оставалась одинокая мелкая ссылка,
-                    прижатая влево — карточка теряла нижний ряд целиком и
-                    читалась как недогруженная, а не как «пустая, но целая».
-                    Хуже: это первый экран после лендинга, где доверие ещё не
-                    заработано, и «сломанная вёрстка» стоит дороже всего.
+      {checkinState === "enabled" && !!companionName && (
+        <p
+          className="flex items-center gap-1.5 t-meta"
+          style={{ color: "var(--ivory-500)" }}
+        >
+          <Bell className="size-3.5 shrink-0 text-primary" aria-hidden="true" />
+          {companionName} будет тихо махать тебе с острова раз в день.
+        </p>
+      )}
 
-                    Бар остаётся скрытым намеренно: 10 серых пустых сегментов у
-                    человека с нулём стартов — это визуализация нуля, она
-                    демотивирует (и врать зажжённым сегментом нельзя — данные
-                    обязаны быть честными). Вместо бара тот же самый
-                    двухколоночный baseline-ряд, что и у прогресса: слева счёт
-                    ориентиров, справа «весь остров →». Анатомия карточки
-                    идентична во всех состояниях, разница только в содержании.
-
-                    Копия ужата до «10 ориентиров ждут» по замеру: на 390px
-                    левой колонке достаётся 223px, и вариант «10 ориентиров ·
-                    первый в одном старте» переносился на вторую строку —
-                    ровно тот сиротский перенос, который я считаю браком.
-                    «В одном старте» вырезано не ради длины, а потому что это
-                    дублировало заголовок карточки («Следующий старт вырастит
-                    «Первый росток»»): заголовок говорит ЧТО дальше, нижний
-                    ряд — насколько велик мир целиком (endowment всего набора).
-                  */}
-                  {stats.totalStarts === 0 && (
-                    <span className="flex items-baseline justify-between gap-2">
-                      <span className="min-w-0 font-mono text-xs uppercase tracking-wider tabular-nums text-muted-foreground">
-                        {LANDMARK_COUNT} ориентиров ждут
-                      </span>
-                      <Link
-                        href="/app/world"
-                        className="-my-3.5 inline-flex shrink-0 items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                      >
-                        весь остров →
-                      </Link>
-                    </span>
-                  )}
-                  {/* Вариативный слой награды — раньше этот текст жил только
-                      в ветке totalStarts >= LANDMARK_COUNT ниже, то есть
-                      впервые появлялся ПОСЛЕ десятого старта, хотя drawFind
-                      (island-elements.ts) уже считает находку на каждый
-                      старт с первого. Перенесено сюда, к раннему окну
-                      удержания. */}
-                  <span
-                    className={`flex items-center gap-1.5 text-xs leading-snug ${
-                      pityRipe ? "text-primary" : "text-muted-foreground"
-                    }`}
-                  >
-                    <Sparkles className="size-3.5 shrink-0" aria-hidden="true" />
-                    {pityRipe
-                      ? "Следующая находка будет необычной — или лучше"
-                      : "И одна находка на остров — какая, не знаю сам"}
-                  </span>
-                </>
-              ) : pityRipe ? (
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm leading-snug text-muted-foreground">
-                    Следующая находка будет{" "}
-                    <span className="font-semibold text-reward">
-                      необычной — или лучше
-                    </span>
-                    .
-                  </span>
-                  <Link
-                    href="/app/world"
-                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                  >
-                    она уже ждёт →
-                  </Link>
-                </div>
-              ) : (
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm leading-snug text-muted-foreground">
-                    Редких находок:{" "}
-                    <span className="font-semibold text-reward">
-                      {rareFound} из{" "}
-                      {ISLAND_POOL.filter((e) => e.rarity === "rare").length}
-                    </span>{" "}
-                    — полная сессия повышает шанс.
-                  </span>
-                  <Link
-                    href="/app/world"
-                    className="-my-3.5 inline-flex w-fit items-center py-3.5 font-mono text-xs uppercase tracking-wider text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
-                  >
-                    весь остров →
-                  </Link>
-                </div>
-              )}
-
-              {/* Действие — внутри той же рамки, что и его награда (по
-                  вашей просьбе в этой сессии). Ночью действие сюда не
-                  переезжает — см. комментарий у ghost-кнопки выше. */}
-              {firstWord?.actionStep ? (
-                <div className="flex flex-col gap-1">
-                        {/* Шаг на кнопке НЕ обрезаем. Проверено в браузере на
-                            реальном плане: trimLabel(28) + truncate давали
-                            «Начинаю: „открыть файл и перечитат…"» — человек
-                            видел обрубок ровно того текста, ради которого
-                            кнопка существует. Весь смысл первого шага в том,
-                            что он крошечный и конкретный: «перечитать
-                            последний абзац» снимает страх, «перечитат…» его
-                            добавляет — мозг достраивает неизвестный объём.
-                            Кнопка растёт в высоту под текст, а не режет его:
-                            две строки здесь дешевле, чем потерянный старт. */}
-                        <Button
-                          size="lg"
-                          className="cta-sheen h-auto w-full items-start gap-2 py-3 font-semibold whitespace-normal"
-                          onClick={() => startNow(firstWord.actionStep as string)}
-                        >
-                          <Play className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                          <span className="text-left leading-snug text-pretty">
-                            Начинаю: «{firstWord.actionStep}»
-                          </span>
-                        </Button>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-11 self-center text-muted-foreground"
-                    onClick={() => router.push("/app/session")}
-                  >
-                    Другое дело
-                  </Button>
-                </div>
-              ) : (
-                stats.totalStarts > 0 &&
-                !firstWord?.showStarterChips &&
-                !firstWord?.nightMode && (
-                  <div className="flex flex-col gap-2">
-                    <Button
-                      size="lg"
-                      className="cta-sheen w-full gap-2 font-semibold"
-                      onClick={() => {
-                        const quick = queuedStep ?? lastStepLabel;
-                        return quick
-                          ? router.push(
-                              `/app/session?step=${encodeURIComponent(quick)}&d=15`,
-                            )
-                          : router.push("/app/session");
-                      }}
-                    >
-                      {/* Продолжение раздробленной задачи (Zeigarnik) и
-                          повтор прошлой — разные по смыслу действия, но до
-                          сих пор рендерились с одной и той же иконкой Play.
-                          Стрелка вперёд честнее говорит «дальше», а не
-                          «сначала». */}
-                      {queuedStep ? (
-                        <ArrowRight className="size-4" aria-hidden="true" />
-                      ) : (
-                        <Play className="size-4" aria-hidden="true" />
-                      )}
-                      {(() => {
-                        const quick = queuedStep ?? lastStepLabel;
-                        if (!quick) return "Начать сессию";
-                        const short = trimLabel(quick, 22);
-                        return queuedStep
-                          ? `Следующий шаг: «${short}»`
-                          : `Повторить: «${short}»`;
-                      })()}
-                    </Button>
-                    {lastStepLabel && (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-11 self-center text-muted-foreground"
-                        onClick={() => router.push("/app/session")}
-                      >
-                        Другое дело
-                      </Button>
-                    )}
-                  </div>
-                )
-              )}
-            </div>
-          )}
-
-          {/* Порядок сверху вниз = приоритет: действие (CTA) → награда
-              (goal-карта) → отношения (имя). Карточка имени, стоявшая
-              МЕЖДУ действием и наградой, разрывала связку «сделай — и
-              вырастет» лишним социальным решением (serial position +
-              минимизация числа решений до действия) */}
-          {/* #24 · ГЕРОЙ ДНЯ. «Дизайн закончен, когда нечего убрать»: когда на
-              экране есть готовый первый шаг, единственное нужное действие —
-              нажать «Начинаю». Форма имени в этот момент — второе социальное
-              решение поверх первого, и она физически отодвигает кнопку от
-              большого пальца. Просьба об имени не исчезает, она ЖДЁТ момента,
-              когда экран свободен (нет плана на сегодня): тогда она и главное
-              событие кадра, и не конкурирует с действием.
-              Ночью тоже прячем: ночной экран должен вести в сон, а не
-              открывать новую ветку взаимодействия. */}
-          {nameOffer && (
-              <form
-                className="glass flex flex-col gap-2 rounded-2xl p-3"
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  giveName(nameDraft);
-                }}
-              >
-                <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
-                </p>
-                <div className="flex gap-2">
-                  {/* h-11 (44px), не h-10: замерено рендером — оба контрола
-                      были 40px, ниже минимума тач-цели. Прошлый скан их не
-                      поймал: в тестовом стейте имя уже было задано, и форма
-                      просто не рендерилась.
-                      text-base на инпуте: как и в композере чата, шрифт
-                      меньше 16px заставляет Safari на iOS зумить страницу
-                      при фокусе. */}
-                  <input
-                    value={nameDraft}
-                    onChange={(e) => setNameDraft(e.target.value)}
-                    placeholder="Как меня зовут?"
-                    maxLength={24}
-                    aria-label="Имя для напарника"
-                    disabled={nameBusy}
-                    className="glass h-11 min-w-0 flex-1 rounded-xl px-3 text-base disabled:opacity-60"
-                  />
-                  <Button
-                    type="submit"
-                    size="sm"
-                    className="h-11"
-                    disabled={!nameDraft.trim() || nameBusy}
-                  >
-                    {nameBusy ? "Запоминаю…" : "Так и зовут"}
-                  </Button>
-                </div>
-              </form>
-            )}
+      {/* Просьба об имени ЖДЁТ свободного кадра: когда на экране есть готовый
+          первый шаг, единственное нужное действие — начать, а форма имени
+          физически отодвигает кнопку от большого пальца. */}
+      {nameOffer && (
+        <form
+          className="surface-quiet flex flex-col gap-2 p-3.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            giveName(nameDraft);
+          }}
+        >
+          <p className="t-voice-sm">
+            Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
+            откликаться.
+          </p>
+          <div className="flex gap-2">
+            {/* text-base (16px) на инпуте обязателен: при меньшем кегле
+                Safari на iOS зумит всю страницу при фокусе. */}
+            <input
+              value={nameDraft}
+              onChange={(e) => setNameDraft(e.target.value)}
+              placeholder="Как меня зовут?"
+              maxLength={24}
+              aria-label="Имя для напарника"
+              disabled={nameBusy}
+              className="surface-quiet h-11 min-w-0 flex-1 px-3 text-base outline-none disabled:opacity-60"
+            />
+            <Button
+              type="submit"
+              size="sm"
+              className="h-11"
+              disabled={!nameDraft.trim() || nameBusy}
+            >
+              {nameBusy ? "Запоминаю…" : "Так и зовут"}
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 
+  /**
+   * КОНТЕКСТНЫЙ PLACEHOLDER (#14). Вечное «Сообщение Напарнику» не
+   * подсказывает ничего — это подпись поля, а не приглашение. Текст
+   * подсказки — самая дешёвая помощь, какая бывает: он ничего не занимает
+   * и при этом снимает вопрос «а что сюда вообще писать», который для
+   * человека с пустым полем и плохим фокусом и есть причина закрыть экран.
+   */
+  const composerPlaceholder =
+    homeState === "focus"
+      ? "Напиши, если что-то мешает…"
+      : homeState === "returned"
+        ? "Расскажи, как прошло…"
+        : homeState === "task"
+          ? "Что-то мешает начать?"
+          : stats?.totalStarts === 0
+            ? "Напиши задачу как получится…"
+            : "Что сейчас мешает начать?";
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* sr-only: без единого heading на экране скринридер не может
-          перескочить сюда по заголовкам — визуально ничего не меняет. */}
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* sr-only: без единого heading скринридер не может перескочить сюда
+          по заголовкам — визуально ничего не меняет. */}
       <h1 className="sr-only">Напарник — дом</h1>
-      {/* Единственная скролл-зона экрана: интро-карточки (header) + лента
-          переписки едут вместе, композер CompanionChat прижат внизу. */}
+
+      {homeState === "task" && movement && (
+        <StickyContext
+          visible={cardOutOfView}
+          task={movement.task}
+          minutes={advice.minutes}
+          compact={composing}
+          onChange={() => router.push("/app/session")}
+        />
+      )}
+
       <CompanionChat
         mode="companion"
         greeting={buildChatGreeting(stats?.totalStarts ?? 0, companionName)}
+        placeholder={composerPlaceholder}
         onPlanSaved={refresh}
         showSuggestions={!firstWord?.showStarterChips}
         header={introHeader}
-        // #23 · Наверху ленты лежат карточки «Дома» — их и обновляем жестом.
         onPullRefresh={refresh}
+        onComposingChange={setComposing}
+        /* Док живой сессии — над композером, внутри чата: он про состояние
+           мира, а не про переписку, но место у него ровно там, куда человек
+           смотрит, когда собирается что-то сделать. */
+        dock={
+          activeSession ? (
+            <SessionDock
+              session={activeSession}
+              onReturn={() => router.push("/app/session")}
+            />
+          ) : null
+        }
+        /* Во время сессии чат не подкидывает новых предложений: экран
+           «Дома» в этом состоянии обязан быть тише обычного, иначе он
+           соревнуется с фокусом, который сам же и запустил. */
+        quiet={homeState === "focus"}
       />
     </div>
   );

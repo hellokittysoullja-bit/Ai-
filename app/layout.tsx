@@ -1,6 +1,6 @@
 import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
-import { Manrope, JetBrains_Mono, Caveat } from "next/font/google";
+import { Manrope, JetBrains_Mono, Neucha } from "next/font/google";
 import "./globals.css";
 
 const manrope = Manrope({
@@ -13,9 +13,19 @@ const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
 });
 
-const caveat = Caveat({
+/**
+ * Голос существа. Заменяет Caveat: связная скоропись Caveat читается
+ * заметно медленнее на кириллице, а реплики напарника — не декоративная
+ * подпись, а текст, который человек действительно читает на каждом экране.
+ * Neucha рукописна по форме, но набрана раздельными знаками и нарисована
+ * под кириллицу — тот же тёплый голос без платы за разбор букв.
+ * У Neucha одно начертание (400), поэтому weight указан явно: без него
+ * next/font падает на сборке.
+ */
+const neucha = Neucha({
   subsets: ["latin", "cyrillic"],
-  variable: "--font-caveat",
+  weight: "400",
+  variable: "--font-neucha",
 });
 
 export const metadata: Metadata = {
@@ -63,7 +73,7 @@ export default function RootLayout({
       // при переходах между страницами — data-атрибут снимает конфликт, сам
       // scroll-behavior по-прежнему приходит из CSS и уважает reduced-motion.
       data-scroll-behavior="smooth"
-      className={`bg-background ${manrope.variable} ${jetbrainsMono.variable} ${caveat.variable}`}
+      className={`bg-background ${manrope.variable} ${jetbrainsMono.variable} ${neucha.variable}`}
     >
       <body className="antialiased font-sans">
         {children}

@@ -8,7 +8,16 @@
  */
 
 let ctx: AudioContext | null = null
-let running: { stop: () => void } | null = null
+let running: { stop: () => void; setLevel: (v: number) => void } | null = null
+
+/**
+ * Три уровня вместо «вкл/выкл» (#47). Разница между «тихо» и «обычно» — не
+ * прихоть: в наушниках и через динамик телефона один и тот же гейн даёт
+ * совершенно разную громкость, и без выбора человек просто выключает звук
+ * целиком вместо того, чтобы сделать его удобным.
+ */
+export const AMBIENT_GAIN = { off: 0, quiet: 0.013, normal: 0.028 } as const
+export type AmbientGainLevel = keyof typeof AMBIENT_GAIN
 
 function audioCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null
@@ -31,8 +40,14 @@ export function isAmbientPlaying(): boolean {
   return running !== null
 }
 
-export function startCampfire() {
-  if (running) return
+export function startCampfire(level: AmbientGainLevel = 'normal') {
+  if (running) {
+    // Уже горит — просто меняем громкость, не пересобирая граф: пересборка
+    // дала бы слышимый обрыв ровно в момент, когда человек крутит уровень.
+    currentLevel = AMBIENT_GAIN[level]
+    running.setLevel(currentLevel)
+    return
+  }
   const ac = audioCtx()
   if (!ac) return
 
@@ -40,7 +55,7 @@ export function startCampfire() {
   master.gain.value = 0
   master.connect(ac.destination)
   // Плавный вход за 1.5 с — звук «разгорается», а не включается
-  master.gain.linearRampToValueAtTime(0.028, ac.currentTime + 1.5)
+  master.gain.linearRampToValueAtTime(AMBIENT_GAIN[level], ac.currentTime + 1.5)
 
   // Гул пламени: коричневый шум через низкий фильтр
   const bufferLen = ac.sampleRate * 2
@@ -96,6 +111,12 @@ export function startCampfire() {
   scheduleCrackle()
 
   running = {
+    setLevel(v: number) {
+      const t = ac.currentTime
+      master.gain.cancelScheduledValues(t)
+      master.gain.setValueAtTime(master.gain.value, t)
+      master.gain.linearRampToValueAtTime(v, t + 0.4)
+    },
     stop() {
       if (crackleTimer) window.clearTimeout(crackleTimer)
       // Плавное затухание — костёр гаснет, а не обрывается
@@ -110,6 +131,9 @@ export function startCampfire() {
       }, 900)
     },
   }
+
+  currentLevel = AMBIENT_GAIN[level]
+  attachVisibilityGuard()
 }
 
 export function stopCampfire() {
@@ -117,4 +141,26 @@ export function stopCampfire() {
   const r = running
   running = null
   r.stop()
+}
+
+/**
+ * Костёр замолкает, когда приложение уходит в фон (#47).
+ *
+ * Без этого звук продолжает идти поверх входящего звонка, чужого видео или
+ * музыки, которую человек включил, свернув вкладку, — и выключить его можно
+ * только вернувшись в приложение, которое он только что осознанно покинул.
+ * Гасим уровнем, а не stop(): граф остаётся живым, и возврат во вкладку
+ * восстанавливает звук ровно там, где он был, без пересборки и щелчка.
+ */
+let currentLevel = 0
+let visibilityGuardAttached = false
+
+function attachVisibilityGuard() {
+  if (visibilityGuardAttached) return
+  if (typeof document === 'undefined') return
+  visibilityGuardAttached = true
+  document.addEventListener('visibilitychange', () => {
+    if (!running) return
+    running.setLevel(document.hidden ? 0 : currentLevel)
+  })
 }

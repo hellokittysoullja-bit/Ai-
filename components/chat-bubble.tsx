@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
-import { Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
+import { AlertCircle, Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
 import { SPRING_GESTURE, SPRING_SNAPPY } from '@/lib/motion'
 import { hapticDone, hapticReaction, hapticThreshold } from '@/lib/haptics'
 
@@ -65,28 +65,43 @@ function BubbleTail({ side }: { side: 'left' | 'right' }) {
   )
 }
 
+/**
+ * Место реплики в группе подряд идущих сообщений одного говорящего.
+ * Раньше сюда приходил один булев `isFirstOfGroup`, и «последняя реплика
+ * группы» была невыразима — все реплики кроме первой выглядели одинаково,
+ * поэтому группа не имела визуального НИЗА, только верх. Гештальт работает,
+ * когда замкнуты оба конца: скруглённые углы должны соединять группу
+ * сверху (у аватара) и закрывать её снизу.
+ */
+export type GroupPosition = 'single' | 'first' | 'middle' | 'last'
+
 type ChatBubbleProps = {
   text: string
   isUser: boolean
-  isFirstOfGroup: boolean
+  groupPosition: GroupPosition
   /** 0 — свежая реплика у низа, 1 — уехала далеко вверх (#13) */
   depth: number
   reaction?: Reaction | null
   onReact: (r: Reaction | null) => void
   onReply: () => void
   reduceMotion: boolean
+  /** Реплика не ушла на сервер (#16, #17). Только для своих сообщений. */
+  failed?: boolean
 }
 
 export function ChatBubble({
   text,
   isUser,
-  isFirstOfGroup,
+  groupPosition,
   depth,
   reaction,
   onReact,
   onReply,
   reduceMotion,
+  failed = false,
 }: ChatBubbleProps) {
+  const isFirstOfGroup = groupPosition === 'single' || groupPosition === 'first'
+  const closesGroup = groupPosition === 'last' || groupPosition === 'middle'
   const [menuOpen, setMenuOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   const longPressTimer = useRef<number | null>(null)
@@ -158,12 +173,29 @@ export function ChatBubble({
   const depthOpacity = reduceMotion ? 1 : 1 - depth * 0.38
   const depthSaturate = reduceMotion ? 1 : 1 - depth * 0.45
 
-  const bubbleClass = isUser
-    ? 'chat-bubble-user px-3 py-2 text-sm leading-relaxed'
-    : 'chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
+  /* Радиус 22px + асимметричные углы, замыкающие группу. Свой угол —
+     всегда со стороны говорящего: у кота слева, у человека справа. */
+  const cornerClass = [
+    'rounded-[22px]',
+    isFirstOfGroup ? (isUser ? 'rounded-tr-[8px]' : 'rounded-tl-[8px]') : '',
+    closesGroup ? (isUser ? 'rounded-br-[8px]' : 'rounded-bl-[8px]') : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
+  /* Реплика человека НЕ набирается рукописным: свои слова — это то, что
+     человек уже сформулировал, они принадлежат интерфейсу, а не голосу
+     персонажа. Рукописный только у кота. */
+  const bubbleClass = isUser
+    ? 'chat-bubble-user px-3.5 py-2.5 t-secondary'
+    : 'chat-bubble-cat px-3.5 py-2.5 t-voice-sm'
+
+  /* Ширина: 78% своим, 84% коту. Не одна цифра на обоих — у реплик разная
+     работа. Ответ существа несёт мысль целиком и выигрывает от строки
+     подлиннее; своя реплика чаще короткая, и узкий столбец сильнее
+     отделяет её от чужой стороны ленты. */
   return (
-    <div className={`relative max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
+    <div className={`relative ${isUser ? 'ml-auto max-w-[78%]' : 'max-w-[84%]'}`}>
       {/* Иконка-цель ответа лежит ПОД пузырём и открывается протяжкой. */}
       <motion.span
         aria-hidden="true"
@@ -174,6 +206,7 @@ export function ChatBubble({
       </motion.span>
 
       <motion.div
+        data-failed={failed ? 'true' : undefined}
         style={{
           x,
           scale: depthScale,
@@ -181,12 +214,13 @@ export function ChatBubble({
           filter: `saturate(${depthSaturate})`,
           transformOrigin: isUser ? 'right center' : 'left center',
           // Переменные для SVG-хвостика: он всегда совпадает с пузырём.
+          // Теперь это плотные токены поверхностей, а не полупрозрачное
+          // стекло — хвост и тело пузыря заливаются буквально одним цветом,
+          // поэтому шов между ними не проявляется ни на каком фоне сцены.
           ['--tail-fill' as string]: isUser
-            ? 'oklch(0.9 0.21 130)'
-            : 'oklch(0.16 0.02 150 / 0.62)',
-          ['--tail-stroke' as string]: isUser
-            ? 'transparent'
-            : 'oklch(1 0 0 / 0.16)',
+            ? 'var(--moss-800)'
+            : 'var(--plum-800)',
+          ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.07)',
         }}
         // Тянуть можно только к своей стороне: реплика уходит «в ответ», а не
         // болтается в обе стороны. dragElastic — упругое сопротивление за
@@ -217,13 +251,23 @@ export function ChatBubble({
         onPointerDown={startLongPress}
         onPointerUp={cancelLongPress}
         onPointerLeave={cancelLongPress}
-        className={`glass-shine relative select-none whitespace-pre-wrap rounded-2xl ${bubbleClass}`}
+        className={`relative select-none whitespace-pre-wrap ${cornerClass} ${bubbleClass}`}
       >
         {/* #10 · Настоящий хвостик — только у головы группы, как в реальных
             мессенджерах: продолжение реплики хвоста не получает. */}
         {isFirstOfGroup && <BubbleTail side={isUser ? 'right' : 'left'} />}
         {text}
       </motion.div>
+      {/* #17 · Статус «не отправлено» — на самой реплике, в характере
+          продукта: без кода ошибки и без красной стены. Мысль человека
+          осталась и видна; действие по её спасению — рядом с ней, а не
+          в уведомлении, которое надо успеть прочитать. */}
+      {failed && (
+        <span className="mt-1 flex items-center justify-end gap-1 pr-1 t-micro" style={{ color: 'var(--danger-muted)' }}>
+          <AlertCircle className="size-3" aria-hidden="true" />
+          Не отправлено
+        </span>
+      )}
 
       {/* Поставленная реакция живёт на кромке пузыря — она про эту реплику,
           а не отдельная строка в ленте. */}
