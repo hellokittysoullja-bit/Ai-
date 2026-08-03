@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, CalendarCheck, Play, Sparkles } from "lucide-react";
+import { Bell, CalendarCheck } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
-import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
+import { type MascotExpression } from "@/components/mascot-svg";
+import { AppTopbar } from "@/components/app-topbar";
+import { FirstMoveCard } from "@/components/first-move-card";
+import { StickyTaskBar } from "@/components/sticky-task-bar";
 import {
   getCompanionName,
   getFinds,
@@ -22,22 +23,13 @@ import {
   type Plan,
 } from "@/lib/memory";
 import {
-  ISLAND_ELEMENT_NAMES,
-  ISLAND_POOL,
-  LANDMARK_COUNT,
-} from "@/lib/island-elements";
-import { landmarkAnchors, landmarkNodes } from "@/lib/island-sprites";
-import {
   enableCheckins,
   getCheckinState,
   mirrorCompanionName,
   registerServiceWorker,
   type CheckinState,
 } from "@/lib/checkin";
-import { trimLabel } from "@/lib/utils";
-import { Bell } from "lucide-react";
-import { GreetingSkeleton, RewardCardSkeleton } from "@/components/skeletons";
-import { SPRING_GESTURE } from "@/lib/motion";
+import { FirstMoveCardSkeleton } from "@/components/skeletons";
 
 type FirstWord = {
   greeting: string;
@@ -71,12 +63,15 @@ type FirstWord = {
  */
 const NIGHT_UNTIL_HOUR = 5;
 
-/** Готовые крошечные шаги: ноль решений до первого старта */
-const starterChips = [
-  "Открыть нужный файл",
-  "Убрать одну вещь со стола",
-  "Написать одно предложение",
-];
+/*
+ * Стартер-чипы («Открыть нужный файл», «Убрать одну вещь со стола», …)
+ * удалены. В состоянии «дела ещё нет» экран показывает ТРИ ЭМОЦИОНАЛЬНЫХ
+ * ВХОДА чата — «Не могу начать», «Раздроби задачу», «Сегодня тяжело», — и
+ * два визуально идентичных ряда пилюль подряд, ведущих к разным вещам
+ * (мгновенный старт vs сообщение существу), были прямым нарушением
+ * закона Хика в самом дорогом месте продукта. Готовые крошечные шаги
+ * никуда не пропали: их предлагает сам напарник в ответ на «раздроби».
+ */
 
 /**
  * Дневник отсутствия: напарник жил на острове, пока человека не было.
@@ -718,7 +713,7 @@ export function HomeScreen() {
                   сохранён полностью (никакой блокировки — запрет породил бы
                   реактивное сопротивление), но перестаёт быть точкой
                   притяжения взгляда. Закон Фиттса, применённый наоборот:
-                  трение до действия повышается осознанно, потому что
+                  трение до действия повышается ос��знанно, потому что
                   вредное в этот час действие — именно старт.
                 */}
                 <Button
@@ -795,7 +790,7 @@ export function HomeScreen() {
                 <p className="text-xs leading-relaxed text-muted-foreground">
                   Почти получилось: чтобы я мог писать первым, добавь меня на
                   экран «Домой» (Поделиться → На экран «Домой») — и нажми ещё
-                  раз.
+                  ра��.
                 </p>
               )}
             </div>
@@ -1008,7 +1003,7 @@ export function HomeScreen() {
                     левой колонке достаётся 223px, и вариант «10 ориентиров ·
                     первый в одном старте» переносился на вторую строку —
                     ровно тот сиротский перенос, который я считаю браком.
-                    «В одном старте» вырезано не ради длины, а потому что это
+                    «В одном старте�� вырезано не ради длины, а потому что это
                     дублировало заголовок карточки («Следующий старт вырастит
                     «Первый росток»»): заголовок говорит ЧТО дальше, нижний
                     ряд — насколько велик мир целиком (endowment всего набора).
