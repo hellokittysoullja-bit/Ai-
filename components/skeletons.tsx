@@ -34,51 +34,29 @@ function Bar({
   );
 }
 
-/** Приветствие: аватар-кружок + две строки текста. */
-export function GreetingSkeleton() {
-  // Только текстовая часть: живой маскот рендерится рядом всегда (он не
-  // ждёт данных), поэтому дублировать его кружком здесь нельзя — при
-  // подмене получилось бы два аватара подряд. size-13/pt-1 повторяют
-  // реальную колонку приветствия.
-  return (
-    <div className="flex flex-1 flex-col gap-2 pt-2" aria-hidden="true">
-      <Bar w="92%" h={13} />
-      <Bar w="78%" h={13} />
-      <Bar w="55%" h={13} />
-    </div>
-  );
-}
-
 /**
- * Карточка награды: спрайт + подпись + прогресс + крупный CTA.
- * Высота CTA 52px — ровно как у живой кнопки, чтобы низ карточки не поехал.
+ * Карточка «Первое движение»: micro-label → заголовок → мета → CTA 52 →
+ * secondary 44 → подпись. Скелетон повторяет ГЕОМЕТРИЮ будущей карточки
+ * один в один (радиус 24, padding 20, те же высоты), поэтому появление
+ * данных не двигает ни один пиксель раскладки. Ни спиннера, ни
+ * горизонтального прожектора через весь экран.
  */
-export function RewardCardSkeleton() {
+export function FirstMoveCardSkeleton() {
   return (
-    // rounded-2xl и gap-3 — ровно как у живой карточки, иначе подмена
-    // читается сменой формы, а не проявлением содержимого.
     <div
-      className="glass flex flex-col gap-3 rounded-2xl p-4"
+      className="glass flex flex-col gap-3 rounded-[24px] p-5"
       aria-hidden="true"
     >
-      <div className="flex items-center gap-3.5">
-        <div className="skeleton-pulse size-14 shrink-0 rounded-xl bg-foreground/[0.07]" />
-        <div className="flex flex-1 flex-col gap-2">
-          <Bar w="58%" h={10} />
-          <Bar w="40%" h={18} />
-        </div>
+      <Bar w="38%" h={11} />
+      <Bar w="72%" h={18} />
+      <Bar w="52%" h={13} />
+      {/* Кнопка-заглушка остаётся серой: лаймовый акцент до появления
+          реального действия обещал бы кнопку, которой ещё нет. */}
+      <div className="skeleton-pulse h-[52px] w-full rounded-2xl bg-foreground/[0.07]" />
+      <div className="skeleton-pulse h-11 w-full rounded-2xl bg-foreground/[0.04]" />
+      <div className="flex justify-center">
+        <Bar w="64%" h={11} />
       </div>
-      {/* Тропа (#22): точки-следы, а не сегменты — повторяем новый трек */}
-      <div className="flex h-4 items-center justify-between">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div
-            key={i}
-            className="skeleton-pulse size-1.5 rounded-full bg-foreground/[0.07]"
-            style={{ animationDelay: `${i * 60}ms` }}
-          />
-        ))}
-      </div>
-      <Bar w="70%" h={12} />
     </div>
   );
 }
