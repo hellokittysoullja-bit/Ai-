@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { getFinds, getStarts } from "@/lib/memory";
 import { LANDMARK_COUNT } from "@/lib/island-elements";
 import { landmarkAnchors, landmarkNodes } from "@/lib/island-sprites";
@@ -165,6 +166,12 @@ export function AppBackdrop() {
   const [hour, setHour] = useState(0);
   const [mounted, setMounted] = useState(false);
   const [landmarks, setLandmarks] = useState(0);
+  // #2 · Ориентир, выросший за только что законченную сессию, ждёт своего
+  // первого показа на Доме, а не проигрывает прорастание где придётся
+  // (сцена одна на все три экрана и не перемонтируется между ними).
+  const [pendingGrowth, setPendingGrowth] = useState<number | null>(null);
+  const [grownIndex, setGrownIndex] = useState<number | null>(null);
+  const pathname = usePathname();
 
   useEffect(() => {
     let alive = true;
@@ -176,7 +183,20 @@ export function AppBackdrop() {
         if (!alive) return;
         setHasAurora(finds.some((f) => f.key === "aurora"));
         setHasMoon(starts.length >= LANDMARK_COUNT);
-        setLandmarks(Math.min(starts.length, RIDGE.length));
+        const count = Math.min(starts.length, RIDGE.length);
+        setLandmarks(count);
+        // Сколько ориентиров человек уже видел на горизонте — сравнение с
+        // count ловит рост между визитами. Не пишем сюда сами: запись
+        // "видел" происходит только когда прорастание реально показано
+        // (см. эффект на pathname ниже), иначе гонка с несколькими вкладками
+        // могла бы съесть анимацию до того, как человек попал на Дом.
+        let seen = 0;
+        try {
+          seen = Number(window.localStorage.getItem("naparnik:ridgeSeen")) || 0;
+        } catch {
+          /* приватный режим */
+        }
+        if (count > seen) setPendingGrowth(count - 1);
         setPhase(moonPhase(new Date()));
       });
     };
@@ -197,6 +217,21 @@ export function AppBackdrop() {
       document.removeEventListener("visibilitychange", readMemory);
     };
   }, []);
+
+  // #2 · Прорастание играет один раз — в момент, когда человек реально на
+  // Доме (единственное место, где горизонт виден за перепиской, а не за
+  // формой Фокуса или картой Мира). Как только показали — фиксируем «видел»,
+  // чтобы возврат на /app позже не проигрывал тот же рост снова.
+  useEffect(() => {
+    if (pathname !== "/app" || pendingGrowth === null) return;
+    setGrownIndex(pendingGrowth);
+    try {
+      window.localStorage.setItem("naparnik:ridgeSeen", String(pendingGrowth + 1));
+    } catch {
+      /* приватный режим */
+    }
+    setPendingGrowth(null);
+  }, [pathname, pendingGrowth]);
 
   const skyPhase: SkyPhase = mounted ? phaseForHour(hour) : "night";
   const sky = SKY[skyPhase];
@@ -413,6 +448,7 @@ export function AppBackdrop() {
             return (
               <g
                 key={i}
+                className={i === grownIndex ? "island-grow island-new-element" : undefined}
                 transform={`translate(${p.x} ${p.y}) scale(${p.s}) translate(${-a.x} ${-a.y})`}
               >
                 {landmarkNodes[i]}

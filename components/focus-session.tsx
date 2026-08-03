@@ -38,7 +38,7 @@ import {
 } from '@/lib/island-elements'
 import { playStartSigh } from '@/lib/reward-sound'
 import { startCampfire, stopCampfire } from '@/lib/ambient'
-import { hapticDone, hapticStart } from '@/lib/haptics'
+import { hapticDone, hapticStart, hapticThreshold } from '@/lib/haptics'
 import { trimLabel } from '@/lib/utils'
 
 const durations = [15, 25, 45]
@@ -154,6 +154,10 @@ export function FocusSession() {
     }
   }
   const [minutes, setMinutes] = useState(initialMinutes)
+  // #7 · Default Effect: пока человек сам не тронул длительность, чип 25
+  // мин помечен как рекомендованный, а не просто «уже выбранный системой».
+  // Как только выбор стал осознанным — метка больше не нужна.
+  const [durationTouched, setDurationTouched] = useState(Boolean(prefilledDuration))
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [voice, setVoice] = useState(fallbackVoice.start)
   const [doneVoice, setDoneVoice] = useState<string | null>(null)
@@ -548,7 +552,10 @@ export function FocusSession() {
                 <button
                   key={chip}
                   type="button"
-                  onClick={() => setTask(chip)}
+                  onClick={() => {
+                    if (task !== chip) hapticThreshold()
+                    setTask(chip)
+                  }}
                   aria-pressed={task === chip}
                   className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     task === chip
@@ -650,21 +657,43 @@ export function FocusSession() {
             </span>
             <div className="flex gap-2">
               {durations.map((d) => (
-                <button
-                  key={d}
-                  type="button"
-                  onClick={() => setMinutes(d)}
-                  aria-pressed={minutes === d}
-                  className={`flex-1 rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
-                    minutes === d
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'glass text-muted-foreground transition-[filter] duration-150 hover:text-foreground hover:brightness-125'
-                  }`}
-                >
-                  {d} мин
-                </button>
+                <div key={d} className="flex flex-1 flex-col items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (minutes !== d) hapticThreshold()
+                      setMinutes(d)
+                      setDurationTouched(true)
+                    }}
+                    aria-pressed={minutes === d}
+                    className={`w-full rounded-xl border px-3 py-3 text-sm font-semibold transition-colors ${
+                      minutes === d
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'glass text-muted-foreground transition-[filter] duration-150 hover:text-foreground hover:brightness-125'
+                    }`}
+                  >
+                    {d} мин
+                  </button>
+                  {/* #7 · Default Effect: 25 мин помечен как рекомендованный,
+                      пока выбор ещё не стал осознанным действием человека */}
+                  {!durationTouched && d === 25 && (
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-primary/70">
+                      рекомендуем
+                    </span>
+                  )}
+                </div>
               ))}
             </div>
+            {/* #8 · Confirmation bias: короткая честная строка под уже
+                сделанным выбором — снимает микро-сомнение «а не мало/много
+                ли я взял», не задавая нового решения */}
+            <p className="text-center text-xs leading-relaxed text-muted-foreground">
+              {minutes === 15
+                ? '15 — короткий разгон, если просто нужно сдвинуться с места'
+                : minutes === 25
+                  ? '25 — классический фокус-блок, не выматывает'
+                  : '45 — для дела, в которое стоит погрузиться'}
+            </p>
           </div>
           <motion.div whileTap={reducedMotion ? undefined : { scale: 0.96 }}>
             <Button
@@ -724,20 +753,51 @@ export function FocusSession() {
         transition={{ duration: 0.6 }}
       >
         {/* Существо — центр сцены: дышит, радуется четвертям, встречает из отвлечения */}
-        <motion.div
-          animate={
-            reducedMotion
-              ? undefined
-              : { y: [0, -4, 0], rotate: [0, 0, -1.5, 0, 1.5, 0, 0] }
-          }
-          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <MascotSvg
-            expression={cheering || backFromDrift ? 'happy' : 'focused'}
-            label="Напарник работает рядом"
-            size={130}
-          />
-        </motion.div>
+        {/* #10 · Кольцо вместо линейного бара под существом: время сессии
+            читается на самом объекте, за которым и так следит взгляд, а не
+            в отдельной полоске ниже — тот же вес внимания, один якорь
+            вместо двух. -inset-4: кольцо на 16px шире мяскота (130px), не
+            задевая его контур. rotate(-90deg): прогресс стартует с 12
+            часов — там же, где начинается любой аналоговый таймер. */}
+        <div className="relative flex items-center justify-center">
+          <svg
+            className="pointer-events-none absolute -inset-4"
+            viewBox="0 0 156 156"
+            aria-hidden="true"
+          >
+            <circle cx="78" cy="78" r="72" fill="none" stroke="var(--secondary)" strokeWidth="4" />
+            <circle
+              cx="78"
+              cy="78"
+              r="72"
+              fill="none"
+              stroke="var(--primary)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 72}
+              style={{
+                strokeDashoffset: 2 * Math.PI * 72 * (1 - progress),
+                transform: 'rotate(-90deg)',
+                transformOrigin: '78px 78px',
+                transition: reducedMotion ? 'none' : 'stroke-dashoffset 1s linear',
+              }}
+            />
+          </svg>
+          <motion.div
+            animate={
+              reducedMotion
+                ? undefined
+                : { y: [0, -4, 0], rotate: [0, 0, -1.5, 0, 1.5, 0, 0] }
+            }
+            transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
+          >
+            <MascotSvg
+              expression={cheering || backFromDrift ? 'happy' : 'focused'}
+              label="Напарник работает рядом"
+              size={130}
+            />
+          </motion.div>
+        </div>
         <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
           {backFromDrift
             ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
@@ -761,14 +821,6 @@ export function FocusSession() {
               {mm}:{ss}
             </div>
           )}
-          <div className="h-1.5 w-64 overflow-hidden rounded-full bg-secondary">
-            {/* scaleX вместо width: width-анимация каждый тик — layout+paint
-                (гейт 14); transform живёт на GPU */}
-            <div
-              className="h-full w-full origin-left rounded-full bg-primary transition-transform duration-1000 ease-linear"
-              style={{ transform: `scaleX(${progress})` }}
-            />
-          </div>
           <div className="flex items-center gap-4">
             {/* U2: min-h-11 + padding — честная тап-зона 44px (Fitts) */}
             <button
