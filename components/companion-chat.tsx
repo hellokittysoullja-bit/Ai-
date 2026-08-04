@@ -192,6 +192,9 @@ export function CompanionChat({
   // новая приходит снизу. Реальный отклик на КЛЮЧЕВОЕ редкое действие
   // (не команда с клавиатуры сотни раз в день — Эмиль здесь не запрещает).
   const [sendCount, setSendCount] = useState(0)
+  // Скриптовая деградация полезна, но не должна притворяться сетевым ответом:
+  // пользователь видит, что сообщение обработано локально и не потеряно.
+  const [offlineReply, setOfflineReply] = useState(false)
 
   // Долгое нажатие (копирование + реакции) переехало в ChatBubble вместе с
   // остальными жестами реплики — держать таймер здесь, а меню там, значило
@@ -245,6 +248,7 @@ export function CompanionChat({
     // Graceful degradation: LLM недоступен (нет ключа, лимит, сеть) —
     // напарник отвечает скриптовым мозгом из своей памяти. Никогда не молчит.
     onError() {
+      setOfflineReply(true)
       setMessages((prev) => {
         const lastUser = [...prev].reverse().find((m) => m.role === 'user')
         const userText =
@@ -617,6 +621,7 @@ export function CompanionChat({
     const text = replyTo
       ? `> ${replyTo.text.replace(/\n/g, ' ')}\n\n${input}`
       : input
+    setOfflineReply(false)
     sendMessage({ text })
     setInput('')
     setReplyTo(null)
@@ -687,6 +692,24 @@ export function CompanionChat({
               {header}
             </div>
           ) : null}
+          {/* Полоса «переписка / напарник рядом» — только там, где над ней
+              уже стоит закреплённый контекст «Дома»: она отделяет «карточки
+              статуса» от «живого разговора» как два разных слоя экрана.
+              В чистом чате (Фокус) это нечего было бы отделять. */}
+          {header ? (
+            <div className="conversation-rail flex items-center justify-between gap-3 px-1 pt-1">
+              <span className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground">
+                переписка
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 rounded-full bg-primary shadow-[0_0_7px_oklch(0.86_0.22_130/0.5)]"
+                />
+                напарник рядом
+              </span>
+            </div>
+          ) : null}
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
@@ -698,7 +721,7 @@ export function CompanionChat({
                 приветствие и сообщения произносит один и тот же персонаж —
                 и один и тот же материал, с гарантированным контрастом
                 текста независимо от участка сцены под пузырём. */}
-            <div className="chat-bubble-cat max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground">
+            <div className="chat-bubble-cat max-w-[88%] rounded-2xl rounded-tl-sm px-4 py-2.5 font-hand text-[1.18rem] leading-snug text-secondary-foreground">
               {greeting}
             </div>
           </motion.div>
@@ -723,15 +746,21 @@ export function CompanionChat({
                     key={chip}
                     type="button"
                     onClick={() => {
+                      if (!canSend) return
                       hapticStart()
+                      setOfflineReply(false)
                       sendMessage({ text: chip })
                     }}
+                    disabled={!canSend}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     // #27 · Чипы приходят лестницей после приветствия:
                     // stagger из lib/motion — один шаг ритма на весь продукт.
                     transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
-                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
+                    // disabled: пока запрос уже летит, повторный тап по чипу
+                    // раньше тихо отправлял дубль — теперь кнопка блокируется,
+                    // тот же гард, что уже стоит на форме композера ниже.
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary disabled:pointer-events-none disabled:opacity-45"
                   >
                     {chip}
                   </motion.button>
@@ -1008,6 +1037,18 @@ export function CompanionChat({
             </motion.div>
           )}
           </AnimatePresence>
+          {/* Скриптовая деградация видима, не притворяется сетевым ответом —
+              иначе продукт учит человека неверной модели «сеть всегда
+              работает» и молча теряет доверие при следующем реальном сбое. */}
+          {offlineReply && (
+            <div
+              role="status"
+              className="ml-10 flex items-start gap-2 rounded-xl border border-white/10 bg-background/70 px-3 py-2 text-xs leading-relaxed text-muted-foreground"
+            >
+              <span className="mt-1 size-1.5 shrink-0 rounded-full bg-reward" aria-hidden="true" />
+              Связь пропала — я ответил локально. Твоё сообщение не потерялось.
+            </div>
+          )}
           <div ref={bottomRef} />
         </div>
       </div>

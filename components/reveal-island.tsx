@@ -172,13 +172,16 @@ export function RevealIsland({
         />
       )}
 
-      {/* Новый элемент: прорастает на месте пружиной (island-grow из globals.css) */}
+      {/* Новый элемент: прорастает на месте пружиной (island-grow из globals.css).
+          Позиционирующий transform — на ВНЕШНЕМ <g>, анимация island-grow — на
+          ВНУТРЕННЕМ: тот же transform/CSS-animation коллайдер, что уже
+          документирован и исправлен в island.tsx (CLAUDE.md §5.1) — здесь он
+          был пропущен, потому что это отдельный компонент. */}
       {grown && (
-        <g
-          className={`island-grow${isRare ? '' : ' island-new-element'}`}
-          transform={newFindPos ? `translate(${newFindPos.x} ${newFindPos.y}) scale(${newFindPos.s})` : undefined}
-        >
-          {newItem.kind === 'landmark' ? landmarkNodes[newItem.index] : findSprites[newItem.find.key]}
+        <g transform={newFindPos ? `translate(${newFindPos.x} ${newFindPos.y}) scale(${newFindPos.s})` : undefined}>
+          <g className={`island-grow${isRare ? '' : ' island-new-element'}`}>
+            {newItem.kind === 'landmark' ? landmarkNodes[newItem.index] : findSprites[newItem.find.key]}
+          </g>
         </g>
       )}
 

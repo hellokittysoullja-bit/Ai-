@@ -151,19 +151,19 @@ export function ChatBubble({
   /*
    * #13 · Глубина. Ушедшее вверх отъезжает и теряет насыщенность — ровно то,
    * что делает воздушная перспектива в реальном мире. Держим мягко: масштаб
-   * до 0.955 и прозрачность до 0.62. Сильнее — и старые реплики стали бы
-   * нечитаемыми, а это переписка, к которой возвращаются.
+   * до 0.975 и прозрачность до 0.78. История остаётся фоном, но не становится
+   * недоступной: переписка — память, а не декоративная глубина сцены.
    */
-  const depthScale = reduceMotion ? 1 : 1 - depth * 0.045
-  const depthOpacity = reduceMotion ? 1 : 1 - depth * 0.38
-  const depthSaturate = reduceMotion ? 1 : 1 - depth * 0.45
+  const depthScale = reduceMotion ? 1 : 1 - depth * 0.025
+  const depthOpacity = reduceMotion ? 1 : 1 - depth * 0.22
+  const depthSaturate = reduceMotion ? 1 : 1 - depth * 0.25
 
   const bubbleClass = isUser
-    ? 'chat-bubble-user px-3 py-2 text-sm leading-relaxed'
-    : 'chat-bubble-cat px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground'
+    ? 'chat-bubble-user px-4 py-2.5 text-[0.95rem] leading-relaxed'
+    : 'chat-bubble-cat px-4 py-2.5 font-hand text-[1.16rem] leading-snug text-secondary-foreground'
 
   return (
-    <div className={`relative max-w-[85%] ${isUser ? 'ml-auto' : ''}`}>
+    <div className={`relative ${isUser ? 'ml-auto max-w-[82%]' : 'max-w-[88%]'}`}>
       {/* Иконка-цель ответа лежит ПОД пузырём и открывается протяжкой. */}
       <motion.span
         aria-hidden="true"
@@ -240,7 +240,10 @@ export function ChatBubble({
               onReact(null)
             }}
             aria-label="Убрать реакцию"
-            className={`absolute -bottom-3 flex size-7 items-center justify-center rounded-full border border-white/12 bg-secondary text-xs shadow-[0_4px_12px_-4px_oklch(0_0_0/0.6)] ${
+            // before:-inset-2.5: видимый бейдж остаётся size-7 (28px), но
+            // тач-зона расширяется до ~44px — тот же приём, что у точек
+            // section-nav.tsx.
+            className={`absolute -bottom-3 flex size-7 items-center justify-center rounded-full border border-white/12 bg-secondary text-xs shadow-[0_4px_12px_-4px_oklch(0_0_0/0.6)] before:absolute before:-inset-2.5 ${
               isUser ? 'left-1' : 'right-1'
             }`}
           >
@@ -278,7 +281,7 @@ export function ChatBubble({
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.12 } }}
               transition={SPRING_GESTURE}
-              className={`absolute -top-12 z-40 flex items-center gap-0.5 rounded-full border border-white/12 bg-secondary p-1 shadow-[0_8px_24px_-8px_oklch(0_0_0/0.7)] ${
+              className={`absolute -top-14 z-40 flex items-center gap-0.5 rounded-full border border-white/12 bg-secondary p-1 shadow-[0_8px_24px_-8px_oklch(0_0_0/0.7)] ${
                 isUser ? 'right-0' : 'left-0'
               }`}
             >
@@ -292,7 +295,7 @@ export function ChatBubble({
                     setMenuOpen(false)
                   }}
                   aria-label={r.label}
-                  className={`flex size-9 items-center justify-center rounded-full transition-colors ${
+                  className={`flex size-11 items-center justify-center rounded-full transition-colors ${
                     reaction === r.key ? 'bg-primary/20' : 'hover:bg-white/8'
                   }`}
                 >
@@ -308,7 +311,7 @@ export function ChatBubble({
                 type="button"
                 onClick={copyText}
                 aria-label="Скопировать"
-                className="flex size-9 items-center justify-center rounded-full transition-colors hover:bg-white/8"
+                className="flex size-11 items-center justify-center rounded-full transition-colors hover:bg-white/8"
               >
                 <Copy className="size-3.5 text-foreground" aria-hidden="true" />
               </button>
