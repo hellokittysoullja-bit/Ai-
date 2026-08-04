@@ -23,6 +23,7 @@ import {
 import { useDictation } from '@/hooks/use-dictation'
 import { PullToStretch } from '@/components/pull-to-stretch'
 import { hapticStart } from '@/lib/haptics'
+import { playMessageTick } from '@/lib/reward-sound'
 import { ChatBubble, type Reaction } from '@/components/chat-bubble'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
@@ -61,6 +62,26 @@ type CompanionChatProps = {
   onPullRefresh?: () => Promise<void> | void
 }
 
+/** Цвет ореола аватара по мимике — тот же тёплый/холодный язык, что уже
+    разводит очаг (тепло) и луну (холод) в остальной сцене, здесь применён
+    к самому часто повторяющемуся объекту экрана вместо одного плоского
+    тона на все случаи. reacting перекрывает мимику: «это только что
+    пришло» — событие само по себе, ярче любого устойчивого настроения. */
+function avatarGlowColor(expression: MascotExpression, reacting: boolean): string {
+  if (reacting) return 'oklch(0.72 0.17 55 / 0.55)'
+  switch (expression) {
+    case 'happy':
+    case 'excited':
+      return 'oklch(0.72 0.17 55 / 0.4)'
+    case 'focused':
+      return 'oklch(0.86 0.22 130 / 0.32)'
+    case 'sleepy':
+      return 'oklch(0.62 0.05 250 / 0.28)'
+    default:
+      return 'oklch(0.72 0.17 55 / 0.22)'
+  }
+}
+
 function CompanionAvatar({
   reacting = false,
   expression = 'calm',
@@ -78,15 +99,17 @@ function CompanionAvatar({
   // в inferExpression). Радость от новизны и тон сообщения не всегда
   // совпадают: кот может искренне обрадоваться (кольцо), сказав при этом
   // что-то сфокусированное — оба сигнала живут не подменяя друг друга.
+  // Кольцо — теперь многослойное (.avatar-ring в globals.css) и на приход
+  // реплики не просто светлеет, а коротко пульсирует (.avatar-ring-active,
+  // 2 вдоха и стоп) — тот же переход от «плоского индикатора» к «телесному
+  // отклику», что уже применён к CTA (cta-sheen) и карточке старта
+  // (start-card-breathe).
   return (
     <div
-      className="relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80"
-      style={{
-        boxShadow: reacting
-          ? '0 0 0 2px oklch(0.72 0.17 55 / 0.35), 0 0 14px -2px oklch(0.72 0.17 55 / 0.5)'
-          : '0 0 0 1px oklch(0.72 0.17 55 / 0.12)',
-        transition: 'box-shadow 260ms ease-out',
-      }}
+      className={`avatar-ring relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80 ${
+        reacting ? 'avatar-ring-active' : ''
+      }`}
+      style={{ ['--avatar-glow' as string]: avatarGlowColor(expression, reacting) }}
     >
       <MascotSvg expression={reacting ? 'happy' : expression} size={30} />
     </div>
@@ -152,6 +175,18 @@ function buildSuggestions(memory: MemoryContext | null, hour: number): string[] 
   if (totalStarts === 0) chips.push('С чего вообще начать')
 
   return Array.from(new Set(chips)).slice(0, 3)
+}
+
+/** Ведущая иконка чипа — по смыслу текста, не декоративно одинаковая для
+    всех трёх: продолжение уже начатого (Zeigarnik) читается стрелкой
+    вперёд, план — календарём, всё остальное — искрой первого касания.
+    Первое прикосновение к чату — момент Peak-End самого начала разговора,
+    трём одинаковым текстовым пилюлям здесь не хватало ни одной причины
+    для глаза различить их быстрее, чем прочитать целиком. */
+function chipIcon(chip: string): typeof ArrowRight {
+  if (/^(поехали|следующий)/i.test(chip)) return ArrowRight
+  if (/план/i.test(chip)) return CalendarCheck
+  return Sparkles
 }
 
 /** Чип должен читаться одним взглядом — длинный первый шаг режем по слову. */
@@ -330,6 +365,15 @@ export function CompanionChat({
   // «Он тебя помнит»: разговор переживает перезагрузку страницы.
   // Восстанавливаем последние сообщения при открытии чата.
   const chatRestoredRef = useRef(false)
+  // #30 · Свежесть реплики: id, восстановленные из памяти при открытии
+  // чата, попадают сюда ДО первого рендера ленты — всё, чего здесь нет,
+  // родилось только что. Один источник правды для трёх новых откликов
+  // разом (пружина-«пружинка» на баблах, галочка «доставлено», позже —
+  // не более того): открытие чата с историей в 20 реплик не должно
+  // превращаться в фейерверк из галочек и подпрыгивающих пузырей — это
+  // тот же урок, что уже поймал seenHistoryRef чуть ниже для реакции кота.
+  const restoredIdsRef = useRef<Set<string>>(new Set())
+  const isFresh = (id: string) => !restoredIdsRef.current.has(id)
   // Момент первого появления каждой реплики — в state (не в ref), иначе
   // свежий таймстемп новой реплики никогда не попадёт на экран: ref не
   // вызывает перерендер сам по себе.
@@ -342,6 +386,7 @@ export function CompanionChat({
       getChatTimestamps(),
     ]).then(([saved, loadedTimes]) => {
       setTimes(loadedTimes)
+      restoredIdsRef.current = new Set(saved.map((m) => m.id))
       if (saved.length > 0) setMessages(saved)
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -483,6 +528,10 @@ export function CompanionChat({
     }
     if (lastAssistant.id === lastAssistantIdRef.current) return
     lastAssistantIdRef.current = lastAssistant.id
+    // Мультисенсорный отклик: та же граница «это только что пришло, а не
+    // старая история», что уже отделяет реакцию кота от обычного рендера —
+    // тон играет ровно там же и ровно тогда же.
+    playMessageTick('received')
     // Помечаем как «ждём объявления» — само объявление уходит диктору
     // ниже, только когда текст этой реплики перестанет меняться. ID
     // появляется в ленте ДО того, как стриминг долетит до конца: объявить
@@ -515,6 +564,23 @@ export function CompanionChat({
   // Ушёл вверх по переписке — показываем возврат вниз. Стандартная
   // аффорданса чата, без неё длинная история становится ловушкой.
   const [atBottom, setAtBottom] = useState(true)
+
+  // #32 · Счётчик непрочитанного на кнопке возврата: голая стрелка отвечает
+  // «там что-то есть», но не «сколько» — Zeigarnik/curiosity gap сильнее с
+  // числом (тот же приём, что бейдж непрочитанного в Telegram/Slack).
+  // Считаем ТОЛЬКО пока лента реально уведена вверх — свежая переписка,
+  // прочитанная по мере прихода, к «непрочитанному» отношения не имеет.
+  const [unreadCount, setUnreadCount] = useState(0)
+  const lastMessageCountRef = useRef(0)
+  useEffect(() => {
+    const delta = messages.length - lastMessageCountRef.current
+    if (delta > 0 && !atBottom) setUnreadCount((c) => c + delta)
+    lastMessageCountRef.current = messages.length
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages.length])
+  useEffect(() => {
+    if (atBottom) setUnreadCount(0)
+  }, [atBottom])
 
   /*
    * #13 · ГЛУБИНА ПО СКРОЛЛУ. Считаем не в CSS и не на каждый кадр скролла в
@@ -604,6 +670,20 @@ export function CompanionChat({
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
 
+  // #31 · «Напарник печатает…» — прогрессивное раскрытие. Три скачущие
+  // точки уже честно говорят «идёт ответ»; подпись добавляется только
+  // если ожидание реально затянулось (1.1s) — на быстрый скриптовый ответ
+  // подпись успела бы разве что мигнуть, это был бы шум, а не тепло.
+  const [showTypingHint, setShowTypingHint] = useState(false)
+  useEffect(() => {
+    if (status !== 'submitted') {
+      setShowTypingHint(false)
+      return
+    }
+    const t = window.setTimeout(() => setShowTypingHint(true), 1100)
+    return () => window.clearTimeout(t)
+  }, [status])
+
   function submit() {
     if (!input.trim() || !canSend) return
     // Диктовка активна — отправка её закрывает: иначе микрофон продолжает
@@ -612,6 +692,7 @@ export function CompanionChat({
     // Подтверждение телом в момент отправки: действие получает отклик
     // раньше, чем придёт ответ по сети.
     hapticStart()
+    playMessageTick('sent')
     // #12 · Цитату передаём модели как контекст, а не как украшение в UI:
     // ответ «на это» бессмысленен, если напарник не знает, на что именно.
     const text = replyTo
@@ -667,7 +748,15 @@ export function CompanionChat({
         // контекстом «Дома» верх ленты в покое (scrollTop 0) — это маскот и
         // приветствие: гасить их первые пиксели нельзя. Шапка и так открывает
         // ленту с чистого края (pt-4), растворять там нечего.
-        className={`flex flex-1 flex-col overflow-y-auto ${
+        // grain grain-chat + relative: та же плёночная текстура, что держит
+        // hero лендинга (footer.tsx, hero.tsx), вдвое тише и БЕЗ overflow-
+        // hidden — этот контейнер и так overflow-y-auto, второе значение
+        // перезаписало бы вертикальный скролл всей ленты. relative нужен
+        // только затем, чтобы ::before мерился по этому боксу, а не по
+        // дальнему предку: сама текстура при этом остаётся неподвижной
+        // плёнкой поверх вьюпорта ленты, а не едет вместе с содержимым —
+        // абсолютно спозиционированный узел в скролл-контейнере не скроллится.
+        className={`grain grain-chat relative flex flex-1 flex-col overflow-y-auto ${
           header
             ? ""
             : "[mask-image:linear-gradient(to_bottom,transparent_0,black_24px)]"
@@ -714,7 +803,9 @@ export function CompanionChat({
                 можно просто нажать
               </span>
               <div className="flex flex-wrap gap-2">
-                {suggestionChips.map((chip, ci) => (
+                {suggestionChips.map((chip, ci) => {
+                  const Icon = chipIcon(chip)
+                  return (
                   // Stagger 45мс — в стандартном диапазоне 20–80мс и только
                   // при первом появлении списка: ряд «собирается», а не
                   // выпрыгивает плитой. Дальше чипы исчезают навсегда, так
@@ -726,16 +817,18 @@ export function CompanionChat({
                       hapticStart()
                       sendMessage({ text: chip })
                     }}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, y: 6, scale: 0.94 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
                     // #27 · Чипы приходят лестницей после приветствия:
                     // stagger из lib/motion — один шаг ритма на весь продукт.
                     transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
-                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
+                    className="glass glass-interactive press inline-flex min-h-11 items-center gap-1.5 rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
                   >
+                    <Icon className="size-3.5 shrink-0 text-primary/80" aria-hidden="true" />
                     {chip}
                   </motion.button>
-                ))}
+                  )
+                })}
               </div>
               {/* min-h-11: цель была 143×17px — ниже минимума 24px по
                   WCAG 2.5.8, при том что это единственный быстрый выход
@@ -784,6 +877,11 @@ export function CompanionChat({
               !!prevTime &&
               todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
 
+            // #30 · Реплика родилась в этой сессии (не пришла из
+            // восстановленной истории) — только такие получают «сочный»
+            // вход и хлопок галочки, см. restoredIdsRef выше.
+            const fresh = isFresh(message.id)
+
             return (
             <div
               key={message.id}
@@ -795,10 +893,16 @@ export function CompanionChat({
               className="flex flex-col gap-2"
             >
               {showDayDivider && (
-                <div className="my-1 flex items-center justify-center">
-                  <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                // Хайрлайн + пилюля вместо одинокого плавающего блока:
+                // Gestalt continuation — линия читает разделитель как
+                // «разрыв главы» в едином потоке, а не отдельный виджет,
+                // вклеенный между репликами.
+                <div className="my-1 flex items-center gap-3">
+                  <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-r from-transparent to-white/[0.08]" />
+                  <span className="shrink-0 rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
                     {formatDayLabel(thisTime)}
                   </span>
+                  <span aria-hidden="true" className="h-px flex-1 bg-gradient-to-l from-transparent to-white/[0.08]" />
                 </div>
               )}
               <div
@@ -822,11 +926,24 @@ export function CompanionChat({
                           ? { opacity: 0 }
                           : { opacity: 0, y: 10, scale: 0.97, x: isUser ? 8 : -8 }
                       }
-                      animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
+                      // #30 · «Сочный» вход (game feel: лёгкий перелёт масштаба
+                      // за целевую точку и обратно, приём squash&stretch из
+                      // геймдева — Swink, Game Feel) — только для реплик,
+                      // родившихся в этой сессии. Восстановленная история
+                      // получает старый, спокойный вход: 15 баблов, влетающих
+                      // с перелётом разом при открытии чата, — это уже не
+                      // полировка, а хаос.
+                      animate={
+                        fresh
+                          ? { opacity: 1, y: 0, scale: [0.97, 1.035, 1], x: 0 }
+                          : { opacity: 1, y: 0, scale: 1, x: 0 }
+                      }
                       transition={
                         reduceMotion
                           ? { duration: 0.15 }
-                          : SPRING_SNAPPY
+                          : fresh
+                            ? { ...SPRING_SNAPPY, scale: { duration: 0.34, times: [0, 0.55, 1], ease: 'easeOut' } }
+                            : SPRING_SNAPPY
                       }
                     >
                       {!isUser &&
@@ -872,10 +989,24 @@ export function CompanionChat({
                     startTime?: string
                   }
                   return (
+                    // #33 · Договор с собой — не реплика, а печать: тот же
+                    // .glass + тёплая primary-кромка, что у карточки старта
+                    // ниже (готов к старту), плюс восковая печать-галочка в
+                    // углу. Раньше карточка делила материал с обычной
+                    // болтовнёй (chat-bubble-cat) — план, положенный на
+                    // вечер, читался как одна из фраз, а не как оформленное
+                    // обещание.
                     <div
                       key={i}
-                      className="chat-bubble-cat ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3"
+                      className="glass glass-shine relative ml-10 flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-3"
+                      style={{ ['--glass-border' as string]: 'color-mix(in oklab, var(--primary) 40%, transparent)' }}
                     >
+                      <span
+                        aria-hidden="true"
+                        className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-primary shadow-[0_4px_10px_-4px_oklch(0.86_0.22_130/0.65)]"
+                      >
+                        <Check className="size-3.5 text-primary-foreground" aria-hidden="true" />
+                      </span>
                       <span className="flex items-center gap-1.5 font-mono text-xs uppercase tracking-widest text-primary">
                         <CalendarCheck className="size-3.5" aria-hidden="true" />
                         план положен
@@ -966,7 +1097,10 @@ export function CompanionChat({
                       мессенджерах), не просто ещё один серый символ рядом
                       с временем */}
                   {isUser && status !== 'streaming' && status !== 'submitted' && (
-                    <Check className="size-3 text-primary" aria-hidden="true" />
+                    <Check
+                      className={`size-3 text-primary ${fresh ? 'check-pop' : ''}`}
+                      aria-hidden="true"
+                    />
                   )}
                 </span>
               )}
@@ -988,22 +1122,42 @@ export function CompanionChat({
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
               transition={SPRING_SNAPPY}
             >
-              <CompanionAvatar />
-              {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
-                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней. */}
-              <span
-                className="glass flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
-                aria-label="Напарник печатает"
-              >
+              <CompanionAvatar expression="focused" />
+              <span className="flex flex-col gap-1">
+                {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
+                    форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней.
+                    Средняя точка — тёплый янтарь очага вместо ровно того же
+                    серого: тот же приём, что уже красит галочку «доставлено»
+                    в primary, — «жест жив», не просто три одинаковых пятна. */}
                 <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.3s' }}
-                />
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.15s' }}
-                />
-                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                  className="glass flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
+                  aria-label="Напарник печатает"
+                >
+                  <span
+                    className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
+                    style={{ animationDelay: '-0.3s' }}
+                  />
+                  <span
+                    className="size-1.5 animate-bounce rounded-full bg-[oklch(0.72_0.17_55/0.85)] motion-reduce:animate-none"
+                    style={{ animationDelay: '-0.15s' }}
+                  />
+                  <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                </span>
+                {/* #31 · Подпись приходит только если ожидание реально
+                    затянулось — быстрый скриптовый ответ её не увидит вовсе. */}
+                <AnimatePresence>
+                  {showTypingHint && (
+                    <motion.span
+                      initial={{ opacity: 0, y: -2 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.25 }}
+                      className="pl-1 font-hand text-sm text-muted-foreground"
+                    >
+                      напарник печатает…
+                    </motion.span>
+                  )}
+                </AnimatePresence>
               </span>
             </motion.div>
           )}
@@ -1022,8 +1176,13 @@ export function CompanionChat({
             onClick={() => {
               const el = scrollRef.current
               el?.scrollTo({ top: el.scrollHeight, behavior: 'smooth' })
+              setUnreadCount(0)
             }}
-            aria-label="К свежим сообщениям"
+            aria-label={
+              unreadCount > 0
+                ? `К свежим сообщениям — новых: ${unreadCount}`
+                : 'К свежим сообщениям'
+            }
             initial={{ opacity: 0, y: 6, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.98 }}
@@ -1035,6 +1194,16 @@ export function CompanionChat({
             className="press pointer-events-auto absolute bottom-28 right-4 z-20 flex size-11 items-center justify-center rounded-full border border-white/12 bg-secondary shadow-[0_6px_18px_-6px_oklch(0_0_0/0.7)]"
           >
             <ArrowDown className="size-4 text-foreground" aria-hidden="true" />
+            {/* #32 · Число, а не только точка: «там что-то есть» слабее, чем
+                «там 3 новых» — Zeigarnik держит крепче, когда знает объём. */}
+            {unreadCount > 0 && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-mono text-[10px] font-bold leading-none text-primary-foreground shadow-[0_0_0_2px_var(--color-secondary)]"
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </motion.button>
         )}
       </AnimatePresence>
@@ -1092,8 +1261,21 @@ export function CompanionChat({
         {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
             рассеянный свет (тонкий контур + вынесенное свечение), а не
             сплошная неоновая обводка — так фокус читается премиально, а
-            не как игровой хайлайт. */}
-        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1.5px_oklch(0.86_0.22_130/0.4),0_0_22px_-4px_oklch(0.86_0.22_130/0.4),0_10px_30px_-12px_oklch(0_0_0/0.55)]">
+            не как игровой хайлайт.
+            #34 · Два новых слоя поверх старого: (1) едва заметный подъём +
+            масштаб на фокусе — поле не просто светится, а физически
+            «приподнимается в готовность» (приём чек-аутов Stripe/Linear);
+            (2) тёплая кромка --glass-border, когда есть что отправить,
+            даже ДО фокуса — предвосхищающая аффорданса (то, что уже
+            заметно готово к действию, должно выглядеть готовым). */}
+        <div
+          className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-all duration-200 focus-within:-translate-y-0.5 focus-within:scale-[1.008] focus-within:shadow-[0_0_0_1.5px_oklch(0.86_0.22_130/0.4),0_0_22px_-4px_oklch(0.86_0.22_130/0.4),0_14px_34px_-12px_oklch(0_0_0/0.6)]"
+          style={
+            input.trim()
+              ? { ['--glass-border' as string]: 'color-mix(in oklab, var(--primary) 30%, transparent)' }
+              : undefined
+          }
+        >
           <textarea
             ref={textareaRef}
             value={input}
@@ -1153,8 +1335,21 @@ export function CompanionChat({
             disabled={!canSend || !input.trim()}
             aria-label="Отправить"
             // size-11, не size-10: 40px — тоже ниже минимума 44px
-            className="size-11 shrink-0 rounded-xl"
+            // relative: якорь для искры отправки ниже.
+            className="relative size-11 shrink-0 overflow-visible rounded-xl"
           >
+            {/* #35 · Искра отправки — визуальный эквивалент hapticStart для
+                десктопа и телефонов без вибромотора. Ключ по sendCount:
+                новый узел на каждую отправку, поэтому CSS-анимация просто
+                проигрывается заново при монтировании, без ручного тайминга. */}
+            {sendCount > 0 && (
+              <span
+                key={sendCount}
+                aria-hidden="true"
+                className="send-spark pointer-events-none absolute inset-0 rounded-xl"
+                style={{ boxShadow: '0 0 0 2px oklch(0.86 0.22 130 / 0.55)' }}
+              />
+            )}
             {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
                 {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
                 разное дерево на сервере (useReducedMotion → null) и на клиенте

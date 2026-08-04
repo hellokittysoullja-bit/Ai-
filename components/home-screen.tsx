@@ -832,7 +832,12 @@ export function HomeScreen() {
               трансформа на один тап. Док самого класса .press это прямо
               запрещает: «только на CTA без собственного active-transform». */}
           {stats && (
-            <div className="glass relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
+            // glass-shine: тот же одноразовый проблеск, что уже красит луну
+            // (Э4 в globals.css) — «свет мира касается интерфейса» на
+            // появление элемента. Самая крупная и самая ценная карточка
+            // экрана раньше была единственной .glass-поверхностью «Дома»
+            // без этого приёма.
+            <div className="glass glass-shine relative flex flex-col gap-3 overflow-hidden rounded-2xl p-4">
               {stats.totalStarts < LANDMARK_COUNT ? (
                 <>
                   {/* Аура за силуэтом: холодный лунный свет из угла карты.

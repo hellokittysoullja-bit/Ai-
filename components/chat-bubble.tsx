@@ -91,6 +91,17 @@ export function ChatBubble({
   const [copied, setCopied] = useState(false)
   const longPressTimer = useRef<number | null>(null)
   const draggingRef = useRef(false)
+  // Три искры, расходящиеся из бейджа реакции — только на ПОСТАНОВКУ, не
+  // на снятие: снятие реакции — нейтральное действие, награждать его тем же
+  // откликом обесценило бы саму реакцию (variable reward работает только
+  // в одну сторону — к позитивному действию).
+  const [justReacted, setJustReacted] = useState(false)
+  const reactSparkTimer = useRef<number | null>(null)
+  useEffect(() => {
+    return () => {
+      if (reactSparkTimer.current) window.clearTimeout(reactSparkTimer.current)
+    }
+  }, [])
 
   const x = useMotionValue(0)
   // Иконка ответа проявляется по мере протяжки — сам жест объясняет себя,
@@ -225,6 +236,31 @@ export function ChatBubble({
         {text}
       </motion.div>
 
+      {/* Три искры расходятся из бейджа ровно на постановку реакции — сам
+          жест long-press уже награждён хаптикой и всплытием бейджа, искры
+          добавляют тот же отклик тем, у кого звук/вибро выключены. */}
+      {justReacted && (
+        <span
+          aria-hidden="true"
+          className={`pointer-events-none absolute -bottom-3 flex size-7 items-center justify-center ${
+            isUser ? 'left-1' : 'right-1'
+          }`}
+        >
+          <span
+            className="reaction-spark absolute size-1 rounded-full bg-primary"
+            style={{ ['--dx' as string]: '-11px', ['--dy' as string]: '-13px' }}
+          />
+          <span
+            className="reaction-spark absolute size-1 rounded-full bg-primary"
+            style={{ ['--dx' as string]: '10px', ['--dy' as string]: '-11px', animationDelay: '40ms' }}
+          />
+          <span
+            className="reaction-spark absolute size-1 rounded-full bg-primary"
+            style={{ ['--dx' as string]: '1px', ['--dy' as string]: '-17px', animationDelay: '80ms' }}
+          />
+        </span>
+      )}
+
       {/* Поставленная реакция живёт на кромке пузыря — она про эту реплику,
           а не отдельная строка в ленте. */}
       <AnimatePresence>
@@ -288,8 +324,18 @@ export function ChatBubble({
                   type="button"
                   onClick={() => {
                     hapticReaction()
+                    const settingNew = reaction !== r.key
                     onReact(reaction === r.key ? null : r.key)
                     setMenuOpen(false)
+                    if (settingNew) {
+                      if (reactSparkTimer.current) window.clearTimeout(reactSparkTimer.current)
+                      setJustReacted(false)
+                      // Ремоунт на следующий кадр: если реакция меняется
+                      // быстро (лапка → сердце), класс должен переиграться
+                      // с нуля, а не продолжить уже идущую анимацию.
+                      requestAnimationFrame(() => setJustReacted(true))
+                      reactSparkTimer.current = window.setTimeout(() => setJustReacted(false), 600)
+                    }
                   }}
                   aria-label={r.label}
                   className={`flex size-9 items-center justify-center rounded-full transition-colors ${

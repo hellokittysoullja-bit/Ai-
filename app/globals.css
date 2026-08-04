@@ -1005,3 +1005,144 @@ body[data-companion-speaking] .app-hearth {
     filter: none;
   }
 }
+
+/* ==========================================================================
+   ЧАТ — ВИЗУАЛЬНЫЙ АПГРЕЙД.
+   Материал переписки уже был честным «жидким стеклом» (см. секцию выше),
+   но экран не давал глазу ни одной причины назвать его дорогим: одна
+   плоская текстура, один статичный аватар, события без отдачи. Ниже —
+   слой деталей, каждая привязана к конкретному моменту взаимодействия
+   (Aesthetic-Usability Effect, Norman 2004: воспринимаемая полировка
+   поднимает доверие к самому продукту, не только к его виду), и каждая
+   контингентна — играет на СОБЫТИЕ, не по таймеру (тот же закон Р1,
+   что уже держит всю сцену AppBackdrop).
+   ========================================================================== */
+
+/* Камерное зерно поверх переписки — то же самое зерно, что уже держит
+   hero-секцию лендинга (.grain), но вдвое тише: чат не должен спорить с
+   текстом реплик за внимание, ему нужна фактура, а не эффект. Плоская
+   заливка на OLED без зерна читается «сайтом», зерно — плёнкой. */
+.grain.grain-chat::before {
+  opacity: 0.32;
+}
+
+/* Аватар напарника — многослойное кольцо вместо плоского box-shadow.
+   Цвет ореола (--avatar-glow, задаётся инлайн из CompanionAvatar) меняется
+   по мимике: тёплый янтарь очага для радости, холодноватый лайм для
+   сосредоточенности, лунная синева для сонного — тот же язык «тёплое/
+   холодное», что уже разводит очаг и луну в остальной сцене, применённый
+   к самому часто повторяющемуся объекту экрана. */
+.avatar-ring {
+  box-shadow:
+    0 0 0 1px oklch(1 0 0 / 0.1),
+    0 0 0 3px var(--avatar-glow, transparent),
+    0 2px 10px -4px oklch(0 0 0 / 0.55);
+  transition: box-shadow 280ms ease-out;
+}
+@keyframes avatar-ring-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.1),
+      0 0 0 3px var(--avatar-glow, transparent),
+      0 0 12px -2px var(--avatar-glow, transparent),
+      0 2px 10px -4px oklch(0 0 0 / 0.55);
+  }
+  50% {
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.18),
+      0 0 0 5px var(--avatar-glow, transparent),
+      0 0 20px -2px var(--avatar-glow, transparent),
+      0 2px 10px -4px oklch(0 0 0 / 0.55);
+  }
+}
+/* 2 вдоха и стоп — тот же принцип, что у cta-sheen/start-card-breathe:
+   существо радуется ПРИХОДУ реплики, не превращается в маячок. reacting
+   само гаснет через 1.6s (companion-chat.tsx), поэтому infinite здесь
+   безопасен — класс снимается вместе с состоянием. */
+.avatar-ring-active {
+  animation: avatar-ring-pulse 0.8s ease-in-out 2;
+}
+@media (prefers-reduced-motion: reduce) {
+  .avatar-ring-active {
+    animation: none;
+  }
+}
+
+/* Галочка «доставлено» — раньше просто появлялась кадром вместе с
+   остальным таймстемпом. Сама вёрстка уже гарантирует контингентность:
+   узел монтируется в DOM ровно в момент, когда статус реально стал
+   'ready' (см. условие рендера в companion-chat.tsx) — при восстановлении
+   истории чата этот момент уже в прошлом, и JS явно гасит анимацию для
+   таких реплик (isFresh), чтобы открытие чата не превращалось в фейерверк
+   галочек по всей истории разом. */
+@keyframes check-pop {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.check-pop {
+  animation: check-pop 360ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .check-pop {
+    animation: none;
+  }
+}
+
+/* Искра у кнопки отправки — визуальный аналог хаптики для десктопа и для
+   телефонов без вибромотора: тонкое лаймовое кольцо расходится и гаснет
+   ровно на момент реального нажатия (ключ по sendCount — новый DOM-узел
+   на каждую отправку, повторного проигрывания без нового события нет). */
+@keyframes send-spark {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+.send-spark {
+  animation: send-spark 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .send-spark {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+/* Реакция на реплику — три крошечные искры расходятся из точки тапа один
+   раз при ПОСТАНОВКЕ реакции (не при снятии): усиливает и без того
+   контингентный жест долгим нажатием собственной наградой, не только
+   хаптикой. Смещение — через --dx/--dy, задаются инлайн на каждой искре. */
+@keyframes reaction-spark {
+  0% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(0.2);
+    opacity: 0;
+  }
+}
+.reaction-spark {
+  animation: reaction-spark 560ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reaction-spark {
+    animation: none;
+    opacity: 0;
+  }
+}
