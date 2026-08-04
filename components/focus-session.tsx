@@ -134,9 +134,14 @@ export function FocusSession() {
   // bottleneck СДВГ; выбор готового микрошага снимает стену.
   const [brokenSteps, setBrokenSteps] = useState<string[] | null>(null)
   const [breaking, setBreaking] = useState(false)
+  // Раньше сетевая ошибка просто отпускала кнопку без следа — человек не
+  // понимал, сработало дробление или нет, и был вынужден жать вслепую ещё
+  // раз. Теперь ошибка видима и даёт явный повтор (WCAG Status Messages).
+  const [breakError, setBreakError] = useState(false)
   async function breakDown() {
     if (!task.trim() || breaking) return
     setBreaking(true)
+    setBreakError(false)
     try {
       const res = await fetch('/api/breakdown', {
         method: 'POST',
@@ -146,9 +151,12 @@ export function FocusSession() {
       if (res.ok) {
         const data = (await res.json()) as { steps: string[] | null }
         if (data.steps) setBrokenSteps(data.steps)
+        else setBreakError(true)
+      } else {
+        setBreakError(true)
       }
     } catch {
-      /* сеть недоступна — кнопка просто отпустится */
+      setBreakError(true)
     } finally {
       setBreaking(false)
     }
@@ -557,7 +565,10 @@ export function FocusSession() {
                     setTask(chip)
                   }}
                   aria-pressed={task === chip}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                  // min-h-11: пилюля визуально компактна (py-1.5), но тач-цель
+                  // должна быть не меньше 44px (WCAG 2.5.8) — замерено рендером,
+                  // раньше цель была ~32px.
+                  className={`inline-flex min-h-11 items-center rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                     task === chip
                       ? 'border-primary bg-primary text-primary-foreground'
                       : 'glass text-muted-foreground transition-[filter] duration-150 hover:text-foreground hover:brightness-125'
@@ -602,7 +613,10 @@ export function FocusSession() {
               autoFocus={!prefilledStep}
               enterKeyHint="go"
               placeholder="Открыть файл презентации"
-              className="glass h-12 rounded-xl px-4 text-sm"
+              // text-base, не text-sm: 14px триггерит авто-zoom всей страницы
+              // в iOS Safari при фокусе на поле — тот же фикс, что уже стоит
+              // в companion-chat.tsx.
+              className="glass h-12 rounded-xl px-4 text-base"
             />
           </label>
 
@@ -621,6 +635,21 @@ export function FocusSession() {
               <Sparkles className="size-4 shrink-0 text-primary" aria-hidden="true" />
               {breaking ? 'Дроблю…' : 'Звучит крупно? Раздробить'}
             </button>
+          )}
+          {breakError && !brokenSteps && !breaking && (
+            <div
+              role="status"
+              className="flex items-center gap-2 self-start rounded-full border border-white/10 bg-background/70 px-4 py-2 text-xs leading-relaxed text-muted-foreground"
+            >
+              Не вышло раздробить — сеть подвела.
+              <button
+                type="button"
+                onClick={breakDown}
+                className="press inline-flex min-h-11 items-center font-semibold text-primary underline-offset-4 hover:underline"
+              >
+                Ещё раз
+              </button>
+            </div>
           )}
           {brokenSteps && (
             <div className="glass flex flex-col gap-2 rounded-2xl p-3">

@@ -6,7 +6,9 @@ import { AppNav } from "@/components/app-nav";
  *
  * Почему нет app-header:
  * — Header с «← назад» убивает native feel (это сайт, не компаньон).
- * — Exit affordance на уровне глаз сокращает session length ~18% (Nielsen Norman).
+ * — Постоянный exit affordance на уровне глаз конкурирует с основным
+ *   действием экрана каждый кадр — не измеряли на своих данных, поэтому не
+ *   ссылаемся на конкретную цифру чужого исследования.
  * — iOS/Android back gesture решает навигацию системно.
  * — В Genshin Impact нет кнопки «← Back to website». Причина та же.
  *

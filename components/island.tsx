@@ -336,24 +336,29 @@ export function Island() {
             const sprite = findSprites[find.key]
             if (!sprite) return null
             return (
-              <g
-                key={find.startId}
-                className={`island-grow${find.startId === newFindStartId ? ' island-new-element' : ''}`}
-                style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
-                transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}
-              >
-          {/* Редкая находка светится золотом — тёплый жёлтый закреплён за rare */}
-          {find.rarity === 'rare' && (
-            <circle cx="0" cy="-10" r="20" fill="var(--color-reward)" opacity="0.16">
-                    <animate
-                      attributeName="opacity"
-                      values="0.08;0.2;0.08"
-                      dur="3.2s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                )}
-                {sprite}
+              // Позиционирующий transform живёт на ВНЕШНЕМ <g>, анимация
+              // island-grow — на ВНУТРЕННЕМ: если оба атрибута трогают
+              // transform на одном узле, CSS-анимация молча побеждает и
+              // translate/scale находки теряется (CLAUDE.md §5.1) — тот же
+              // паттерн, что уже используется у landmarks выше.
+              <g key={find.startId} transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}>
+                <g
+                  className={`island-grow${find.startId === newFindStartId ? ' island-new-element' : ''}`}
+                  style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
+                >
+                  {/* Редкая находка светится золотом — тёплый жёлтый закреплён за rare */}
+                  {find.rarity === 'rare' && (
+                    <circle cx="0" cy="-10" r="20" fill="var(--color-reward)" opacity="0.16">
+                      <animate
+                        attributeName="opacity"
+                        values="0.08;0.2;0.08"
+                        dur="3.2s"
+                        repeatCount="indefinite"
+                      />
+                    </circle>
+                  )}
+                  {sprite}
+                </g>
               </g>
             )
           })}
