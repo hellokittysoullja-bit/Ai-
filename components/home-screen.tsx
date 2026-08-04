@@ -26,7 +26,7 @@ import {
   type Plan,
   type SessionResult,
 } from "@/lib/memory";
-import { LANDMARK_COUNT } from "@/lib/island-elements";
+import { ISLAND_ELEMENT_NAMES, LANDMARK_COUNT } from "@/lib/island-elements";
 import {
   enableCheckins,
   getCheckinState,
@@ -531,6 +531,19 @@ export function HomeScreen() {
           ? { task: lastStepLabel, source: "repeat" }
           : null;
 
+  /*
+   * Искра предвкушения в главной карточке (см. FirstMovementCard). Честно
+   * называем только то, что предсказуемо: ориентиры 1–10 идут в фиксированном
+   * порядке, поэтому «дальше вырастет X» — не обещание, а факт. После
+   * LANDMARK_COUNT пул случайный (drawFind), и называть находку заранее
+   * значило бы либо угадывать, либо тихо портить сюрприз, ради которого
+   * вероятностный пул вообще существует — там карточка честно молчит.
+   */
+  const nextGrowth =
+    stats && stats.totalStarts < LANDMARK_COUNT
+      ? { name: ISLAND_ELEMENT_NAMES[stats.totalStarts], landmarkIndex: stats.totalStarts }
+      : null;
+
   const homeState: HomeState = activeSession
     ? "focus"
     : sessionResult && !resultShown
@@ -679,6 +692,7 @@ export function HomeScreen() {
           task={movement.task}
           source={movement.source}
           minutes={advice.minutes}
+          nextGrowth={nextGrowth}
           busy={startBusy}
           onStart={startMovement}
           onOther={() => router.push("/app/session")}

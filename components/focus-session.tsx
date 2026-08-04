@@ -734,8 +734,16 @@ export function FocusSession() {
             Название «Первое движение», не «Первый шаг»: человек не обещает
             закончить задачу, он обещает сдвинуться. Формулировка снимает
             обязательство, которое он не готов взять.
+
+            surface-quiet, не surface-card: сплошной Plum-блок на прямом
+            сравнении с прежней версией экрана читался как форма в рамке —
+            сцена (маскот, гряда силуэтов на фоне) переставала быть сценой
+            и превращалась в задний план позади UI-карточки. surface-quiet
+            (5% белого) группирует те же элементы едва заметной подложкой:
+            граница видна, если специально искать, а не потому что кто-то
+            нарисовал прямоугольник поверх ночного неба.
           */}
-          <div className="surface-card flex flex-col gap-3 p-4">
+          <div className="surface-quiet flex flex-col gap-3 p-4">
             <div className="flex flex-col gap-0.5">
               <span className="t-eyebrow">Первое движение</span>
               <span className="t-secondary" style={{ color: 'var(--ivory-500)' }}>
@@ -1195,37 +1203,14 @@ export function FocusSession() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
         >
-          {/*
-            #44 · ЗАДАЧА ОСТАЁТСЯ ВИДИМОЙ — и стоит НАД таймером, а не под
-            ним. Порядок не косметика: человек, поднявший глаза от работы,
-            должен первым делом увидеть, чем он занят, и только потом
-            сколько осталось. Обратный порядок превращает экран в таймер с
-            подписью вместо «я делаю вот это, и время идёт».
-          */}
-          <div className="flex flex-col items-center gap-1">
-            <span className="t-eyebrow">Сейчас</span>
-            <p
-              className={`max-w-[19rem] text-balance text-center t-task font-semibold text-foreground ${
-                showFullTask ? '' : 'line-clamp-2'
-              }`}
-            >
-              {task}
-            </p>
-            {!showFullTask && task.length > 60 && (
-              <button
-                type="button"
-                onClick={() => setShowFullTask(true)}
-                className="min-h-11 px-2 t-meta underline-offset-4 hover:underline"
-                style={{ color: 'var(--ivory-500)' }}
-              >
-                Показать полностью
-              </button>
-            )}
-          </div>
-
-          {/* Существо — центр сцены: дышит, радуется четвертям, встречает
-              из отвлечения. Кольцо прогресса — на нём же: время читается на
-              том объекте, за которым и так следит взгляд. */}
+          {/* Существо — центр сцены и ПЕРВОЕ, что видит взгляд: весь продукт
+              стоит на метафоре «кот сидит рядом», не на метафоре «вот твоя
+              задача». Дублировано прямым сравнением рендером с прежней
+              версией экрана: как только название задачи встало НАД
+              маскотом крупным заголовком, кот перестал быть героем кадра —
+              компаньон-присутствие уступило место форме-с-подписью.
+              Кольцо прогресса — на самом маскоте: время читается на том
+              объекте, за которым и так следит взгляд. */}
           <div className="relative flex items-center justify-center">
             <svg
               className="pointer-events-none absolute -inset-4"
@@ -1274,6 +1259,34 @@ export function FocusSession() {
                 size={130}
               />
             </motion.div>
+          </div>
+
+          {/*
+            #44 · ЗАДАЧА ОСТАЁТСЯ ВИДИМОЙ — и стоит НАД таймером, ПОСЛЕ
+            маскота. Человек, поднявший глаза от работы, видит сперва
+            компаньона (эмоциональный якорь), затем чем занят, и только
+            потом сколько осталось — три разных вопроса, три ответа по
+            убыванию срочности, не один заголовок поверх другого.
+          */}
+          <div className="flex flex-col items-center gap-1">
+            <span className="t-eyebrow">Сейчас</span>
+            <p
+              className={`max-w-[19rem] text-balance text-center t-task font-semibold text-foreground ${
+                showFullTask ? '' : 'line-clamp-2'
+              }`}
+            >
+              {task}
+            </p>
+            {!showFullTask && task.length > 60 && (
+              <button
+                type="button"
+                onClick={() => setShowFullTask(true)}
+                className="min-h-11 px-2 t-meta underline-offset-4 hover:underline"
+                style={{ color: 'var(--ivory-500)' }}
+              >
+                Показать полностью
+              </button>
+            )}
           </div>
 
           {/*
