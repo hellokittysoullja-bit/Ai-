@@ -125,46 +125,31 @@ export function IslandDisclosure({
                       aria-valuemax={LANDMARK_COUNT}
                       aria-label={`Пройдено ${stats.totalStarts} из ${LANDMARK_COUNT} ориентиров острова`}
                     >
-                      {/* Тропа, а не полоса загрузки: пройденные шаги — следы,
-                          следующий — точка-цель, остальное — уходящий вдаль
-                          пунктир. Goal Gradient читается формой, а не
-                          процентами. */}
-                      <span className="relative flex h-4 items-center">
+                      {/*
+                        ТРЕТИЙ ПРОХОД — тонкая линия вместо десяти точек.
+                        Десять отдельных кружков (заполненных + пунктирных +
+                        одного мигающего) на 358px карточки — это реальный
+                        визуальный шум: глазу приходится посчитать точки,
+                        чтобы понять число, которое уже написано текстом
+                        строкой ниже. Одна линия того же смысла (заполнена на
+                        90%) читается мгновенно, без подсчёта, и не
+                        конкурирует с текстом за внимание.
+                      */}
+                      <span className="relative block h-1 overflow-hidden rounded-full bg-white/[0.08]">
                         <span
                           aria-hidden="true"
-                          className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-white/[0.07]"
-                        />
-                        <span
-                          aria-hidden="true"
-                          className="absolute left-0 top-1/2 h-px -translate-y-1/2 bg-primary/45"
+                          className="absolute inset-y-0 left-0 rounded-full bg-primary/70"
                           style={{
-                            width: `${(Math.max(0, stats.totalStarts - 1) / (LANDMARK_COUNT - 1)) * 100}%`,
+                            width: `${(stats.totalStarts / LANDMARK_COUNT) * 100}%`,
                           }}
                         />
-                        <span className="relative flex w-full items-center justify-between">
-                          {Array.from({ length: LANDMARK_COUNT }, (_, i) => {
-                            const done = i < stats.totalStarts
-                            const isNext = i === stats.totalStarts
-                            return (
-                              <span
-                                key={i}
-                                className={
-                                  done
-                                    ? 'size-2 rounded-full bg-primary'
-                                    : isNext
-                                      ? 'trail-beacon size-2 rounded-full bg-primary/70 ring-2 ring-primary/25'
-                                      : 'size-1 rounded-full bg-white/15'
-                                }
-                              />
-                            )
-                          })}
-                        </span>
                       </span>
                       <span className="flex items-baseline justify-between gap-2">
                         <span className="tabular-nums t-meta" style={{ color: 'var(--ivory-500)' }}>
-                          {stats.totalStarts} из {LANDMARK_COUNT}
+                          {stats.totalStarts} из {LANDMARK_COUNT} до «
+                          {ISLAND_ELEMENT_NAMES[stats.totalStarts]}»
                           {LANDMARK_COUNT - stats.totalStarts === 1
-                            ? ' · остался последний'
+                            ? ' · последний шаг'
                             : stats.lastStartDate === todayKey(new Date())
                               ? ' · вырос сегодня'
                               : ''}
