@@ -605,11 +605,25 @@ export function HomeScreen() {
 
   const introHeader = (
     <div className="flex flex-col gap-5">
-      <div className="flex items-start gap-3">
+      {/*
+        ГЕРОЙСКИЙ ОТКРЫВАЮЩИЙ МОМЕНТ (после прямого сравнения рендером —
+        прошлый проход ничего здесь не поменял ВИЗУАЛЬНО, только
+        подстроил детали ниже по экрану, и это было видно).
+        Контраст масштабов — самый дешёвый и самый надёжный рычаг
+        красоты: маскот 52px рядом с 20px-текстом не создавал вообще
+        никакой драмы, оба тонули в одном визуальном весе с чипами и
+        кнопками ниже. Здесь — реальный скачок: кот вдвое крупнее (84px),
+        очаг за ним разгорается и дышит (тот же .hearth-breathe, что уже
+        живёт в AppBackdrop — не новая анимация, а перенесённый в чат тот
+        же язык сцены), реплика набрана заметно крупнее (t-voice-hero).
+        Одна смелая идея, не три: только этот блок получает лишний вес,
+        всё, что ниже (карточка, чипы, композер), остаётся тихим.
+      */}
+      <div className="flex items-center gap-4">
         <div className="relative shrink-0">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute left-1/2 top-1/2 h-20 w-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.16)_0%,transparent_70%)]"
+            className="hearth-breathe pointer-events-none absolute left-1/2 top-1/2 h-[8.5rem] w-[8.5rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(ellipse_at_center,oklch(0.72_0.17_55/0.34)_0%,oklch(0.72_0.17_55/0.1)_45%,transparent_72%)]"
           />
           <motion.div
             className="relative"
@@ -621,7 +635,7 @@ export function HomeScreen() {
             <MascotSvg
               expression={mascotExpression}
               label={companionName ?? "Напарник"}
-              size={52}
+              size={84}
             />
           </motion.div>
         </div>
@@ -629,7 +643,7 @@ export function HomeScreen() {
           {firstWord ? (
             <motion.div
               key="greeting"
-              className="flex flex-col gap-1 pt-1"
+              className="flex min-w-0 flex-col gap-1"
               initial={reduceMotion ? false : { opacity: 0, y: 5 }}
               animate={{ opacity: 1, y: 0 }}
               transition={reduceMotion ? { duration: 0 } : SPRING_GESTURE}
@@ -641,7 +655,7 @@ export function HomeScreen() {
                   персонаж, а системное сообщение в рукописном шрифте. */}
               <p
                 ref={greetingRef}
-                className={`t-voice ${greetingClamped ? "line-clamp-3" : ""}`}
+                className={`t-voice-hero text-balance ${greetingClamped ? "line-clamp-3" : ""}`}
               >
                 {firstWord.greeting}
               </p>
