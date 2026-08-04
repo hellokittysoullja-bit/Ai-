@@ -1017,22 +1017,23 @@ export function CompanionChat({
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
               transition={SPRING_SNAPPY}
             >
-              <CompanionAvatar />
+              {/* expression="focused", не reacting: reacting-кольцо семантически
+                  означает «реплика только что пришла» (см. комментарий в
+                  CompanionAvatar) — во время печати ничего ещё не пришло,
+                  кот думает, а не радуется. */}
+              <CompanionAvatar expression="focused" />
               {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
-                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней. */}
+                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней.
+                  Три тлеющих угля (.ember-dot, globals.css) — тот же огонь,
+                  что горит в кольце аватара и в фоне сцены, вместо безликих
+                  серых точек. Три разных периода мерцания. */}
               <span
                 className="glass flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
                 aria-label="Напарник печатает"
               >
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.3s' }}
-                />
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.15s' }}
-                />
-                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                <span className="ember-dot size-1.5 rounded-full" style={{ animationDuration: '0.9s' }} />
+                <span className="ember-dot size-1.5 rounded-full" style={{ animationDuration: '1.15s', animationDelay: '0.15s' }} />
+                <span className="ember-dot size-1.5 rounded-full" style={{ animationDuration: '0.8s', animationDelay: '0.3s' }} />
               </span>
             </motion.div>
           )}
@@ -1133,8 +1134,11 @@ export function CompanionChat({
         {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
             рассеянный свет (тонкий контур + вынесенное свечение), а не
             сплошная неоновая обводка — так фокус читается премиально, а
-            не как игровой хайлайт. */}
-        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1.5px_oklch(0.86_0.22_130/0.4),0_0_22px_-4px_oklch(0.86_0.22_130/0.4),0_10px_30px_-12px_oklch(0_0_0/0.55)]">
+            не как игровой хайлайт. chat-input-dock (globals.css) — готовый
+            класс уже лежал в файле, но ни разу не был подключён к разметке;
+            rounded-3xl роднит форму дока с капсулами чипов/пилюль по всему
+            экрану, а не с прямоугольными углами reward-карточки. */}
+        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200">
           <textarea
             ref={textareaRef}
             value={input}

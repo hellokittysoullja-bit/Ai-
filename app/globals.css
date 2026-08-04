@@ -597,9 +597,37 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     0 0 18px -6px oklch(0.86 0.22 130 / 0.35);
 }
 
+/* Индикатор «напарник печатает»: три тлеющих угля вместо безликих серых
+   точек bg-muted-foreground/animate-bounce. Тот же тёплый оттенок 55, что у
+   кольца CompanionAvatar и очага в фоне сцены — контингентно (только пока
+   реально идёт запрос), диегетично (это огонь того же очага, не абстрактная
+   UI-анимация), НЕ --color-reward (тот зарезервирован за редкими находками —
+   см. комментарий у токена в :root, разбавлять нельзя). Три разных периода —
+   органичное мерцание, а не механический метроном в три ноги. */
+@keyframes ember-flicker {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+.ember-dot {
+  background: oklch(0.72 0.17 55);
+  box-shadow: 0 0 6px -1px oklch(0.72 0.17 55 / 0.7);
+  animation: ember-flicker 1s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .start-card-breathe {
     animation: none;
+  }
+  .ember-dot {
+    animation: none;
+    opacity: 0.75;
   }
 }
 
