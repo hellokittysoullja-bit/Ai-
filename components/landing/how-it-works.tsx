@@ -95,8 +95,13 @@ export function HowItWorks() {
               <p className="text-lg leading-relaxed text-muted-foreground">
                 {step.text}
               </p>
-              {/* Цитата крупнее */}
-              <div className="rounded-xl border border-primary/30 bg-primary/10 px-5 py-4">
+              {/* Цитата крупнее. Было: плоский border+bg-primary/10 без
+                  объёма — заметно беднее настоящих пузырей чата в
+                  приложении. .glass-highlight (globals.css) — готовый
+                  третий материальный ярус с той же формулой глубины
+                  (inset-блик + внешнее свечение), уже предназначенный
+                  именно для одного акцентного элемента на секцию. */}
+              <div className="glass-highlight rounded-xl px-5 py-4">
                 <p
                   className={`font-hand text-xl leading-snug text-primary md:text-2xl ${
                     i % 2 === 0 ? "-rotate-[0.6deg]" : "rotate-[0.5deg]"

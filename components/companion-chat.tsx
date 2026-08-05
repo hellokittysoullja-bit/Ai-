@@ -23,7 +23,7 @@ import {
 import { useDictation } from '@/hooks/use-dictation'
 import { PullToStretch } from '@/components/pull-to-stretch'
 import { hapticStart } from '@/lib/haptics'
-import { ChatBubble, type Reaction } from '@/components/chat-bubble'
+import { ChatBubble, BubbleTail, type Reaction } from '@/components/chat-bubble'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
 import {
@@ -78,9 +78,19 @@ function CompanionAvatar({
   // в inferExpression). Радость от новизны и тон сообщения не всегда
   // совпадают: кот может искренне обрадоваться (кольцо), сказав при этом
   // что-то сфокусированное — оба сигнала живут не подменяя друг друга.
+  // Скейл-попап (#28) добавлен к кольцу: раньше «реакция» была только
+  // светом, без движения тела — существо будто моргало лампочкой, а не
+  // отзывалось. Один упругий вдох (1→1.2→1) на то же событие, что и
+  // кольцо — тот же контингентный триггер, ничего нового не добавлено
+  // в критерии срабатывания, только сила самого отклика.
+  const reduceMotion = useReducedMotion()
   return (
-    <div
+    <motion.div
       className="relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80"
+      animate={
+        reduceMotion ? undefined : { scale: reacting ? [1, 1.2, 1] : 1 }
+      }
+      transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
       style={{
         boxShadow: reacting
           ? '0 0 0 2px oklch(0.72 0.17 55 / 0.35), 0 0 14px -2px oklch(0.72 0.17 55 / 0.5)'
@@ -89,7 +99,7 @@ function CompanionAvatar({
       }}
     >
       <MascotSvg expression={reacting ? 'happy' : expression} size={30} />
-    </div>
+    </motion.div>
   )
 }
 
@@ -603,6 +613,11 @@ export function CompanionChat({
 
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
+  // Слот справа в композере: микрофон/стоп остаётся, пока реально идёт
+  // запись (даже если частичный транскрипт уже что-то вписал в поле),
+  // иначе — кнопка отправки, если есть текст или диктовка недоступна вовсе
+  // (тогда disabled-отправка — тот же фолбэк, что был всегда).
+  const dictationActiveControl = dictation.supported && (dictation.listening || !input.trim())
 
   function submit() {
     if (!input.trim() || !canSend) return
@@ -623,6 +638,15 @@ export function CompanionChat({
     setSendCount((c) => c + 1)
   }
 
+  // Таймстемп группируется по роли, но быстрый диалог («он ответил — я
+  // ответил») чередует роли на каждой реплике — тогда КАЖДОЕ сообщение
+  // формально становится «последним в своей группе», и одна и та же минута
+  // повторяется под каждым пузырём подряд. Реальные мессенджеры схлопывают
+  // это по времени: показывают метку только когда она реально изменилась
+  // (плюс всегда на самом последнем сообщении, чтобы «когда мы говорили в
+  // последний раз» было видно однозначно). lastShownClock — счётчик,
+  // сбрасывающийся на каждый рендер (не state), ровно для этой цели.
+  let lastShownClock: string | null = null
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Диктор молчал про новые реплики целиком — announceText обновляется
@@ -687,6 +711,24 @@ export function CompanionChat({
               {header}
             </div>
           ) : null}
+          {/* Полоса «переписка / напарник рядом» — только там, где над ней
+              уже стоит закреплённый контекст «Дома»: она отделяет «карточки
+              статуса» от «живого разговора» как два разных слоя экрана.
+              В чистом чате (Фокус) это нечего было бы отделять. */}
+          {header ? (
+            <div className="conversation-rail flex items-center justify-between gap-3 px-1 pt-1">
+              <span className="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-muted-foreground">
+                переписка
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 rounded-full bg-primary shadow-[0_0_7px_oklch(0.86_0.22_130/0.5)]"
+                />
+                напарник рядом
+              </span>
+            </div>
+          ) : null}
           <motion.div
             className="flex items-start gap-2"
             initial={{ opacity: 0, y: 10 }}
@@ -697,8 +739,22 @@ export function CompanionChat({
             {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
                 приветствие и сообщения произносит один и тот же персонаж —
                 и один и тот же материал, с гарантированным контрастом
-                текста независимо от участка сцены под пузырём. */}
-            <div className="chat-bubble-cat max-w-[85%] rounded-2xl rounded-tl-sm px-3 py-1.5 font-hand text-lg leading-snug text-secondary-foreground">
+                текста независимо от участка сцены под пузырём.
+                rounded-tl-sm раньше имитировал «хвостик» скруглением угла —
+                ровно то приближение, ради которого в chat-bubble.tsx
+                нарисован настоящий SVG-хвостик (BubbleTail). Приветствие —
+                первая реплика, которую видит человек: она обязана нести ту
+                же деталь материала, что и все остальные, не урезанную
+                версию. --tail-fill/--tail-stroke зеркалят те же значения,
+                что ChatBubble ставит для isUser=false. */}
+            <div
+              className="chat-bubble-cat relative max-w-[88%] rounded-2xl px-4 py-2.5 font-hand text-[1.18rem] leading-snug text-secondary-foreground"
+              style={{
+                ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
+                ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
+              }}
+            >
+              <BubbleTail side="left" />
               {greeting}
             </div>
           </motion.div>
@@ -723,15 +779,20 @@ export function CompanionChat({
                     key={chip}
                     type="button"
                     onClick={() => {
+                      if (!canSend) return
                       hapticStart()
                       sendMessage({ text: chip })
                     }}
+                    disabled={!canSend}
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     // #27 · Чипы приходят лестницей после приветствия:
                     // stagger из lib/motion — один шаг ритма на весь продукт.
                     transition={{ ...SPRING_SNAPPY, delay: stagger(ci, 0.4) }}
-                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary"
+                    // disabled: пока запрос уже летит, повторный тап по чипу
+                    // раньше тихо отправлял дубль — теперь кнопка блокируется,
+                    // тот же гард, что уже стоит на форме композера ниже.
+                    className="glass glass-interactive press inline-flex min-h-11 items-center rounded-full px-3.5 py-2 text-sm text-foreground shadow-[0_4px_14px_-8px_oklch(0_0_0/0.45)] hover:text-primary disabled:pointer-events-none disabled:opacity-45"
                   >
                     {chip}
                   </motion.button>
@@ -784,6 +845,16 @@ export function CompanionChat({
               !!prevTime &&
               todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
 
+            // Схлопываем повтор одной и той же минуты подряд (см. комментарий
+            // у lastShownClock выше) — но последнее сообщение в ленте всегда
+            // получает метку, иначе непонятно, когда шёл разговор в последний раз.
+            const clockLabel = thisTime ? formatClock(thisTime) : null
+            if (showDayDivider) lastShownClock = null
+            const isLastMessageOverall = mi === messages.length - 1
+            const showTimestamp =
+              isLastOfGroup && !!thisTime && (isLastMessageOverall || clockLabel !== lastShownClock)
+            if (showTimestamp) lastShownClock = clockLabel
+
             return (
             <div
               key={message.id}
@@ -796,7 +867,12 @@ export function CompanionChat({
             >
               {showDayDivider && (
                 <div className="my-1 flex items-center justify-center">
-                  <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                  {/* Был плоский bg-white/5 — единственный элемент во всей
+                      переписке без .glass-материала, который несёт
+                      буквально всё остальное здесь (реплики, чипы, цитата
+                      ответа). Разделитель дня выглядел вклеенным из другого
+                      компонента. */}
+                  <span className="glass rounded-full px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
                     {formatDayLabel(thisTime)}
                   </span>
                 </div>
@@ -947,7 +1023,7 @@ export function CompanionChat({
                   каждую: как в реальных мессенджерах, не как лог событий.
                   Галочка — только у своих и только когда реплика ушла
                   (не во время стриминга: секунду назад это было бы ложью). */}
-              {isLastOfGroup && thisTime && (
+              {showTimestamp && (
                 // text-muted-foreground БЕЗ доп. /70: сам токен уже даёт
                 // 6.63:1 на фоне сцены (замерено попиксельно через canvas),
                 // а «/70» поверх него утапливал 12px-текст до 3.81:1 — ниже
@@ -960,7 +1036,7 @@ export function CompanionChat({
                     isUser ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  {formatClock(thisTime)}
+                  {clockLabel}
                   {/* text-primary: галочка «доставлено» — акцентный сигнал
                       подтверждения (тот же приём, что синие галочки в
                       мессенджерах), не просто ещё один серый символ рядом
@@ -988,22 +1064,23 @@ export function CompanionChat({
               exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.15 } }}
               transition={SPRING_SNAPPY}
             >
-              <CompanionAvatar />
+              {/* expression="focused", не reacting: reacting-кольцо семантически
+                  означает «реплика только что пришла» (см. комментарий в
+                  CompanionAvatar) — во время печати ничего ещё не пришло,
+                  кот думает, а не радуется. */}
+              <CompanionAvatar expression="focused" />
               {/* Тот же .glass + тень, что у реплик: пузырь-ожидание — это
-                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней. */}
+                  форма реплики В ПРОЦЕССЕ, а не отдельный виджет рядом с ней.
+                  Три тлеющих угля (.ember-dot, globals.css) — тот же огонь,
+                  что горит в кольце аватара и в фоне сцены, вместо безликих
+                  серых точек. Три разных периода мерцания. */}
               <span
                 className="glass flex items-center gap-1 rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-[0_4px_16px_-8px_oklch(0_0_0/0.5)]"
                 aria-label="Напарник печатает"
               >
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.3s' }}
-                />
-                <span
-                  className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none"
-                  style={{ animationDelay: '-0.15s' }}
-                />
-                <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground/70 motion-reduce:animate-none" />
+                <span className="ember-dot size-1.5 rounded-full" style={{ animationDuration: '0.9s' }} />
+                <span className="ember-dot size-1.5 rounded-full" style={{ animationDuration: '1.15s', animationDelay: '0.15s' }} />
+                <span className="ember-dot size-1.5 rounded-full" style={{ animationDuration: '0.8s', animationDelay: '0.3s' }} />
               </span>
             </motion.div>
           )}
@@ -1092,8 +1169,14 @@ export function CompanionChat({
         {/* Мягкое гало вместо жёсткого кольца: тот же токен primary, но как
             рассеянный свет (тонкий контур + вынесенное свечение), а не
             сплошная неоновая обводка — так фокус читается премиально, а
-            не как игровой хайлайт. */}
-        <div className="glass mx-auto flex max-w-md items-end gap-2 rounded-2xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200 focus-within:shadow-[0_0_0_1.5px_oklch(0.86_0.22_130/0.4),0_0_22px_-4px_oklch(0.86_0.22_130/0.4),0_10px_30px_-12px_oklch(0_0_0/0.55)]">
+            не как игровой хайлайт. chat-input-dock (globals.css) — готовый
+            класс уже лежал в файле, но ни разу не был подключён к разметке;
+            rounded-3xl роднит форму дока с капсулами чипов/пилюль по всему
+            экрану, а не с прямоугольными углами reward-карточки. */}
+        {/* py-1.5, не py-2: с одним слотом справа (см. ниже) вместо
+            микрофона+отправки бок о бок доку больше не нужен запас под два
+            44px-квадрата сразу — тоньше без потери тач-целей. */}
+        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-[transform,box-shadow,border-color] duration-200">
           <textarea
             ref={textareaRef}
             value={input}
@@ -1116,71 +1199,106 @@ export function CompanionChat({
             // страницу при фокусе на поле ввода, это ломает раскладку на
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
-            // минимума тач-цели 44px (замерено рендером).
-            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+            // минимума тач-зоны 44px (замерено рендером).
+            // caret-primary: курсор мигает лаймом, не системным чёрным/белым —
+            // дешёвая деталь, которую держат в голове дорогие продукты
+            // (Linear, Arc), но обычно теряют в фоллбэке на браузерный дефолт.
+            // focus-visible:outline-none ПОВЕРХ outline-none: у shadcn-ресета
+            // есть правило :is(...,textarea,...):focus-visible{outline:2px
+            // solid var(--ring)} специфичностью (0,1,1) — оно бьёт голый
+            // .outline-none (0,1,0) и рисовало резкое лаймовое кольцо ПОВЕРХ
+            // всей ручной работы с .chat-input-dock ниже, что и было
+            // настоящим источником «неонового кольца», а не сам док.
+            // focus-visible:outline-none даёт (0,2,0) и наконец побеждает.
+            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground caret-primary outline-none focus-visible:outline-none placeholder:text-muted-foreground"
           />
-          {/* #15 · Диктовка. Рендерится только там, где Web Speech реально
-              есть — кнопка, которая ничего не делает, хуже её отсутствия.
-              Во время записи иконка меняется на «стоп»: одна кнопка, два
-              состояния, без второго элемента управления. */}
-          {dictation.supported && (
-            <button
-              type="button"
-              onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
-              aria-label={dictation.listening ? 'Остановить диктовку' : 'Диктовать голосом'}
-              aria-pressed={dictation.listening}
-              className={`press flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                dictation.listening
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {dictation.listening ? (
-                <span className="relative flex items-center justify-center">
-                  {/* Пульс — контингентный сигнал «идёт запись», ровно на
-                      время жеста, а не бесконечная анимация в интерфейсе. */}
-                  <span className="absolute size-7 animate-ping rounded-full bg-primary/25 motion-reduce:animate-none" />
-                  <Square className="relative size-4 fill-current" aria-hidden="true" />
-                </span>
-              ) : (
-                <Mic className="size-5" aria-hidden="true" />
-              )}
-            </button>
-          )}
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!canSend || !input.trim()}
-            aria-label="Отправить"
-            // size-11, не size-10: 40px — тоже ниже минимума 44px
-            className="size-11 shrink-0 rounded-xl"
-          >
-            {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
-                {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
-                разное дерево на сервере (useReducedMotion → null) и на клиенте
-                при гидратации (→ true) — React #418, воспроизводилось только
-                в режиме «уменьшить движение». Структура теперь одна и та же,
-                варьируется лишь длительность: при reduced-motion стрелка
-                меняется мгновенно, без полёта. */}
-            <span className="relative flex size-5 items-center justify-center overflow-hidden">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={sendCount}
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -14, opacity: 0 }}
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-                  }
-                  className="absolute inset-0 flex items-center justify-center"
+          {/* #29 · Один слот справа вместо двух одновременных иконок.
+              Микрофон и «отправить» никогда не нужны в один и тот же
+              момент: либо ещё не начал писать (доступна диктовка), либо
+              уже что-то написал (нужна отправка) — то же поведение, что в
+              самых массовых мессенджерах. Меньше одновременных целей на
+              взгляд (Hick's Law), и композер визуально уже, а не веером из
+              двух квадратов через всю ширину. dictationActiveControl:
+              микрофон/стоп остаётся на месте, пока реально идёт запись,
+              даже если частичный транскрипт уже успел заполнить поле —
+              иначе кнопка «стоп» пропала бы посреди активной диктовки. */}
+          <span className="relative flex size-11 shrink-0 items-center justify-center">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {dictationActiveControl ? (
+                <motion.button
+                  key="mic"
+                  type="button"
+                  initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={reduceMotion ? { opacity: 0 } : { scale: 0.6, opacity: 0 }}
+                  transition={reduceMotion ? { duration: 0.1 } : SPRING_SNAPPY}
+                  onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                  aria-label={dictation.listening ? 'Остановить диктовку' : 'Диктовать голосом'}
+                  aria-pressed={dictation.listening}
+                  className={`press absolute inset-0 flex items-center justify-center rounded-xl transition-colors ${
+                    dictation.listening
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 >
-                  <ArrowUp className="size-5" />
+                  {dictation.listening ? (
+                    <span className="relative flex items-center justify-center">
+                      {/* Пульс — контингентный сигнал «идёт запись», ровно на
+                          время жеста, а не бесконечная анимация в интерфейсе. */}
+                      <span className="absolute size-7 animate-ping rounded-full bg-primary/25 motion-reduce:animate-none" />
+                      <Square className="relative size-4 fill-current" aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <Mic className="size-5" aria-hidden="true" />
+                  )}
+                </motion.button>
+              ) : (
+                <motion.span
+                  key="send"
+                  initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={reduceMotion ? { opacity: 0 } : { scale: 0.6, opacity: 0 }}
+                  transition={reduceMotion ? { duration: 0.1 } : SPRING_SNAPPY}
+                  className="absolute inset-0"
+                >
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!canSend || !input.trim()}
+                    aria-label="Отправить"
+                    // size-11, не size-10: 40px — тоже ниже минимума 44px
+                    className="size-11 shrink-0 rounded-xl"
+                  >
+                    {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
+                        {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
+                        разное дерево на сервере (useReducedMotion → null) и на клиенте
+                        при гидратации (→ true) — React #418, воспроизводилось только
+                        в режиме «уменьшить движение». Структура теперь одна и та же,
+                        варьируется лишь длительность: при reduced-motion стрелка
+                        меняется мгновенно, без полёта. */}
+                    <span className="relative flex size-5 items-center justify-center overflow-hidden">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={sendCount}
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          exit={{ y: -14, opacity: 0 }}
+                          transition={
+                            reduceMotion
+                              ? { duration: 0 }
+                              : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                          }
+                          className="absolute inset-0 flex items-center justify-center"
+                        >
+                          <ArrowUp className="size-5" />
+                        </motion.span>
+                      </AnimatePresence>
+                    </span>
+                  </Button>
                 </motion.span>
-              </AnimatePresence>
-            </span>
-          </Button>
+              )}
+            </AnimatePresence>
+          </span>
         </div>
       </form>
     </div>

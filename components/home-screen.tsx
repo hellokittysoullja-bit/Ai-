@@ -35,7 +35,7 @@ import {
   type CheckinState,
 } from "@/lib/checkin";
 import { trimLabel } from "@/lib/utils";
-import { Bell } from "lucide-react";
+import { Bell, BellOff } from "lucide-react";
 import { GreetingSkeleton, RewardCardSkeleton } from "@/components/skeletons";
 import { SPRING_GESTURE } from "@/lib/motion";
 
@@ -808,6 +808,24 @@ export function HomeScreen() {
                 aria-hidden="true"
               />
               {companionName} будет тихо махать тебе с острова раз в день.
+            </p>
+          )}
+
+          {/* Браузер отказал в разрешении — раньше это состояние было
+              немым: человек нажимал «Да, махай мне» когда-то раньше,
+              передумал в системных настройках, и продукт просто переставал
+              объяснять, что происходит. JS не может запросить разрешение
+              повторно после явного отказа — единственный честный вариант
+              здесь: сказать как есть и не звать никакую кнопку, которая бы
+              всё равно ничего не сделала. */}
+          {checkinState === "denied" && !!companionName && (
+            <p className="flex items-center gap-1.5 text-xs leading-relaxed text-muted-foreground">
+              <BellOff
+                className="size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+              Весточки выключены в настройках браузера — включишь там же,
+              когда захочешь.
             </p>
           )}
 

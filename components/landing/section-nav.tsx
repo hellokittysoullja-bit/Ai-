@@ -52,9 +52,12 @@ export function SectionNav() {
             {s.label}
           </span>
           {/* Размер через scale (не w/h — layout-анимация), свойства
-              перечислены, без UI-glow (закон света Р1) */}
+              перечислены, без UI-glow (закон света Р1). Видимая точка
+              остаётся 12px, но before:-inset-4 расширяет тач-цель до 44px
+              (WCAG 2.5.8 / Fitts) — тот же приём, что у реакций в
+              chat-bubble.tsx (before:-inset-2.5 на size-7 кнопке). */}
           <span
-            className={`block size-3 rounded-full transition-[transform,background-color] duration-300 ${
+            className={`relative block size-3 rounded-full transition-[transform,background-color] duration-300 before:absolute before:-inset-4 before:content-[''] ${
               active === s.id
                 ? "scale-100 bg-primary"
                 : "scale-[0.67] bg-muted-foreground/35 group-hover:bg-muted-foreground/70"

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useReducedMotion } from 'motion/react'
 import {
   addFind,
   getFinds,
@@ -104,6 +105,11 @@ type DiaryEntry = {
 }
 
 export function Island() {
+  // Мерцание звёзд/воды/ореола редкой находки — SVG SMIL <animate>, не CSS:
+  // ни один из @media (prefers-reduced-motion) блоков в globals.css его не
+  // трогает (SMIL — отдельная система анимации). Условный рендер — единственный
+  // способ отключить SMIL для reduced-motion.
+  const reduceMotion = useReducedMotion()
   const [starts, setStarts] = useState<StartEntry[] | null>(null)
   const [finds, setFinds] = useState<IslandFindEntry[]>([])
   const [patterns, setPatterns] = useState<Patterns | null>(null)
@@ -269,13 +275,15 @@ export function Island() {
             [292, 30, 1.0], [348, 20, 1.1], [362, 58, 0.8], [30, 66, 0.7],
           ].map(([x, y, r], i) => (
             <circle key={i} cx={x} cy={y} r={r} fill="var(--color-muted-foreground)" opacity="0.5">
-              <animate
-                attributeName="opacity"
-                values="0.25;0.75;0.25"
-                dur={`${2.6 + (i % 5) * 0.9}s`}
-                begin={`${(i % 7) * 0.5}s`}
-                repeatCount="indefinite"
-              />
+              {!reduceMotion && (
+                <animate
+                  attributeName="opacity"
+                  values="0.25;0.75;0.25"
+                  dur={`${2.6 + (i % 5) * 0.9}s`}
+                  begin={`${(i % 7) * 0.5}s`}
+                  repeatCount="indefinite"
+                />
+              )}
             </circle>
           ))}
           {/* дымка вокруг луны-ориентира — появляется вместе с ней (10-й старт) */}
@@ -297,13 +305,15 @@ export function Island() {
               strokeLinecap="round"
               opacity="0.25"
             >
-              <animate
-                attributeName="opacity"
-                values="0.1;0.35;0.1"
-                dur={`${3.4 + i * 0.7}s`}
-                begin={`${i * 0.8}s`}
-                repeatCount="indefinite"
-              />
+              {!reduceMotion && (
+                <animate
+                  attributeName="opacity"
+                  values="0.1;0.35;0.1"
+                  dur={`${3.4 + i * 0.7}s`}
+                  begin={`${i * 0.8}s`}
+                  repeatCount="indefinite"
+                />
+              )}
             </line>
           ))}
 
@@ -336,24 +346,31 @@ export function Island() {
             const sprite = findSprites[find.key]
             if (!sprite) return null
             return (
-              <g
-                key={find.startId}
-                className={`island-grow${find.startId === newFindStartId ? ' island-new-element' : ''}`}
-                style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
-                transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}
-              >
-          {/* Редкая находка светится золотом — тёплый жёлтый закреплён за rare */}
-          {find.rarity === 'rare' && (
-            <circle cx="0" cy="-10" r="20" fill="var(--color-reward)" opacity="0.16">
-                    <animate
-                      attributeName="opacity"
-                      values="0.08;0.2;0.08"
-                      dur="3.2s"
-                      repeatCount="indefinite"
-                    />
-                  </circle>
-                )}
-                {sprite}
+              // Позиционирующий transform живёт на ВНЕШНЕМ <g>, анимация
+              // island-grow — на ВНУТРЕННЕМ: если оба атрибута трогают
+              // transform на одном узле, CSS-анимация молча побеждает и
+              // translate/scale находки теряется (CLAUDE.md §5.1) — тот же
+              // паттерн, что уже используется у landmarks выше.
+              <g key={find.startId} transform={`translate(${pos.x} ${pos.y}) scale(${pos.s})`}>
+                <g
+                  className={`island-grow${find.startId === newFindStartId ? ' island-new-element' : ''}`}
+                  style={{ animationDelay: `${Math.min(i + LANDMARK_COUNT, 14) * 0.05}s` }}
+                >
+                  {/* Редкая находка светится золотом — тёплый жёлтый закреплён за rare */}
+                  {find.rarity === 'rare' && (
+                    <circle cx="0" cy="-10" r="20" fill="var(--color-reward)" opacity="0.16">
+                      {!reduceMotion && (
+                        <animate
+                          attributeName="opacity"
+                          values="0.08;0.2;0.08"
+                          dur="3.2s"
+                          repeatCount="indefinite"
+                        />
+                      )}
+                    </circle>
+                  )}
+                  {sprite}
+                </g>
               </g>
             )
           })}
@@ -411,6 +428,10 @@ export function Island() {
               return (
                 <div
                   key={rare.key}
+                  // aria-label вместо голого «???»: скринридер иначе читает три
+                  // литерных знака вопроса подряд, без всякого смысла — тут
+                  // должно звучать «пока не найдено», как и выглядит визуально.
+                  aria-label={found ? rare.name : 'Редкая находка, пока не найдена'}
                   className={`flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 text-center ${
                     found ? 'border-reward/60 shadow-[0_0_14px_-4px_var(--color-reward)]' : 'border-white/12'
                   }`}
@@ -421,6 +442,7 @@ export function Island() {
                     </g>
                   </svg>
                   <span
+                    aria-hidden="true"
                     className={`text-[11px] font-semibold leading-tight ${
                       found ? '' : 'text-muted-foreground'
                     }`}
