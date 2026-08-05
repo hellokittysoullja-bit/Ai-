@@ -67,27 +67,32 @@ const REACTIONS: ReadonlyArray<{
     линия без нахлёста, circle-minus-circle по образцу маски фаз луны в
     app-backdrop.tsx, путь без запаса внутрь) проверены рендером и
     отброшены — либо висели в воздухе, либо читались отдельным кружком,
-    либо не доставали до края. */
+    либо не доставали до края.
+
+    #10c — ПЕРЕНЕСЁН СНИЗУ ВВЕРХ → СВЕРХУ ВНИЗ: пользователь сверил с
+    реальными скриншотами WhatsApp/Telegram/iMessage — там хвостик и
+    аватар растут из НИЖНЕГО угла ПОСЛЕДНЕЙ реплики группы, не из верхнего
+    угла первой. ChatBubble/companion-chat.tsx теперь считают isLastOfGroup,
+    не isFirstOfGroup, и сжимают нижний, а не верхний угол. Путь тот же
+    самый, просто зеркально по Y (16-y на каждой точке) — форма и вылет
+    (8px) не менялись, только сторона пузыря, к которой он приклеен. */
 export function BubbleTail({ side }: { side: 'left' | 'right' }) {
   const isLeft = side === 'left'
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 16 16"
-      className={`absolute -top-px h-4 w-4 ${isLeft ? '-left-[8px]' : '-right-[8px] scale-x-[-1]'}`}
+      className={`absolute -bottom-px h-4 w-4 ${isLeft ? '-left-[8px]' : '-right-[8px] scale-x-[-1]'}`}
       style={{ overflow: 'visible' }}
     >
-      {/* Форма верна (сужение к кончику, вылет 8px), но прошлая версия
-          заканчивалась ровно на границе пузыря (x=8 = край) — без запаса
-          внутрь любая мелкая неточность даёт видимый зазор. Здесь та же
-          кривая, просто вся сдвинута на +8 по x: видимый вылет тот же
-          (0..8), а точка стыка теперь на x=16 — 8px нахлёста ВНУТРЬ пузыря
-          (внутри padding-left 16px, текста не касается). */}
+      {/* Та же кривая, что и раньше, зеркальная по Y: точка стыка теперь
+          внизу (y=16), видимый вылет — в верхней части бокса (по-прежнему
+          8px наружу по x, тот же запас 8px внутрь по x). */}
       <path
-        d="M16 0
-           C 11 0.3, 8 2.5, 8 6.5
-           C 8 9.5, 10.5 11.3, 14 11.8
-           C 15 11.2, 15.6 9, 16 7
+        d="M16 16
+           C 11 15.7, 8 13.5, 8 9.5
+           C 8 6.5, 10.5 4.7, 14 4.2
+           C 15 4.8, 15.6 7, 16 9
            Z"
         fill="var(--tail-fill)"
         stroke="var(--tail-stroke)"
@@ -100,7 +105,7 @@ export function BubbleTail({ side }: { side: 'left' | 'right' }) {
 type ChatBubbleProps = {
   text: string
   isUser: boolean
-  isFirstOfGroup: boolean
+  isLastOfGroup: boolean
   /** 0 — свежая реплика у низа, 1 — уехала далеко вверх (#13) */
   depth: number
   reaction?: Reaction | null
@@ -112,7 +117,7 @@ type ChatBubbleProps = {
 export function ChatBubble({
   text,
   isUser,
-  isFirstOfGroup,
+  isLastOfGroup,
   depth,
   reaction,
   onReact,
@@ -234,10 +239,11 @@ export function ChatBubble({
           // Угол, из которого растёт хвостик, сжат до 6px (было 28.8px,
           // --radius-2xl) — иначе скругление физически не долетает до
           // хвостика, оставляя зазор (см. комментарий у BubbleTail). Только
-          // у головы группы: продолжения реплик остаются полностью круглыми
-          // со всех сторон, как и было.
-          ...(isFirstOfGroup
-            ? { [isUser ? 'borderTopRightRadius' : 'borderTopLeftRadius']: '6px' }
+          // у ПОСЛЕДНЕЙ реплики группы (нижний угол — хвостик и аватар
+          // растут снизу, как в WhatsApp/Telegram/iMessage): более ранние
+          // реплики пачки остаются полностью круглыми со всех сторон.
+          ...(isLastOfGroup
+            ? { [isUser ? 'borderBottomRightRadius' : 'borderBottomLeftRadius']: '6px' }
             : {}),
         }}
         // Тянуть можно только к своей стороне: реплика уходит «в ответ», а не
@@ -271,9 +277,10 @@ export function ChatBubble({
         onPointerLeave={cancelLongPress}
         className={`glass-shine relative select-none whitespace-pre-wrap rounded-2xl ${bubbleClass} ${isUser ? 'message-land' : ''}`}
       >
-        {/* #10 · Настоящий хвостик — только у головы группы, как в реальных
-            мессенджерах: продолжение реплики хвоста не получает. */}
-        {isFirstOfGroup && <BubbleTail side={isUser ? 'right' : 'left'} />}
+        {/* #10 · Настоящий хвостик — только у ПОСЛЕДНЕЙ реплики группы,
+            снизу: реальные мессенджеры показывают, кто говорит, там, где
+            пачка сообщений заканчивается, не там, где начинается. */}
+        {isLastOfGroup && <BubbleTail side={isUser ? 'right' : 'left'} />}
         <EmphasisText text={text} />
       </motion.div>
 
