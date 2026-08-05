@@ -613,6 +613,11 @@ export function CompanionChat({
 
   // После скриптового ответа статус может быть 'error' — чат должен жить дальше
   const canSend = status === 'ready' || status === 'error'
+  // Слот справа в композере: микрофон/стоп остаётся, пока реально идёт
+  // запись (даже если частичный транскрипт уже что-то вписал в поле),
+  // иначе — кнопка отправки, если есть текст или диктовка недоступна вовсе
+  // (тогда disabled-отправка — тот же фолбэк, что был всегда).
+  const dictationActiveControl = dictation.supported && (dictation.listening || !input.trim())
 
   function submit() {
     if (!input.trim() || !canSend) return
@@ -1168,7 +1173,10 @@ export function CompanionChat({
             класс уже лежал в файле, но ни разу не был подключён к разметке;
             rounded-3xl роднит форму дока с капсулами чипов/пилюль по всему
             экрану, а не с прямоугольными углами reward-карточки. */}
-        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-2 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200">
+        {/* py-1.5, не py-2: с одним слотом справа (см. ниже) вместо
+            микрофона+отправки бок о бок доку больше не нужен запас под два
+            44px-квадрата сразу — тоньше без потери тач-целей. */}
+        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200">
           <textarea
             ref={textareaRef}
             value={input}
@@ -1191,71 +1199,96 @@ export function CompanionChat({
             // страницу при фокусе на поле ввода, это ломает раскладку на
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
-            // минимума тач-цели 44px (замерено рендером).
+            // минимума тач-зоны 44px (замерено рендером).
             className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
           />
-          {/* #15 · Диктовка. Рендерится только там, где Web Speech реально
-              есть — кнопка, которая ничего не делает, хуже её отсутствия.
-              Во время записи иконка меняется на «стоп»: одна кнопка, два
-              состояния, без второго элемента управления. */}
-          {dictation.supported && (
-            <button
-              type="button"
-              onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
-              aria-label={dictation.listening ? 'Остановить диктовку' : 'Диктовать голосом'}
-              aria-pressed={dictation.listening}
-              className={`press flex size-11 shrink-0 items-center justify-center rounded-xl transition-colors ${
-                dictation.listening
-                  ? 'bg-primary/15 text-primary'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              {dictation.listening ? (
-                <span className="relative flex items-center justify-center">
-                  {/* Пульс — контингентный сигнал «идёт запись», ровно на
-                      время жеста, а не бесконечная анимация в интерфейсе. */}
-                  <span className="absolute size-7 animate-ping rounded-full bg-primary/25 motion-reduce:animate-none" />
-                  <Square className="relative size-4 fill-current" aria-hidden="true" />
-                </span>
-              ) : (
-                <Mic className="size-5" aria-hidden="true" />
-              )}
-            </button>
-          )}
-          <Button
-            type="submit"
-            size="icon"
-            disabled={!canSend || !input.trim()}
-            aria-label="Отправить"
-            // size-11, не size-10: 40px — тоже ниже минимума 44px
-            className="size-11 shrink-0 rounded-xl"
-          >
-            {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
-                {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
-                разное дерево на сервере (useReducedMotion → null) и на клиенте
-                при гидратации (→ true) — React #418, воспроизводилось только
-                в режиме «уменьшить движение». Структура теперь одна и та же,
-                варьируется лишь длительность: при reduced-motion стрелка
-                меняется мгновенно, без полёта. */}
-            <span className="relative flex size-5 items-center justify-center overflow-hidden">
-              <AnimatePresence mode="popLayout" initial={false}>
-                <motion.span
-                  key={sendCount}
-                  initial={{ y: 10, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  exit={{ y: -14, opacity: 0 }}
-                  transition={
-                    reduceMotion
-                      ? { duration: 0 }
-                      : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
-                  }
-                  className="absolute inset-0 flex items-center justify-center"
+          {/* #29 · Один слот справа вместо двух одновременных иконок.
+              Микрофон и «отправить» никогда не нужны в один и тот же
+              момент: либо ещё не начал писать (доступна диктовка), либо
+              уже что-то написал (нужна отправка) — то же поведение, что в
+              самых массовых мессенджерах. Меньше одновременных целей на
+              взгляд (Hick's Law), и композер визуально уже, а не веером из
+              двух квадратов через всю ширину. dictationActiveControl:
+              микрофон/стоп остаётся на месте, пока реально идёт запись,
+              даже если частичный транскрипт уже успел заполнить поле —
+              иначе кнопка «стоп» пропала бы посреди активной диктовки. */}
+          <span className="relative flex size-11 shrink-0 items-center justify-center">
+            <AnimatePresence mode="popLayout" initial={false}>
+              {dictationActiveControl ? (
+                <motion.button
+                  key="mic"
+                  type="button"
+                  initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={reduceMotion ? { opacity: 0 } : { scale: 0.6, opacity: 0 }}
+                  transition={reduceMotion ? { duration: 0.1 } : SPRING_SNAPPY}
+                  onClick={() => (dictation.listening ? dictation.stop() : dictation.start())}
+                  aria-label={dictation.listening ? 'Остановить диктовку' : 'Диктовать голосом'}
+                  aria-pressed={dictation.listening}
+                  className={`press absolute inset-0 flex items-center justify-center rounded-xl transition-colors ${
+                    dictation.listening
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
                 >
-                  <ArrowUp className="size-5" />
+                  {dictation.listening ? (
+                    <span className="relative flex items-center justify-center">
+                      {/* Пульс — контингентный сигнал «идёт запись», ровно на
+                          время жеста, а не бесконечная анимация в интерфейсе. */}
+                      <span className="absolute size-7 animate-ping rounded-full bg-primary/25 motion-reduce:animate-none" />
+                      <Square className="relative size-4 fill-current" aria-hidden="true" />
+                    </span>
+                  ) : (
+                    <Mic className="size-5" aria-hidden="true" />
+                  )}
+                </motion.button>
+              ) : (
+                <motion.span
+                  key="send"
+                  initial={reduceMotion ? false : { scale: 0.6, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  exit={reduceMotion ? { opacity: 0 } : { scale: 0.6, opacity: 0 }}
+                  transition={reduceMotion ? { duration: 0.1 } : SPRING_SNAPPY}
+                  className="absolute inset-0"
+                >
+                  <Button
+                    type="submit"
+                    size="icon"
+                    disabled={!canSend || !input.trim()}
+                    aria-label="Отправить"
+                    // size-11, не size-10: 40px — тоже ниже минимума 44px
+                    className="size-11 shrink-0 rounded-xl"
+                  >
+                    {/* Разметка НЕ ветвится по reduceMotion. Раньше здесь стояло
+                        {reduceMotion ? <ArrowUp/> : <AnimatePresence>…}, и это давало
+                        разное дерево на сервере (useReducedMotion → null) и на клиенте
+                        при гидратации (→ true) — React #418, воспроизводилось только
+                        в режиме «уменьшить движение». Структура теперь одна и та же,
+                        варьируется лишь длительность: при reduced-motion стрелка
+                        меняется мгновенно, без полёта. */}
+                    <span className="relative flex size-5 items-center justify-center overflow-hidden">
+                      <AnimatePresence mode="popLayout" initial={false}>
+                        <motion.span
+                          key={sendCount}
+                          initial={{ y: 10, opacity: 0 }}
+                          animate={{ y: 0, opacity: 1 }}
+                          exit={{ y: -14, opacity: 0 }}
+                          transition={
+                            reduceMotion
+                              ? { duration: 0 }
+                              : { duration: 0.22, ease: [0.22, 1, 0.36, 1] }
+                          }
+                          className="absolute inset-0 flex items-center justify-center"
+                        >
+                          <ArrowUp className="size-5" />
+                        </motion.span>
+                      </AnimatePresence>
+                    </span>
+                  </Button>
                 </motion.span>
-              </AnimatePresence>
-            </span>
-          </Button>
+              )}
+            </AnimatePresence>
+          </span>
         </div>
       </form>
     </div>
