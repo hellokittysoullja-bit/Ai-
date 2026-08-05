@@ -7,6 +7,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, CalendarCheck, Play, Sparkles } from "lucide-react";
 import { CompanionChat } from "@/components/companion-chat";
+import { EmphasisText } from "@/components/emphasis-text";
 import { MascotSvg, type MascotExpression } from "@/components/mascot-svg";
 import {
   getCompanionName,
@@ -84,10 +85,10 @@ const starterChips = [
  * Выбор события детерминированный, чтобы не менялся при каждом рендере.
  */
 const awayDiary = [
-  "Пока тебя не было, я рыбачил у причала. Море было тихое. Остров стоит, ничего не сгорело.",
-  "Я тут пересчитал всё, что выросло на острове, — всё на месте. Пауза — это пауза, не откат.",
-  "Без тебя я смотрел на волны и гадал, что вырастет от твоего следующего старта.",
-  "Я развёл костёр и просто ждал. Это не упрёк — я рад, что ты зашёл.",
+  "Пока тебя не было, я рыбачил у причала. Море было тихое. Остров стоит, *ничего не сгорело*.",
+  "Я тут пересчитал всё, что выросло на острове, — всё на месте. *Пауза* — это пауза, не откат.",
+  "Без тебя я смотрел на волны и гадал, что вырастет от твоего *следующего старта*.",
+  "Я развёл костёр и просто ждал. Это не упрёк — я *рад*, что ты зашёл.",
 ];
 
 type IntroChoice = "procrastinate" | "curious" | null;
@@ -117,13 +118,13 @@ function buildFirstWord(
   const dayN = Math.floor(now.getTime() / 86_400_000);
   const nightTales = [
     lastFindName
-      ? `Ночью «${lastFindName}» тихо стояла под звёздами — я сторожил. `
-      : "Ночью остров тихо дышал под звёздами — я сторожил. ",
-    "Под утро над островом пролетела падающая звезда. Хороший знак. ",
-    "Ночью море было гладкое, как стекло. Остров ждёт первый старт дня. ",
+      ? `Ночью «${lastFindName}» тихо стояла под *звёздами* — я сторожил. `
+      : "Ночью остров тихо дышал под *звёздами* — я сторожил. ",
+    "Под утро над островом пролетела *падающая звезда*. Хороший знак. ",
+    "Ночью море было гладкое, как стекло. Остров ждёт *первый старт* дня. ",
     lastFindName
-      ? `Мне ночью показалось, что «${lastFindName}» подросла. Проверим после старта? `
-      : "К утру на берегу прибавилось ракушек. Остров живёт. ",
+      ? `Мне ночью показалось, что «${lastFindName}» *подросла*. Проверим после старта? `
+      : "К утру на берегу прибавилось *ракушек*. Остров живёт. ",
   ];
   const nightLine =
     patterns.daysAway === 1 ? nightTales[(patterns.totalStarts + dayN) % nightTales.length] : "";
@@ -136,7 +137,7 @@ function buildFirstWord(
           (patterns.totalStarts + patterns.daysAway) % awayDiary.length
         ] + " "
       : patterns.daysAway !== null && patterns.daysAway === 2
-        ? "Ты пришёл. Два дня — это просто два дня, остров всё помнит. "
+        ? "Ты пришёл. Два дня — это просто два дня, остров *всё помнит*. "
         : "";
 
   // Совпадение с личным часом стартов: мягкий, честный толчок из данных
@@ -171,13 +172,13 @@ function buildFirstWord(
     // остаётся только подтвердить и отпустить. Никакого призыва к старту.
     if (plan) {
       return {
-        greeting: `Договорились: когда встанешь — ${plan.firstStep.toLowerCase()}. Больше от тебя сейчас ничего не нужно. Спи, я посторожу остров.`,
+        greeting: `Договорились: когда встанешь — ${plan.firstStep.toLowerCase()}. Больше от тебя сейчас ничего не нужно. *Спи*, я посторожу остров.`,
         actionStep: null,
         nightMode: true,
       };
     }
     return {
-      greeting: `Сейчас ${clock}. Ночь — не время начинать: с недосыпом завтра будет вдвое тяжелее. Давай положим один шаг на утро и разойдёмся.`,
+      greeting: `Сейчас ${clock}. Ночь — не время начинать: с недосыпом завтра будет вдвое тяжелее. Давай положим *один шаг* на утро и разойдёмся.`,
       hint: "Один тап — и всё. Начать всё равно можно, но я бы не советовал.",
       actionStep: null,
       offerEveningPlan: true,
@@ -189,7 +190,7 @@ function buildFirstWord(
   if (plan && plan.forDate === today) {
     const time = plan.startTime ? ` в ${plan.startTime}` : "";
     return {
-      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, жми кнопку.`,
+      greeting: `${awayLine}Ты решил: «${plan.task}»${time}. Не думай про всё дело — просто ${plan.firstStep.toLowerCase()}.${hourLine} ${companionName ?? "Я"} рядом, *жми кнопку*.`,
       actionStep: plan.firstStep,
     };
   }
@@ -197,14 +198,14 @@ function buildFirstWord(
   // План на завтра уже положен, сейчас день — подтверждение
   if (plan && !isLate) {
     return {
-      greeting: `На завтра у нас уже лежит план: «${plan.task}». А сегодня можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
+      greeting: `На завтра у нас уже лежит план: «${plan.task}». А *сегодня* можно ничего не доказывать. Хочешь — поболтаем, хочешь — начнём что-то маленькое.`,
       actionStep: null,
     };
   }
 
   if (plan && isLate) {
     return {
-      greeting: `План на завтра уже готов: «${plan.task}», первый шаг — ${plan.firstStep.toLowerCase()}. Утром ${companionName ?? "я"} напишу первым. Можешь спать спокойно.`,
+      greeting: `План на завтра уже готов: «${plan.task}», *первый шаг* — ${plan.firstStep.toLowerCase()}. Утром ${companionName ?? "я"} напишу первым. Можешь спать спокойно.`,
       actionStep: null,
     };
   }
@@ -223,7 +224,7 @@ function buildFirstWord(
     if (intro === "procrastinate") {
       return {
         greeting:
-          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только крошечным стартом. Я рядом.",
+          "Ты сказал, что вечно откладываешь. Это не лечится силой воли — только *крошечным стартом*. Я рядом.",
         hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
         actionStep: null,
         showStarterChips: true,
@@ -232,7 +233,7 @@ function buildFirstWord(
     if (intro === "curious") {
       return {
         greeting:
-          "Заходи, смотри. Это мой дом, а остров растёт от твоих стартов.",
+          "Заходи, смотри. Это мой *дом*, а остров растёт от твоих стартов.",
         hint: "Попробуй один крошечный шаг ниже — увидишь, как это работает.",
         actionStep: null,
         showStarterChips: true,
@@ -240,7 +241,7 @@ function buildFirstWord(
     }
     return {
       greeting:
-        "Привет. Я Напарник. Я не буду учить тебя жить — я помогаю начинать.",
+        "Привет. Я *Напарник*. Я не буду учить тебя жить — я помогаю начинать.",
       hint: "Выбери крошечный шаг ниже — или напиши, что висит.",
       actionStep: null,
       showStarterChips: true,
@@ -252,14 +253,14 @@ function buildFirstWord(
       // Короче прежней реплики: рядом появляется однотаповая карточка
       // договора — 4 строки рукописного текста + карточка = перегруз
       greeting:
-        "Вечер — время договориться с завтрашним собой. Один тап ниже — и можно спать спокойно. Или напиши своё.",
+        "Вечер — время договориться с *завтрашним собой*. Один тап ниже — и можно спать спокойно. Или напиши своё.",
       actionStep: null,
       offerEveningPlan: true,
     };
   }
 
   return {
-    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это ноль. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
+    greeting: `${nightLine}${awayLine}Плана на сегодня нет — и это не минус, это *ноль*. Выбери одно крошечное действие прямо сейчас, или напиши мне, что висит — раздробим.${hourLine}`,
     actionStep: null,
   };
 }
@@ -607,11 +608,11 @@ export function HomeScreen() {
                 >
                   <p
                     ref={greetingRef}
-                    className={`font-hand text-xl leading-snug ${
+                    className={`font-sans text-lg leading-snug ${
                       greetingClamped ? "line-clamp-3" : ""
                     }`}
                   >
-                    {firstWord.greeting}
+                    <EmphasisText text={firstWord.greeting} />
                   </p>
                   {greetingClamped && greetingOverflows && (
                     <button
@@ -773,9 +774,8 @@ export function HomeScreen() {
                   className="mt-0.5 size-4 shrink-0 text-primary"
                   aria-hidden="true"
                 />
-                <p className="font-hand text-lg leading-snug">
-                  Хочешь, я буду махать тебе с острова раз в день? Один тихий
-                  раз, без спама — и никаких «ты пропал».
+                <p className="font-sans text-[0.95rem] leading-relaxed">
+                  <EmphasisText text="Хочешь, я буду махать тебе с острова раз в день? *Один тихий раз*, без спама — и никаких «ты пропал»." />
                 </p>
               </div>
               {/* h-11, не h-10: 40px — не смог отрендерить это состояние в
@@ -1204,9 +1204,8 @@ export function HomeScreen() {
                   giveName(nameDraft);
                 }}
               >
-                <p className="font-hand text-lg leading-snug">
-                  Слушай… у меня ведь до сих пор нет имени. Дашь мне его? Я буду
-                  откликаться.
+                <p className="font-sans text-[0.95rem] leading-relaxed">
+                  <EmphasisText text="Слушай… у меня ведь до сих пор нет *имени*. Дашь мне его? Я буду откликаться." />
                 </p>
                 <div className="flex gap-2">
                   {/* h-11 (44px), не h-10: замерено рендером — оба контрола

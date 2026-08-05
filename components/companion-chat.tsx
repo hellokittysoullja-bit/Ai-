@@ -24,6 +24,7 @@ import { useDictation } from '@/hooks/use-dictation'
 import { PullToStretch } from '@/components/pull-to-stretch'
 import { hapticStart } from '@/lib/haptics'
 import { ChatBubble, BubbleTail, type Reaction } from '@/components/chat-bubble'
+import { EmphasisText } from '@/components/emphasis-text'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
 import {
@@ -748,14 +749,14 @@ export function CompanionChat({
                 версию. --tail-fill/--tail-stroke зеркалят те же значения,
                 что ChatBubble ставит для isUser=false. */}
             <div
-              className="chat-bubble-cat relative max-w-[88%] rounded-2xl px-4 py-2.5 font-hand text-[1.18rem] leading-snug text-secondary-foreground"
+              className="chat-bubble-cat relative max-w-[88%] rounded-2xl px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground"
               style={{
                 ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
                 ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
               }}
             >
               <BubbleTail side="left" />
-              {greeting}
+              <EmphasisText text={greeting} />
             </div>
           </motion.div>
 

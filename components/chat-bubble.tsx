@@ -5,6 +5,7 @@ import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/re
 import { Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
 import { SPRING_GESTURE, SPRING_SNAPPY } from '@/lib/motion'
 import { hapticDone, hapticReaction, hapticThreshold } from '@/lib/haptics'
+import { EmphasisText } from '@/components/emphasis-text'
 
 /**
  * Материал одной реплики. Вынесен из companion-chat (900 строк) отдельным
@@ -164,9 +165,16 @@ export function ChatBubble({
   const depthOpacity = reduceMotion ? 1 : 1 - depth * 0.22
   const depthSaturate = reduceMotion ? 1 : 1 - depth * 0.25
 
+  /*
+   * Типографика: раньше вся речь напарника шла шрифтом Caveat целиком —
+   * читаемо на одной фразе, утомительно на сотнях сообщений. Теперь оба
+   * борта набраны ОДНИМ размером/интерлиньяжем (0.95rem/leading-relaxed) —
+   * идентичная сетка вместо «у кота крупнее и теснее» — рукописный стиль
+   * возвращается точечно, только на словах в *звёздочках* (EmphasisText).
+   */
   const bubbleClass = isUser
     ? 'chat-bubble-user px-4 py-2.5 text-[0.95rem] leading-relaxed'
-    : 'chat-bubble-cat px-4 py-2.5 font-hand text-[1.16rem] leading-snug text-secondary-foreground'
+    : 'chat-bubble-cat px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground'
 
   return (
     <div className={`relative ${isUser ? 'ml-auto max-w-[82%]' : 'max-w-[88%]'}`}>
@@ -233,7 +241,7 @@ export function ChatBubble({
         {/* #10 · Настоящий хвостик — только у головы группы, как в реальных
             мессенджерах: продолжение реплики хвоста не получает. */}
         {isFirstOfGroup && <BubbleTail side={isUser ? 'right' : 'left'} />}
-        {text}
+        <EmphasisText text={text} />
       </motion.div>
 
       {/* Поставленная реакция живёт на кромке пузыря — она про эту реплику,
