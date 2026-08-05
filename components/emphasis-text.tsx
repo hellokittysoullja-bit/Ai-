@@ -24,7 +24,12 @@ export function EmphasisText({ text }: { text: string }) {
   while ((match = re.exec(text))) {
     if (match.index > lastIndex) parts.push(text.slice(lastIndex, match.index))
     parts.push(
-      <span key={key++} className="font-hand text-[1.08em]">
+      // mr-[0.14em]: Caveat наклонён вправо — последняя буква слова визуально
+      // наезжает на следующее слово, даже когда между ними есть обычный
+      // пробел (замерено рендером: «прикоснуться к» читалось как
+      // «прикоснутьсяк» без зазора). Компенсируем только справа — переход
+      // «прямой → курсив» слева уже читается нормально, слева не трогаем.
+      <span key={key++} className="font-hand text-[1.08em] mr-[0.14em]">
         {match[1]}
       </span>,
     )
