@@ -78,9 +78,19 @@ function CompanionAvatar({
   // в inferExpression). Радость от новизны и тон сообщения не всегда
   // совпадают: кот может искренне обрадоваться (кольцо), сказав при этом
   // что-то сфокусированное — оба сигнала живут не подменяя друг друга.
+  // Скейл-попап (#28) добавлен к кольцу: раньше «реакция» была только
+  // светом, без движения тела — существо будто моргало лампочкой, а не
+  // отзывалось. Один упругий вдох (1→1.2→1) на то же событие, что и
+  // кольцо — тот же контингентный триггер, ничего нового не добавлено
+  // в критерии срабатывания, только сила самого отклика.
+  const reduceMotion = useReducedMotion()
   return (
-    <div
+    <motion.div
       className="relative flex size-9 shrink-0 items-center justify-center rounded-full border border-white/10 bg-secondary/80"
+      animate={
+        reduceMotion ? undefined : { scale: reacting ? [1, 1.2, 1] : 1 }
+      }
+      transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
       style={{
         boxShadow: reacting
           ? '0 0 0 2px oklch(0.72 0.17 55 / 0.35), 0 0 14px -2px oklch(0.72 0.17 55 / 0.5)'
@@ -89,7 +99,7 @@ function CompanionAvatar({
       }}
     >
       <MascotSvg expression={reacting ? 'happy' : expression} size={30} />
-    </div>
+    </motion.div>
   )
 }
 
