@@ -775,7 +775,7 @@ export function CompanionChat({
                 borderBottomLeftRadius: '0px',
               }}
             >
-              <BubbleTail side="left" />
+              <BubbleTail side="left" warm />
               <EmphasisText text={greeting} />
             </div>
           </motion.div>

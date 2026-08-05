@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
 import { Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
 import { SPRING_GESTURE, SPRING_SNAPPY } from '@/lib/motion'
@@ -94,29 +94,66 @@ const REACTIONS: ReadonlyArray<{
     верхне-правого угла к нижне-левому, вогнутая внутрь. Ровно поэтому угол
     пузыря у последней реплики группы (ниже) сжат до 0 — острый угол, не
     скруглённый: технике нужно, чтобы её прямые рёбра встречали ТАКИЕ ЖЕ
-    прямые рёбра пузыря, а не убегающую дугу. */
-export function BubbleTail({ side }: { side: 'left' | 'right' }) {
+    прямые рёбра пузыря, а не убегающую дугу.
+
+    #10f — МАТЕРИАЛ ДОГНАН ДО ПУЗЫРЯ: форма была верна, но на реальном
+    рендере (вечер, тёплый угол ярче) виден горизонтальный шов ЦВЕТА — не
+    геометрии — там, где плоская заливка хвостика встречает градиентный,
+    подсвеченный очагом и застеклённый пузырь. Два отдельных огреха:
+    1) backdrop-filter (blur+saturate) стоит на пузыре, но не на хвостике —
+       пузырь стеклянный, хвостик плоский. Тот же фильтр теперь и на самом
+       SVG (он поддерживает backdrop-filter как обычный HTML-элемент).
+    2) warm — тёплое пятно очага у .chat-bubble-cat живёт в radial-gradient
+       на 18% 100% (нижний левый угол пузыря — ровно там, где начинается
+       хвостик), но обрывалось на границе пузыря. Радиальный градиент здесь
+       — не копия чужого CSS, а собственное приближение той же тёплой точки
+       (oklch(0.72 0.17 55)), угасающее к кончику: тепло теперь течёт из
+       пузыря в хвостик, а не обрывается на стыке. У пользовательской
+       стороны акцента нет — там градиент вертикальный (свет сверху/масса
+       снизу), не угловой, добавлять было бы нечего. */
+export function BubbleTail({ side, warm = false }: { side: 'left' | 'right'; warm?: boolean }) {
   const isLeft = side === 'left'
+  const gradientId = useId()
   return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className={`absolute bottom-0 h-5 w-5 ${isLeft ? '-left-5' : '-right-5 scale-x-[-1]'}`}
-      style={{ overflow: 'visible' }}
+    // backdrop-filter не применяется к корню <svg> в Chromium (проверено
+    // рендером: computed backdropFilter оставался "none" несмотря на
+    // инлайн-стиль на самом svg) — нужен обычный HTML-элемент с явным
+    // размером, оборачивающий SVG, а не сам svg-узел.
+    <div
+      className={`absolute bottom-0 h-5 w-5 overflow-visible ${isLeft ? '-left-5' : '-right-5'}`}
+      style={{ backdropFilter: 'blur(16px) saturate(150%)' }}
     >
-      {/* Заливка — вся фигура. Обводка — ТОЛЬКО видимая дуга: прямые рёбра
-          (верх, право) совпадают с краем пузыря и не должны нести свою
-          линию поверх его собственной — иначе на стыке виден шов, даже
-          когда сама заливка уже не имеет зазора. */}
-      <path d="M20 0 C20 11 11 20 0 20 H20 V0 Z" fill="var(--tail-fill)" />
-      <path
-        d="M20 0 C20 11 11 20 0 20"
-        fill="none"
-        stroke="var(--tail-stroke)"
-        strokeWidth="0.7"
-        strokeLinecap="round"
-      />
-    </svg>
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 20 20"
+        className={`size-full ${isLeft ? '' : 'scale-x-[-1]'}`}
+        style={{ overflow: 'visible' }}
+      >
+        {/* Заливка — вся фигура. Обводка — ТОЛЬКО видимая дуга: прямые рёбра
+            (верх, право) совпадают с краем пузыря и не должны нести свою
+            линию поверх его собственной — иначе на стыке виден шов, даже
+            когда сама заливка уже не имеет зазора. */}
+        <path d="M20 0 C20 11 11 20 0 20 H20 V0 Z" fill="var(--tail-fill)" />
+        {warm && (
+          <>
+            <defs>
+              <radialGradient id={gradientId} cx="0.85" cy="0.1" r="0.75">
+                <stop offset="0%" stopColor="oklch(0.72 0.17 55 / 0.3)" />
+                <stop offset="100%" stopColor="oklch(0.72 0.17 55 / 0)" />
+              </radialGradient>
+            </defs>
+            <path d="M20 0 C20 11 11 20 0 20 H20 V0 Z" fill={`url(#${gradientId})`} />
+          </>
+        )}
+        <path
+          d="M20 0 C20 11 11 20 0 20"
+          fill="none"
+          stroke="var(--tail-stroke)"
+          strokeWidth="0.7"
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
   )
 }
 
@@ -240,8 +277,15 @@ export function ChatBubble({
         // константу забыли обновить, и хвостик разошёлся цветом с телом
         // пузыря, к которому приклеен. Найдено сверкой с реальным
         // скриншотом устройства.
+        //
+        // isUser: пузырь красится вертикальным градиентом (светлый верх →
+        // тёмный низ, .chat-bubble-user), а хвостик сидит СНИЗУ (#10c) —
+        // раньше здесь стоял ВЕРХНИЙ (0%) стоп градиента, оставшийся от
+        // старой версии, когда хвостик был сверху. Хвостик красился светлым,
+        // хотя рядом с ним самая тёмная часть пузыря (100%-стоп). Теперь —
+        // тот же нижний стоп, что реально граничит с хвостиком.
         ['--tail-fill' as string]: isUser
-          ? 'oklch(0.9 0.21 130)'
+          ? 'oklch(0.8 0.2 132)'
           : 'oklch(0.4 0.02 150 / 0.9)',
         ['--tail-stroke' as string]: isUser ? 'transparent' : 'oklch(1 0 0 / 0.2)',
       }}
@@ -323,7 +367,7 @@ export function ChatBubble({
           style={{ x }}
           className={`pointer-events-none absolute bottom-0 ${isUser ? 'right-0' : 'left-0'}`}
         >
-          <BubbleTail side={isUser ? 'right' : 'left'} />
+          <BubbleTail side={isUser ? 'right' : 'left'} warm={!isUser} />
         </motion.div>
       )}
 
