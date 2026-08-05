@@ -623,6 +623,15 @@ export function CompanionChat({
     setSendCount((c) => c + 1)
   }
 
+  // Таймстемп группируется по роли, но быстрый диалог («он ответил — я
+  // ответил») чередует роли на каждой реплике — тогда КАЖДОЕ сообщение
+  // формально становится «последним в своей группе», и одна и та же минута
+  // повторяется под каждым пузырём подряд. Реальные мессенджеры схлопывают
+  // это по времени: показывают метку только когда она реально изменилась
+  // (плюс всегда на самом последнем сообщении, чтобы «когда мы говорили в
+  // последний раз» было видно однозначно). lastShownClock — счётчик,
+  // сбрасывающийся на каждый рендер (не state), ровно для этой цели.
+  let lastShownClock: string | null = null
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       {/* Диктор молчал про новые реплики целиком — announceText обновляется
@@ -807,6 +816,16 @@ export function CompanionChat({
               !!prevTime &&
               todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
 
+            // Схлопываем повтор одной и той же минуты подряд (см. комментарий
+            // у lastShownClock выше) — но последнее сообщение в ленте всегда
+            // получает метку, иначе непонятно, когда шёл разговор в последний раз.
+            const clockLabel = thisTime ? formatClock(thisTime) : null
+            if (showDayDivider) lastShownClock = null
+            const isLastMessageOverall = mi === messages.length - 1
+            const showTimestamp =
+              isLastOfGroup && !!thisTime && (isLastMessageOverall || clockLabel !== lastShownClock)
+            if (showTimestamp) lastShownClock = clockLabel
+
             return (
             <div
               key={message.id}
@@ -970,7 +989,7 @@ export function CompanionChat({
                   каждую: как в реальных мессенджерах, не как лог событий.
                   Галочка — только у своих и только когда реплика ушла
                   (не во время стриминга: секунду назад это было бы ложью). */}
-              {isLastOfGroup && thisTime && (
+              {showTimestamp && (
                 // text-muted-foreground БЕЗ доп. /70: сам токен уже даёт
                 // 6.63:1 на фоне сцены (замерено попиксельно через canvas),
                 // а «/70» поверх него утапливал 12px-текст до 3.81:1 — ниже
@@ -983,7 +1002,7 @@ export function CompanionChat({
                     isUser ? 'justify-end' : 'justify-start'
                   }`}
                 >
-                  {formatClock(thisTime)}
+                  {clockLabel}
                   {/* text-primary: галочка «доставлено» — акцентный сигнал
                       подтверждения (тот же приём, что синие галочки в
                       мессенджерах), не просто ещё один серый символ рядом
