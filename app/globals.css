@@ -467,11 +467,17 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
    тех же трёх слоях, что и .glass: преломление, кромка, тень.
    ========================================================================== */
 .chat-bubble-cat {
+  /* Тёплый уголок был закодирован (0.1 альфы), но на реальном рендере
+     терялся — измерено рендером (390×844@3x): пузырь читался ровным серым,
+     без намёка на «свет очага». Поднято до 0.22 и сделано компактнее (70%
+     вместо 90% радиуса) — тепло остаётся угловым акцентом, не заливкой
+     всего пузыря, и не приближается к зоне первой строки текста (та всегда
+     у верхнего края, тёплое пятно — у нижнего). */
   background:
     radial-gradient(
-      120% 90% at 20% 100%,
-      oklch(0.72 0.17 55 / 0.1) 0%,
-      transparent 55%
+      120% 70% at 18% 100%,
+      oklch(0.72 0.17 55 / 0.22) 0%,
+      transparent 60%
     ),
     linear-gradient(
       155deg,
@@ -646,6 +652,21 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
     0 18px 30px -14px oklch(0 0 0 / 0.65);
 }
 
+/* Поле как поверхность, которая «оживает» ровно в момент, когда человек
+   НАЧАЛ печатать — не когда просто тапнул в пустое поле (это уже покрыто
+   :focus-within выше). Разница исключительно в СВЕТЕ: нижняя кромка и тень
+   теплеют к primary — то же лаймовое сияние, что ловит очаг сцены, теперь
+   пойманное и полем ввода — без единого кадра анимации, только сдвиг
+   значения цвета, который .chat-input-dock уже умеет плавно перейти
+   (transition-[...,box-shadow,border-color] на самом доке). */
+.chat-input-dock:focus-within.is-typing {
+  --glass-border-bottom: oklch(0.86 0.22 130 / 0.3);
+  box-shadow:
+    inset 0 1px 0 oklch(1 0 0 / 0.24),
+    0 8px 18px -6px oklch(0.86 0.22 130 / 0.42),
+    0 18px 30px -14px oklch(0 0 0 / 0.65);
+}
+
 /* Индикатор «напарник печатает»: три тлеющих угля вместо безликих серых
    точек bg-muted-foreground/animate-bounce. Тот же тёплый оттенок 55, что у
    кольца CompanionAvatar и очага в фоне сцены — контингентно (только пока
@@ -670,7 +691,146 @@ body[data-focus-immersive] nav[aria-label="Основная навигация"]
   animation: ember-flicker 1s ease-in-out infinite;
 }
 
+/* ЖИВОЙ МИР — редкие диегетичные явления фона (app-backdrop.tsx).
+   Частота задаётся в JS (случайные интервалы в минуты), здесь только форма
+   и длительность одного явления. Каждое — one-shot (forwards, не infinite)
+   кроме дрейфа луны и дыма, которые в реальности идут непрерывно. */
+
+/* Падающая звезда: короткий штрих со светлым носом, летит по своей же
+   диагонали (rotate задаёт направление, translateX — движение вдоль неё) —
+   не «точка едет по экрану», а полоса с трассой, как всё видел глаз. */
+@keyframes shooting-star-fly {
+  0% {
+    transform: rotate(-22deg) translateX(-10px);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: rotate(-22deg) translateX(230px);
+    opacity: 0;
+  }
+}
+.shooting-star {
+  width: 46px;
+  height: 1.5px;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    oklch(0.97 0.02 210 / 0) 0%,
+    oklch(0.97 0.02 210 / 0.85) 70%,
+    oklch(1 0 0 / 0.95) 100%
+  );
+  transform-origin: left center;
+  animation: shooting-star-fly 1.3s cubic-bezier(0.25, 0.1, 0.4, 1) forwards;
+}
+
+/* Светлячок: тот же тёплый оттенок 55, что у очага и кольца существа —
+   редкая тёплая искра над грядой, не абстрактная жёлтая точка. Дрейфует
+   мягкой дугой и гаснет, не долетая до края — реальный светлячок не
+   маршрутизирует по прямой. */
+@keyframes firefly-drift {
+  0% {
+    transform: translate(0, 0);
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.85;
+  }
+  50% {
+    transform: translate(16px, -12px);
+    opacity: 0.45;
+  }
+  78% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translate(-8px, -26px);
+    opacity: 0;
+  }
+}
+.firefly {
+  width: 3px;
+  height: 3px;
+  background: oklch(0.85 0.19 100);
+  box-shadow: 0 0 6px 1.5px oklch(0.85 0.19 100 / 0.75);
+  animation: firefly-drift 5.4s ease-in-out forwards;
+}
+
+/* Дрейф луны: 4 минуты на цикл — на порядок медленнее любого другого
+   движения сцены (7–23с у остального). Небесное тело просто идёт по небу
+   медленнее, чем всё живое на переднем плане, — так это и должно
+   ощущаться, не как ещё одна «анимация» в том же темпе. */
+@keyframes moon-drift {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  50% {
+    transform: translate(-6px, 4px);
+  }
+}
+.moon-drift {
+  animation: moon-drift 240s ease-in-out infinite;
+}
+
+/* Дым из трубы: три завитка на одном 6с цикле с разной задержкой —
+   органичное поднятие, не три синхронных клона. */
+@keyframes chimney-smoke-rise {
+  0% {
+    transform: translate(0, 0) scale(0.6);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate(3px, -18px) scale(1.7);
+    opacity: 0;
+  }
+}
+.chimney-smoke {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: chimney-smoke-rise 6s ease-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .shooting-star,
+  .firefly {
+    display: none;
+  }
+  .moon-drift,
+  .chimney-smoke {
+    animation: none;
+  }
+}
+
+/* Отправленная реплика «садится» на место: короткая тень чуть глубже
+   обычной, оседающая до нуля за 380мс — тот же физический язык, что у
+   реального листа бумаги, брошенного на стол, а не мгновенное появление
+   пикселей. Один раз на mount (новое сообщение), не infinite — событие,
+   не декорация. */
+@keyframes message-land {
+  0% {
+    box-shadow: 0 10px 20px -8px oklch(0 0 0 / 0.5);
+  }
+  100% {
+    box-shadow: 0 2px 6px -4px oklch(0 0 0 / 0);
+  }
+}
+.message-land {
+  animation: message-land 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message-land {
+    animation: none;
+  }
   .start-card-breathe {
     animation: none;
   }

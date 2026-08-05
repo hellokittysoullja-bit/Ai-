@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useReducedMotion } from "motion/react";
 import { getFinds, getStarts } from "@/lib/memory";
 import { LANDMARK_COUNT } from "@/lib/island-elements";
 import { landmarkAnchors, landmarkNodes } from "@/lib/island-sprites";
@@ -172,6 +173,17 @@ export function AppBackdrop() {
   const [pendingGrowth, setPendingGrowth] = useState<number | null>(null);
   const [grownIndex, setGrownIndex] = useState<number | null>(null);
   const pathname = usePathname();
+  const reduceMotion = useReducedMotion();
+
+  // #ЖИВОЙ МИР · Падающая звезда и светлячок — редкие, диегетичные события
+  // ночного неба. Не декорация на таймере, а РЕДКИЕ случайные явления
+  // (минуты между появлениями, каждое живёт секунды) — та же логика
+  // контингентности, что у сияния/очага: заметное движение должно быть
+  // редким, чтобы не приесться, но здесь источник редкости — вероятность,
+  // не заработанное событие (мир живёт сам по себе, не только в ответ на
+  // пользователя). Одно явление за раз, никогда оба разом.
+  const [shootingStar, setShootingStar] = useState<{ id: number; top: number; left: number } | null>(null);
+  const [firefly, setFirefly] = useState<{ id: number; top: number; left: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -235,6 +247,55 @@ export function AppBackdrop() {
 
   const skyPhase: SkyPhase = mounted ? phaseForHour(hour) : "night";
   const sky = SKY[skyPhase];
+  const isDark = skyPhase === "night" || skyPhase === "dusk";
+
+  useEffect(() => {
+    if (reduceMotion || !isDark) {
+      setShootingStar(null);
+      setFirefly(null);
+      return;
+    }
+    let starTimer: number;
+    let starClear: number;
+    let fireflyTimer: number;
+    let fireflyClear: number;
+
+    // Интервалы намеренно случайные и длинные (минуты, не секунды): редкость
+    // — это и есть эффект. Частое явление читалось бы как декоративный тик,
+    // не как «мир живёт сам по себе».
+    const scheduleStar = () => {
+      const delay = 70_000 + Math.random() * 160_000; // ~1.2–3.8 мин
+      starTimer = window.setTimeout(() => {
+        setShootingStar({
+          id: Date.now(),
+          top: 5 + Math.random() * 16,
+          left: 8 + Math.random() * 48,
+        });
+        starClear = window.setTimeout(() => setShootingStar(null), 1300);
+        scheduleStar();
+      }, delay);
+    };
+    const scheduleFirefly = () => {
+      const delay = 45_000 + Math.random() * 110_000; // ~45с–2.5 мин
+      fireflyTimer = window.setTimeout(() => {
+        setFirefly({
+          id: Date.now(),
+          top: 60 + Math.random() * 9,
+          left: 12 + Math.random() * 62,
+        });
+        fireflyClear = window.setTimeout(() => setFirefly(null), 5400);
+        scheduleFirefly();
+      }, delay);
+    };
+    scheduleStar();
+    scheduleFirefly();
+    return () => {
+      window.clearTimeout(starTimer);
+      window.clearTimeout(starClear);
+      window.clearTimeout(fireflyTimer);
+      window.clearTimeout(fireflyClear);
+    };
+  }, [reduceMotion, isDark]);
 
   /*
    * Освещённая доля диска и сторона освещения. Растущая луна (phase < 0.5)
@@ -344,6 +405,31 @@ export function AppBackdrop() {
         ))}
       </div>
 
+      {/* ЖИВОЙ МИР · падающая звезда — редкое явление ночного неба, не тик
+          таймера (см. планирование выше). Одна на раз, короткая (1.3с),
+          и полностью пропадает без следа — реальная падающая звезда не
+          оставляет ничего после себя. */}
+      {shootingStar && (
+        <span
+          key={shootingStar.id}
+          aria-hidden="true"
+          className="shooting-star absolute"
+          style={{ top: `${shootingStar.top}%`, left: `${shootingStar.left}%` }}
+        />
+      )}
+
+      {/* ЖИВОЙ МИР · светлячок у гряды — тёплая (тот же оттенок 55, что очаг)
+          редкая искра над травой, не над репликами. Живёт секунды, дрейфует,
+          гаснет — не зовёт внимание, только даёт сцене дышать. */}
+      {firefly && (
+        <span
+          key={firefly.id}
+          aria-hidden="true"
+          className="firefly absolute rounded-full"
+          style={{ top: `${firefly.top}%`, left: `${firefly.left}%` }}
+        />
+      )}
+
       {/* #20 · ЛУНА — 10-я награда, дальше живёт по реальному календарю.
           В новолуние (lit < 0.06) не рисуем вовсе: пустое небо в новолуние —
           это и есть достоверность, а не потерянный элемент.
@@ -358,8 +444,12 @@ export function AppBackdrop() {
           нужную величину («насколько сейчас темно для неба») — не считать
           её заново, а разделить с тем же сигналом, что гасит звёзды. */}
       {hasMoon && phase !== null && lit > 0.06 && (
+        // moon-drift: луна не висит гвоздём — за 4 минуты едва заметно
+        // смещается на несколько пикселей, как небесное тело в реальном
+        // движении. Цикл настолько медленный, что глаз не ловит «анимацию»,
+        // только ощущение, что небо живое, если засечь его дольше минуты.
         <svg
-          className="absolute right-[14%] top-[11%] h-auto w-[clamp(2.6rem,7vw,4rem)] transition-opacity duration-[1200ms] motion-reduce:transition-none"
+          className="moon-drift absolute right-[14%] top-[11%] h-auto w-[clamp(2.6rem,7vw,4rem)] transition-opacity duration-[1200ms] motion-reduce:transition-none"
           viewBox="0 0 20 20"
           style={{ opacity: sky.stars }}
         >
@@ -463,6 +553,19 @@ export function AppBackdrop() {
               </g>
             );
           })}
+          {/* ЖИВОЙ МИР · дым из трубы — только если домик (RIDGE[3]) уже
+              заработан: дым без дома был бы недиегетичен. Три завитка с
+              разной задержкой на одном 6с цикле — органичное, не
+              метрономное поднятие, как настоящий дым. Внутри той же SVG,
+              что и сам домик, — общий viewBox и brightness-фильтр держат
+              дым в том же «силуэтном» языке, что вся гряда. */}
+          {landmarks > 3 && !reduceMotion && (
+            <g transform="translate(266 25)" opacity="0.55">
+              <circle className="chimney-smoke" style={{ animationDelay: "0s" }} r="2.1" fill="oklch(0.78 0.008 90)" />
+              <circle className="chimney-smoke" style={{ animationDelay: "2s" }} r="1.7" fill="oklch(0.78 0.008 90)" />
+              <circle className="chimney-smoke" style={{ animationDelay: "4s" }} r="1.3" fill="oklch(0.78 0.008 90)" />
+            </g>
+          )}
         </svg>
       )}
 

@@ -204,6 +204,21 @@ export function CompanionChat({
   // (не команда с клавиатуры сотни раз в день — Эмиль здесь не запрещает).
   const [sendCount, setSendCount] = useState(0)
 
+  // Кот прикрывает глаза, когда человек надолго замолчал НАД непустым полем —
+  // присутствие, не нетерпение: реагирует на паузу в мысли (см. mascot-svg.tsx
+  // expression="listening"), не на пустое поле — там существу нечего ждать,
+  // это уже состояние покоя. Возврат мгновенный, по любому вводу или отправке.
+  const [userIdle, setUserIdle] = useState(false)
+  useEffect(() => {
+    if (!input.trim()) {
+      setUserIdle(false)
+      return
+    }
+    setUserIdle(false)
+    const id = window.setTimeout(() => setUserIdle(true), 4500)
+    return () => window.clearTimeout(id)
+  }, [input])
+
   // Долгое нажатие (копирование + реакции) переехало в ChatBubble вместе с
   // остальными жестами реплики — держать таймер здесь, а меню там, значило
   // бы разрывать один жест между двумя файлами.
@@ -736,7 +751,7 @@ export function CompanionChat({
             animate={{ opacity: 1, y: 0 }}
             transition={SPRING_ITEM}
           >
-            <CompanionAvatar />
+            <CompanionAvatar expression={userIdle ? 'listening' : 'calm'} />
             {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
                 приветствие и сообщения произносит один и тот же персонаж —
                 и один и тот же материал, с гарантированным контрастом
@@ -897,20 +912,29 @@ export function CompanionChat({
                       initial={
                         reduceMotion
                           ? { opacity: 0 }
-                          : { opacity: 0, y: 10, scale: 0.97, x: isUser ? 8 : -8 }
+                          : { opacity: 0, y: 10, scale: isUser ? 0.97 : 0.9, x: isUser ? 8 : -8 }
                       }
                       animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
+                      // Пришедшая реплика бота стартует ниже по scale и оседает
+                      // мягче (ниже stiffness/damping) — читается как «слегка
+                      // расширяется», в отличие от короткого щелчка своей же
+                      // отправленной реплики (SPRING_SNAPPY без изменений).
                       transition={
                         reduceMotion
                           ? { duration: 0.15 }
-                          : SPRING_SNAPPY
+                          : {
+                              ...SPRING_SNAPPY,
+                              scale: isUser
+                                ? SPRING_SNAPPY
+                                : { type: 'spring', stiffness: 220, damping: 16 },
+                            }
                       }
                     >
                       {!isUser &&
                         (isFirstOfGroup ? (
                           <CompanionAvatar
                             reacting={reactingId === message.id}
-                            expression={expression}
+                            expression={userIdle ? 'listening' : expression}
                           />
                         ) : (
                           // Место аватара держим всегда: без распорки вторая
@@ -1177,7 +1201,15 @@ export function CompanionChat({
         {/* py-1.5, не py-2: с одним слотом справа (см. ниже) вместо
             микрофона+отправки бок о бок доку больше не нужен запас под два
             44px-квадрата сразу — тоньше без потери тач-целей. */}
-        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-[transform,box-shadow,border-color] duration-200">
+        {/* is-typing: поверхность реагирует именно на НАЧАЛО печати, не на
+            фокус — тап в пустое поле не должен ничего «зажигать», иначе
+            сигнал теряет смысл (реагирует на всё подряд). Только изменение
+            света (тон границы/тени теплеет к primary), без анимации —
+            тот же язык, что просил §7 разбора: поле как поверхность,
+            которая ловит свет, а не мигает. */}
+        <div
+          className={`chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-[transform,box-shadow,border-color] duration-200 ${input.trim() ? 'is-typing' : ''}`}
+        >
           <textarea
             ref={textareaRef}
             value={input}
