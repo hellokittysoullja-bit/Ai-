@@ -862,7 +862,12 @@ export function CompanionChat({
             >
               {showDayDivider && (
                 <div className="my-1 flex items-center justify-center">
-                  <span className="rounded-full bg-white/5 px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+                  {/* Был плоский bg-white/5 — единственный элемент во всей
+                      переписке без .glass-материала, который несёт
+                      буквально всё остальное здесь (реплики, чипы, цитата
+                      ответа). Разделитель дня выглядел вклеенным из другого
+                      компонента. */}
+                  <span className="glass rounded-full px-3 py-1 font-mono text-xs uppercase tracking-widest text-muted-foreground">
                     {formatDayLabel(thisTime)}
                   </span>
                 </div>
