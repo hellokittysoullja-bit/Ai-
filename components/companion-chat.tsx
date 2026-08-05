@@ -768,10 +768,11 @@ export function CompanionChat({
               style={{
                 ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
                 ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
-                // Тот же сжатый угол, что и у последней реплики группы в
-                // ChatBubble — теперь снизу (см. #10c в chat-bubble.tsx):
-                // приветствие ВСЕГДА несёт хвостик, значит всегда «низ».
-                borderBottomLeftRadius: '3px',
+                // Тот же острый угол, что и у последней реплики группы в
+                // ChatBubble (см. #10e в chat-bubble.tsx) — приветствие
+                // ВСЕГДА несёт хвостик, значит всегда «низ», и угол под
+                // ним всегда острый, не скруглённый.
+                borderBottomLeftRadius: '0px',
               }}
             >
               <BubbleTail side="left" />
