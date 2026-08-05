@@ -29,7 +29,7 @@ import { SPRING_GAZE } from "@/lib/motion";
  */
 
 export type MascotExpression =
-  "calm" | "happy" | "focused" | "sleepy" | "excited";
+  "calm" | "happy" | "focused" | "sleepy" | "excited" | "listening";
 
 /* Палитра и геометрия существа живут в mascot-geometry.ts (без 'use client'),
    чтобы серверный первый кадр рисовал того же напарника. */
@@ -71,6 +71,12 @@ export function MascotSvg({
   const focused = expression === "focused";
   const happy = expression === "happy";
   const excited = expression === "excited";
+  // listening: человек надолго замолчал в поле ввода — существо прикрывает
+  // глаза и ждёт, терпеливо, не засыпая. Та же геометрия глаз, что у sleepy
+  // (closedEye), но БЕЗ zzz и без сонного рта-точки — то и другое читается
+  // как «отключился», а не «слушает и не торопит».
+  const listening = expression === "listening";
+  const eyesClosed = sleepy || listening;
 
   /* Зрачки следят за курсором */
   const px = useSpring(0, SPRING_GAZE);
@@ -474,7 +480,7 @@ export function MascotSvg({
         </g>
       )}
       {/* глаза */}
-      {sleepy ? (
+      {eyesClosed ? (
         <>
           {closedEye("l")}
           {closedEye("r")}
@@ -488,7 +494,7 @@ export function MascotSvg({
       {/* нос */}
       <path d="M96 122 L104 122 L100 128 Z" fill={ACCENT} opacity={0.95} />
       {/* рот по выражению */}
-      {expression === "calm" && (
+      {(expression === "calm" || listening) && (
         <path
           d="M92 138 q8 7 16 0"
           fill="none"

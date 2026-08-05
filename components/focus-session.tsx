@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { motion, useReducedMotion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { MascotSvg } from '@/components/mascot-svg'
+import { EmphasisText } from '@/components/emphasis-text'
 import { RevealIsland, type RevealNewItem } from '@/components/reveal-island'
 import { ChevronRight, Sparkles } from 'lucide-react'
 import {
@@ -70,24 +71,24 @@ function buildSetupLine(
   priorSessions: number,
   companionName: string | null,
 ): string {
-  if (prefilledStep) return 'Шаг уже выбран. Просто жми — я рядом.'
+  if (prefilledStep) return 'Шаг уже выбран. Просто *жми* — я рядом.'
   if (priorSessions === 0) {
-    return 'Что делаем? Назови первый шаг — не всю задачу.'
+    return 'Что делаем? Назови *первый шаг* — не всю задачу.'
   }
   return companionName
-    ? `Погнали. Что в фокусе? ${companionName} рядом.`
-    : 'Погнали. Что в фокусе? Я рядом.'
+    ? `Погнали. Что *в фокусе*? ${companionName} рядом.`
+    : 'Погнали. Что *в фокусе*? Я рядом.'
 }
 const AMBIENT_KEY = 'naparnik:ambient'
 
 type Moment = 'start' | 'middle' | 'late' | 'done' | 'early-exit'
 
 const fallbackVoice: Record<Moment, string> = {
-  start: 'Я рядом. Одно действие за раз.',
-  middle: 'Половина есть. Ты реально в игре.',
-  late: 'Осталось чуть-чуть. Финишная прямая.',
-  done: 'Начато и отработано. Мой остров стал чуть больше. Без пафоса: ты красавчик.',
-  'early-exit': 'Ты начал — это главное. Остров всё равно вырос. Ноль стыда.',
+  start: 'Я рядом. *Одно действие* за раз.',
+  middle: '*Половина* есть. Ты реально в игре.',
+  late: 'Осталось чуть-чуть. *Финишная прямая*.',
+  done: 'Начато и отработано. Мой остров стал чуть больше. Без пафоса: ты *красавчик*.',
+  'early-exit': 'Ты начал — это *главное*. Остров всё равно вырос. Ноль стыда.',
 }
 
 async function fetchVoice(moment: Moment, task: string, minutes: number): Promise<string> {
@@ -545,8 +546,8 @@ export function FocusSession() {
         {/* Сцена: существо в центре внимания, а не в углу формы */}
         <div className="flex flex-1 flex-col items-center justify-center gap-4">
           <MascotSvg expression="calm" label={companionName ?? 'Напарник'} size={150} />
-          <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
-            {buildSetupLine(prefilledStep, priorSessions, companionName)}
+          <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-sans text-[0.95rem] leading-relaxed">
+            <EmphasisText text={buildSetupLine(prefilledStep, priorSessions, companionName)} />
           </p>
         </div>
         {/* Управление внизу — в зоне большого пальца */}
@@ -754,12 +755,12 @@ export function FocusSession() {
           <MascotSvg expression="happy" label="Напарник садится рядом" size={170} />
         </motion.div>
         <motion.p
-          className="font-hand text-2xl text-muted-foreground"
+          className="font-sans text-lg text-muted-foreground"
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6, duration: 0.7 }}
         >
-          Сажусь рядом. Начали.
+          <EmphasisText text="*Сажусь рядом*. Начали." />
         </motion.p>
         <motion.p
           className="font-mono text-xs uppercase tracking-widest text-primary"
@@ -851,12 +852,16 @@ export function FocusSession() {
               />
             </motion.div>
           </div>
-          <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-hand text-xl leading-snug">
-            {backFromDrift
-              ? 'Ты отходил — это нормально. Мы всё ещё в деле.'
-              : cheering
-                ? 'Четверть пути позади. Идём.'
-                : voice}
+          <p className="glass max-w-72 text-balance rounded-2xl px-4 py-2 text-center font-sans text-[0.95rem] leading-relaxed">
+            <EmphasisText
+              text={
+                backFromDrift
+                  ? 'Ты отходил — это нормально. Мы всё ещё *в деле*.'
+                  : cheering
+                    ? '*Четверть пути* позади. Идём.'
+                    : voice
+              }
+            />
           </p>
           <div className="flex flex-col items-center gap-2">
             {/* Название дела — контекст «чем я занят», не утилитарная кнопка:
@@ -867,7 +872,9 @@ export function FocusSession() {
               «{task}»
             </p>
             {hideDigits ? (
-              <p className="font-hand text-2xl text-muted-foreground">время идёт — я слежу</p>
+              <p className="font-sans text-lg text-muted-foreground">
+                <EmphasisText text="время идёт — я *слежу*" />
+              </p>
             ) : (
               // U1: без aria-live — role="timer" имеет implicit "off";
               // polite означал объявление КАЖДОЙ секунды скринридером
@@ -928,8 +935,8 @@ export function FocusSession() {
       <MascotSvg expression="excited" label="Напарник радуется" size={110} />
       <div className="flex flex-col gap-2 text-center">
         <h2 className="text-2xl font-bold">{endedEarly ? 'Ты начал.' : 'Сделано.'}</h2>
-        <p className="font-hand text-xl leading-snug text-muted-foreground">
-          {doneVoice ?? fallbackVoice[endedEarly ? 'early-exit' : 'done']}
+        <p className="font-sans text-[0.95rem] leading-relaxed text-muted-foreground">
+          <EmphasisText text={doneVoice ?? fallbackVoice[endedEarly ? 'early-exit' : 'done']} />
         </p>
       </div>
 
