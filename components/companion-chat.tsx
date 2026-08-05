@@ -768,6 +768,9 @@ export function CompanionChat({
               style={{
                 ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
                 ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
+                // Тот же сжатый угол, что и у головы группы в ChatBubble —
+                // приветствие ВСЕГДА несёт хвостик, значит всегда голова.
+                borderTopLeftRadius: '6px',
               }}
             >
               <BubbleTail side="left" />
