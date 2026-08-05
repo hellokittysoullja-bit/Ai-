@@ -1176,7 +1176,7 @@ export function CompanionChat({
         {/* py-1.5, не py-2: с одним слотом справа (см. ниже) вместо
             микрофона+отправки бок о бок доку больше не нужен запас под два
             44px-квадрата сразу — тоньше без потери тач-целей. */}
-        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-shadow duration-200">
+        <div className="chat-input-dock glass mx-auto flex max-w-md items-end gap-2 rounded-3xl px-3 py-1.5 shadow-[0_10px_30px_-12px_oklch(0_0_0/0.55)] transition-[transform,box-shadow,border-color] duration-200">
           <textarea
             ref={textareaRef}
             value={input}
@@ -1200,7 +1200,17 @@ export function CompanionChat({
             // каждое открытие клавиатуры.
             // min-h-11: поле в одну строку (rows=1) мерилось 38px — ниже
             // минимума тач-зоны 44px (замерено рендером).
-            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground outline-none placeholder:text-muted-foreground"
+            // caret-primary: курсор мигает лаймом, не системным чёрным/белым —
+            // дешёвая деталь, которую держат в голове дорогие продукты
+            // (Linear, Arc), но обычно теряют в фоллбэке на браузерный дефолт.
+            // focus-visible:outline-none ПОВЕРХ outline-none: у shadcn-ресета
+            // есть правило :is(...,textarea,...):focus-visible{outline:2px
+            // solid var(--ring)} специфичностью (0,1,1) — оно бьёт голый
+            // .outline-none (0,1,0) и рисовало резкое лаймовое кольцо ПОВЕРХ
+            // всей ручной работы с .chat-input-dock ниже, что и было
+            // настоящим источником «неонового кольца», а не сам док.
+            // focus-visible:outline-none даёт (0,2,0) и наконец побеждает.
+            className="min-h-11 max-h-[7.5rem] flex-1 resize-none bg-transparent py-1.5 text-base leading-relaxed text-foreground caret-primary outline-none focus-visible:outline-none placeholder:text-muted-foreground"
           />
           {/* #29 · Один слот справа вместо двух одновременных иконок.
               Микрофон и «отправить» никогда не нужны в один и тот же
