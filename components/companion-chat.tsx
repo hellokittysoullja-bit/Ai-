@@ -771,7 +771,7 @@ export function CompanionChat({
                 // Тот же сжатый угол, что и у последней реплики группы в
                 // ChatBubble — теперь снизу (см. #10c в chat-bubble.tsx):
                 // приветствие ВСЕГДА несёт хвостик, значит всегда «низ».
-                borderBottomLeftRadius: '6px',
+                borderBottomLeftRadius: '3px',
               }}
             >
               <BubbleTail side="left" />
