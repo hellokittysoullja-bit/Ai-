@@ -23,7 +23,7 @@ import {
 import { useDictation } from '@/hooks/use-dictation'
 import { PullToStretch } from '@/components/pull-to-stretch'
 import { hapticStart } from '@/lib/haptics'
-import { ChatBubble, type Reaction } from '@/components/chat-bubble'
+import { ChatBubble, BubbleTail, type Reaction } from '@/components/chat-bubble'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
 import {
@@ -724,8 +724,22 @@ export function CompanionChat({
             {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
                 приветствие и сообщения произносит один и тот же персонаж —
                 и один и тот же материал, с гарантированным контрастом
-                текста независимо от участка сцены под пузырём. */}
-            <div className="chat-bubble-cat max-w-[88%] rounded-2xl rounded-tl-sm px-4 py-2.5 font-hand text-[1.18rem] leading-snug text-secondary-foreground">
+                текста независимо от участка сцены под пузырём.
+                rounded-tl-sm раньше имитировал «хвостик» скруглением угла —
+                ровно то приближение, ради которого в chat-bubble.tsx
+                нарисован настоящий SVG-хвостик (BubbleTail). Приветствие —
+                первая реплика, которую видит человек: она обязана нести ту
+                же деталь материала, что и все остальные, не урезанную
+                версию. --tail-fill/--tail-stroke зеркалят те же значения,
+                что ChatBubble ставит для isUser=false. */}
+            <div
+              className="chat-bubble-cat relative max-w-[88%] rounded-2xl px-4 py-2.5 font-hand text-[1.18rem] leading-snug text-secondary-foreground"
+              style={{
+                ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
+                ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
+              }}
+            >
+              <BubbleTail side="left" />
               {greeting}
             </div>
           </motion.div>
