@@ -23,11 +23,7 @@ import {
 import { useDictation } from '@/hooks/use-dictation'
 import { PullToStretch } from '@/components/pull-to-stretch'
 import { hapticStart } from '@/lib/haptics'
-import { BubbleShape, ChatBubble, type Reaction } from '@/components/chat-bubble'
-import {
-  canMergeTelegramMessageBoundary,
-  getTelegramBubbleContinuity,
-} from '@/components/telegram-bubble-geometry'
+import { ChatBubble, BubbleTail, type Reaction } from '@/components/chat-bubble'
 import { EmphasisText } from '@/components/emphasis-text'
 import { SPRING_ITEM, SPRING_REVEAL, SPRING_SNAPPY, stagger } from '@/lib/motion'
 import Link from 'next/link'
@@ -124,19 +120,6 @@ function formatClock(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
-}
-
-function partRendersAsChatBlock(part: {
-  type: string
-  state?: string
-}): boolean {
-  if (part.type === 'text') return true
-  return (
-    (part.type === 'tool-savePlan' ||
-      part.type === 'tool-startFocus' ||
-      part.type === 'tool-rememberFact') &&
-    part.state === 'output-available'
-  )
 }
 
 /**
@@ -769,17 +752,26 @@ export function CompanionChat({
             transition={SPRING_ITEM}
           >
             <CompanionAvatar expression={userIdle ? 'listening' : 'calm'} />
-            {/* Тот же материал, что у реплик ниже:
+            {/* Тот же материал, что у реплик ниже (.chat-bubble-cat):
                 приветствие и сообщения произносит один и тот же персонаж —
                 и один и тот же материал, с гарантированным контрастом
                 текста независимо от участка сцены под пузырём.
-                Приветствие — одиночная входящая реплика, поэтому получает
-                ту же цельную Telegram-маску и нижний хвост, что ChatBubble. */}
-            <div className="relative isolate max-w-[88%] px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground">
-              <BubbleShape side="left" position="single" />
-              <span className="relative z-[1]">
-                <EmphasisText text={greeting} />
-              </span>
+                rounded-tl-sm раньше имитировал «хвостик» скруглением угла —
+                ровно то приближение, ради которого в chat-bubble.tsx
+                нарисован настоящий SVG-хвостик (BubbleTail). Приветствие —
+                первая реплика, которую видит человек: она обязана нести ту
+                же деталь материала, что и все остальные, не урезанную
+                версию. --tail-fill/--tail-stroke зеркалят те же значения,
+                что ChatBubble ставит для isUser=false. */}
+            <div
+              className="chat-bubble-cat relative max-w-[88%] rounded-2xl px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground"
+              style={{
+                ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
+                ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
+              }}
+            >
+              <BubbleTail side="left" />
+              <EmphasisText text={greeting} />
             </div>
           </motion.div>
 
@@ -836,68 +828,16 @@ export function CompanionChat({
           )}
 
           {messages.map((message, mi) => {
+            // Группировка подряд идущих реплик одного говорящего — то, что
+            // отличает переписку от списка блоков. Хвостик у пузыря здесь
+            // сверху (rounded-tl-sm/tr-sm), поэтому «голова» группы — ПЕРВОЕ
+            // сообщение: только оно получает хвост и аватар, остальные
+            // прижимаются к нему и идут с ровными углами.
             const prev = messages[mi - 1]
             const next = messages[mi + 1]
+            const isFirstOfGroup = !prev || prev.role !== message.role
+            const isLastOfGroup = !next || next.role !== message.role
             const isUser = message.role === 'user'
-
-            const thisTime = times[message.id]
-            const prevTime = prev ? times[prev.id] : undefined
-            const nextTime = next ? times[next.id] : undefined
-            const crossesPreviousDay =
-              !!thisTime &&
-              !!prevTime &&
-              todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
-            const crossesNextDay =
-              !!thisTime &&
-              !!nextTime &&
-              todayKey(new Date(thisTime)) !== todayKey(new Date(nextTime))
-
-            // Группа Telegram — это соседние текстовые пузыри одного автора
-            // в пределах одного дня. Tool-only сообщения и разделитель дня
-            // разрывают форму: иначе малый радиус визуально обещает соседний
-            // пузырь, которого рядом физически нет.
-            const renderedPartIndices = message.parts.flatMap((part, index) =>
-              partRendersAsChatBlock(part) ? [index] : [],
-            )
-            const previousRenderedPartIndices = prev
-              ? prev.parts.flatMap((part, index) =>
-                  partRendersAsChatBlock(part) ? [index] : [],
-                )
-              : []
-            const nextRenderedPartIndices = next
-              ? next.parts.flatMap((part, index) =>
-                  partRendersAsChatBlock(part) ? [index] : [],
-                )
-              : []
-            const renderedPartOrder = new Map(
-              renderedPartIndices.map((partIndex, order) => [partIndex, order]),
-            )
-            const firstPart = message.parts[renderedPartIndices[0]]
-            const lastPart = message.parts[renderedPartIndices[renderedPartIndices.length - 1]]
-            const previousLastPart = prev
-              ? prev.parts[
-                  previousRenderedPartIndices[
-                    previousRenderedPartIndices.length - 1
-                  ]
-                ]
-              : undefined
-            const nextFirstPart = next
-              ? next.parts[nextRenderedPartIndices[0]]
-              : undefined
-            const previousIsSameGroup = canMergeTelegramMessageBoundary({
-              sameAuthor: !!prev && prev.role === message.role,
-              beforeEndsWithText: previousLastPart?.type === 'text',
-              afterStartsWithText: firstPart?.type === 'text',
-              crossesDay: crossesPreviousDay,
-            })
-            const nextIsSameGroup = canMergeTelegramMessageBoundary({
-              sameAuthor: !!next && next.role === message.role,
-              beforeEndsWithText: lastPart?.type === 'text',
-              afterStartsWithText: nextFirstPart?.type === 'text',
-              crossesDay: crossesNextDay,
-            })
-            const isFirstOfGroup = !previousIsSameGroup
-            const isLastOfGroup = !nextIsSameGroup
 
             // Мимика существа — из содержимого ЕГО ЖЕ реплики, ноль
             // дополнительного состояния (тот же приём, что у героя
@@ -914,7 +854,12 @@ export function CompanionChat({
             // Разделитель дня: только когда дата реально СМЕНИЛАСЬ между
             // соседними репликами — на свежем чате без истории делитель
             // не нужен, «Сегодня» перед первой же репликой — просто шум.
-            const showDayDivider = crossesPreviousDay
+            const thisTime = times[message.id]
+            const prevTime = prev ? times[prev.id] : undefined
+            const showDayDivider =
+              !!thisTime &&
+              !!prevTime &&
+              todayKey(new Date(thisTime)) !== todayKey(new Date(prevTime))
 
             // Схлопываем повтор одной и той же минуты подряд (см. комментарий
             // у lastShownClock выше) — но последнее сообщение в ленте всегда
@@ -955,44 +900,10 @@ export function CompanionChat({
               >
               {message.parts.map((part, i) => {
                 if (part.type === 'text') {
-                  // Один AI-message может содержать несколько text-parts.
-                  // Они образуют одну визуальную Telegram-группу: аватар — у
-                  // первого, хвост — только у последнего. Старая версия
-                  // передавала isFirstOfGroup каждому part и рисовала по
-                  // хвосту/аватару на каждом фрагменте.
-                  // Склеиваем только непосредственно соседние text-parts.
-                  // Tool-card между двумя текстами физически разрывает ряд,
-                  // поэтому переносить через неё малый радиус нельзя.
-                  const partOrder = renderedPartOrder.get(i)
-                  const previousRenderedPart =
-                    partOrder !== undefined && partOrder > 0
-                      ? message.parts[renderedPartIndices[partOrder - 1]]
-                      : undefined
-                  const nextRenderedPart =
-                    partOrder !== undefined &&
-                    partOrder < renderedPartIndices.length - 1
-                      ? message.parts[renderedPartIndices[partOrder + 1]]
-                      : undefined
-                  const previousPartIsText = previousRenderedPart?.type === 'text'
-                  const nextPartIsText = nextRenderedPart?.type === 'text'
-                  const {
-                    previousIsSameBubble,
-                    position: bubblePosition,
-                  } = getTelegramBubbleContinuity({
-                    previousMessageIsSameGroup: previousIsSameGroup,
-                    nextMessageIsSameGroup: nextIsSameGroup,
-                    previousPartIsText,
-                    nextPartIsText,
-                    isAtMessageStart: partOrder === 0,
-                    isAtMessageEnd:
-                      partOrder === renderedPartIndices.length - 1,
-                  })
                   return (
                     <motion.div
                       key={i}
-                      className={`flex w-full items-start gap-2 ${
-                        previousPartIsText ? '-mt-1' : ''
-                      }`}
+                      className="flex w-full items-start gap-2"
                       // Нюанс «своей стороны» (iMessage/Telegram): реплика
                       // едва подъезжает СО СТОРОНЫ своего отправителя (8px —
                       // в пределах 4-8px нормы для входа элемента, не рывок),
@@ -1020,7 +931,7 @@ export function CompanionChat({
                       }
                     >
                       {!isUser &&
-                        (!previousIsSameBubble ? (
+                        (isFirstOfGroup ? (
                           <CompanionAvatar
                             reacting={reactingId === message.id}
                             expression={userIdle ? 'listening' : expression}
@@ -1036,7 +947,7 @@ export function CompanionChat({
                       <ChatBubble
                         text={part.text}
                         isUser={isUser}
-                        position={bubblePosition}
+                        isFirstOfGroup={isFirstOfGroup}
                         depth={depthOf(message.id)}
                         reaction={reactions[`${message.id}-${i}`] ?? null}
                         onReact={(r) =>
