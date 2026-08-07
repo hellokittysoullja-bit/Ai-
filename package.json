@@ -6,8 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint .",
-    "test:bubbles": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test --experimental-strip-types tests/telegram-bubble-geometry.test.mjs"
+    "lint": "eslint ."
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.17",

@@ -1,16 +1,11 @@
 'use client'
 
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
 import { Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
 import { SPRING_GESTURE, SPRING_SNAPPY } from '@/lib/motion'
 import { hapticDone, hapticReaction, hapticThreshold } from '@/lib/haptics'
 import { EmphasisText } from '@/components/emphasis-text'
-import {
-  makeTelegramBubbleGeometry,
-  TELEGRAM_IOS_BUBBLE_SOURCE,
-  type TelegramBubblePosition,
-} from '@/components/telegram-bubble-geometry'
 
 /**
  * Материал одной реплики. Вынесен из companion-chat (900 строк) отдельным
@@ -48,261 +43,39 @@ const REACTIONS: ReadonlyArray<{
   { key: 'heart', label: 'Тепло', Icon: Heart },
 ]
 
-type BubbleSide = 'left' | 'right'
-
-function roundToDevicePixel(value: number): number {
-  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
-  return Math.round(value * dpr) / dpr
-}
-
-/**
- * Цельная векторная поверхность Telegram iOS: корпус, мост к хвосту, нижняя
- * полуэллипса и вычитающая выемка рендерятся одной SVG-маской. В отличие от
- * старого приклеенного BubbleTail здесь невозможно получить шов или другой
- * цвет хвоста. Центральные прямые растягиваются, радиусы и хвост — никогда.
- */
-export function BubbleShape({
-  side,
-  position,
-  landed = false,
-}: {
-  side: BubbleSide
-  position: TelegramBubblePosition
-  landed?: boolean
-}) {
-  const hostRef = useRef<HTMLSpanElement>(null)
-  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
-  const reactId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
-
-  useLayoutEffect(() => {
-    const node = hostRef.current
-    if (!node) return
-
-    const update = () => {
-      const rect = node.getBoundingClientRect()
-      const next = {
-        width: roundToDevicePixel(rect.width),
-        height: roundToDevicePixel(rect.height),
-      }
-      if (next.width <= 0 || next.height <= 0) return
-      setSize((current) =>
-        current && current.width === next.width && current.height === next.height
-          ? current
-          : next,
-      )
-    }
-
-    update()
-    if (typeof ResizeObserver === 'undefined') return
-    const observer = new ResizeObserver(update)
-    observer.observe(node)
-    return () => observer.disconnect()
-  }, [])
-
-  const geometry = size
-    ? makeTelegramBubbleGeometry(size.width, size.height, position)
-    : null
-  const maskId = `telegram-bubble-mask-${reactId}`
-  const catGradientId = `telegram-bubble-cat-gradient-${reactId}`
-  const catWarmthId = `telegram-bubble-cat-warmth-${reactId}`
-  const userGradientId = `telegram-bubble-user-gradient-${reactId}`
-  const edgeFilterId = `telegram-bubble-edge-${reactId}`
-  const shineGradientId = `telegram-bubble-shine-${reactId}`
-
+/** Хвостик пузыря: оттяжка к говорящему, переходящая в тело кривой Безье.
+    Экспортирован — приветственный пузырь в companion-chat.tsx рендерится
+    отдельно от ChatBubble (он не часть messages[]) и раньше падал обратно на
+    rounded-tl-sm, ровно то приближение, которое этот компонент был написан
+    заменить (см. комментарий у #10 ниже). Один и тот же персонаж должен
+    говорить одним и тем же материалом с первой же реплики, не только
+    начиная со второй. */
+export function BubbleTail({ side }: { side: 'left' | 'right' }) {
+  const isLeft = side === 'left'
   return (
-    <span
-      ref={hostRef}
+    <svg
       aria-hidden="true"
-      className="pointer-events-none absolute inset-0 z-0 block overflow-visible"
+      viewBox="0 0 10 14"
+      className={`absolute top-0 h-[14px] w-[10px] ${isLeft ? '-left-[7px]' : '-right-[7px] scale-x-[-1]'}`}
+      style={{ overflow: 'visible' }}
     >
-      {!geometry && (
-        <span
-          className={`telegram-bubble-fallback absolute inset-0 rounded-2xl ${
-            side === 'right' ? 'telegram-bubble-fallback-user' : 'telegram-bubble-fallback-cat'
-          }`}
-        />
-      )}
-      {geometry && (
-        <svg
-          data-telegram-bubble="true"
-          data-bubble-position={position}
-          data-bubble-side={side}
-          data-body-width={geometry.bodyWidth}
-          data-body-height={geometry.bodyHeight}
-          data-draw-tail={geometry.drawTail ? 'true' : 'false'}
-          width={geometry.canvasWidth}
-          height={geometry.bodyHeight}
-          viewBox={`0 0 ${geometry.canvasWidth} ${geometry.bodyHeight}`}
-          preserveAspectRatio="none"
-          className={`telegram-bubble-vector absolute top-0 overflow-visible ${
-            side === 'left' ? 'telegram-bubble-vector-left' : 'telegram-bubble-vector-right'
-          } ${side === 'right' ? 'telegram-bubble-vector-user' : 'telegram-bubble-vector-cat'} ${
-            landed ? 'telegram-bubble-land' : ''
-          }`}
-          style={{
-            left: side === 'left' ? -TELEGRAM_IOS_BUBBLE_SOURCE.tailExtension : 0,
-          }}
-        >
-          <defs>
-            <mask
-              id={maskId}
-              x={-20}
-              y={-20}
-              width={geometry.canvasWidth + 40}
-              height={geometry.bodyHeight + 40}
-              maskUnits="userSpaceOnUse"
-              maskContentUnits="userSpaceOnUse"
-            >
-              <rect
-                x={-20}
-                y={-20}
-                width={geometry.canvasWidth + 40}
-                height={geometry.bodyHeight + 40}
-                fill="black"
-              />
-              <g
-                transform={
-                  side === 'left'
-                    ? `translate(${geometry.canvasWidth} 0) scale(-1 1)`
-                    : undefined
-                }
-              >
-                <path d={geometry.bodyPath} fill="white" />
-                {geometry.bridgePath && <path d={geometry.bridgePath} fill="white" />}
-                {geometry.tailPath && <path d={geometry.tailPath} fill="white" />}
-                {geometry.cutout && (
-                  <ellipse
-                    cx={geometry.cutout.cx}
-                    cy={geometry.cutout.cy}
-                    rx={geometry.cutout.rx}
-                    ry={geometry.cutout.ry}
-                    fill="black"
-                  />
-                )}
-              </g>
-            </mask>
-
-            <linearGradient
-              id={catGradientId}
-              x1="0"
-              y1="0"
-              x2={geometry.canvasWidth}
-              y2={geometry.bodyHeight}
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop offset="0%" stopColor="white" stopOpacity="0.11" />
-              <stop offset="55%" stopColor="white" stopOpacity="0.045" />
-              <stop offset="100%" stopColor="white" stopOpacity="0.02" />
-            </linearGradient>
-            <radialGradient
-              id={catWarmthId}
-              cx="0"
-              cy="0"
-              r="1"
-              gradientUnits="userSpaceOnUse"
-              gradientTransform={`translate(${geometry.canvasWidth * 0.18} ${geometry.bodyHeight}) scale(${geometry.canvasWidth * 1.2} ${Math.max(1, geometry.bodyHeight * 0.7)})`}
-            >
-              <stop offset="0%" stopColor="oklch(0.72 0.17 55)" stopOpacity="0.22" />
-              <stop offset="60%" stopColor="oklch(0.72 0.17 55)" stopOpacity="0" />
-              <stop offset="100%" stopColor="oklch(0.72 0.17 55)" stopOpacity="0" />
-            </radialGradient>
-            <linearGradient
-              id={userGradientId}
-              x1="0"
-              y1="0"
-              x2="0"
-              y2={geometry.bodyHeight}
-              gradientUnits="userSpaceOnUse"
-            >
-              <stop offset="0%" stopColor="oklch(0.9 0.21 130)" />
-              <stop offset="55%" stopColor="var(--primary)" />
-              <stop offset="100%" stopColor="oklch(0.8 0.2 132)" />
-            </linearGradient>
-            <linearGradient
-              id={shineGradientId}
-              x1="0"
-              y1="0"
-              x2="1"
-              y2="0"
-            >
-              <stop offset="0%" stopColor="white" stopOpacity="0" />
-              <stop offset="50%" stopColor="oklch(0.92 0.02 95)" stopOpacity="0.13" />
-              <stop offset="100%" stopColor="white" stopOpacity="0" />
-            </linearGradient>
-            <filter
-              id={edgeFilterId}
-              x={-12}
-              y={-12}
-              width={geometry.canvasWidth + 24}
-              height={geometry.bodyHeight + 24}
-              filterUnits="userSpaceOnUse"
-              colorInterpolationFilters="sRGB"
-            >
-              <feMorphology in="SourceAlpha" operator="dilate" radius="0.55" result="dilated" />
-              <feComposite in="dilated" in2="SourceAlpha" operator="out" result="edge" />
-              <feFlood floodColor="white" floodOpacity="0.22" result="edgeColor" />
-              <feComposite in="edgeColor" in2="edge" operator="in" result="coloredEdge" />
-              <feMerge>
-                <feMergeNode in="SourceGraphic" />
-                <feMergeNode in="coloredEdge" />
-              </feMerge>
-            </filter>
-          </defs>
-
-          <g
-            mask={`url(#${maskId})`}
-            filter={side === 'left' ? `url(#${edgeFilterId})` : undefined}
-          >
-            {side === 'left' ? (
-              <>
-                <rect
-                  width={geometry.canvasWidth}
-                  height={geometry.bodyHeight}
-                  fill="oklch(0.4 0.02 150)"
-                  fillOpacity="0.9"
-                />
-                <rect
-                  width={geometry.canvasWidth}
-                  height={geometry.bodyHeight}
-                  fill={`url(#${catGradientId})`}
-                />
-                <rect
-                  width={geometry.canvasWidth}
-                  height={geometry.bodyHeight}
-                  fill={`url(#${catWarmthId})`}
-                />
-              </>
-            ) : (
-              <rect
-                width={geometry.canvasWidth}
-                height={geometry.bodyHeight}
-                fill={`url(#${userGradientId})`}
-              />
-            )}
-            <rect
-              className="telegram-bubble-shine-sweep"
-              x={-geometry.canvasWidth * 0.55}
-              y={0}
-              width={geometry.canvasWidth * 0.45}
-              height={geometry.bodyHeight}
-              fill={`url(#${shineGradientId})`}
-              style={
-                {
-                  '--telegram-bubble-shine-distance': `${geometry.canvasWidth * 3}px`,
-                } as CSSProperties
-              }
-            />
-          </g>
-        </svg>
-      )}
-    </span>
+      {/* Тело хвоста повторяет заливку пузыря. Цвет берём из currentColor
+          родителя через CSS-переменную, выставленную классами ниже: так
+          хвост не расходится с пузырём при смене темы или материала. */}
+      <path
+        d="M10 0 C 10 5.5 6.5 10.5 0.6 13.2 C 5.2 11 8 6.4 8.4 0 Z"
+        fill="var(--tail-fill)"
+        stroke="var(--tail-stroke)"
+        strokeWidth="0.7"
+      />
+    </svg>
   )
 }
 
 type ChatBubbleProps = {
   text: string
   isUser: boolean
-  position: TelegramBubblePosition
+  isFirstOfGroup: boolean
   /** 0 — свежая реплика у низа, 1 — уехала далеко вверх (#13) */
   depth: number
   reaction?: Reaction | null
@@ -314,7 +87,7 @@ type ChatBubbleProps = {
 export function ChatBubble({
   text,
   isUser,
-  position,
+  isFirstOfGroup,
   depth,
   reaction,
   onReact,
@@ -400,8 +173,8 @@ export function ChatBubble({
    * возвращается точечно, только на словах в *звёздочках* (EmphasisText).
    */
   const bubbleClass = isUser
-    ? 'px-4 py-2.5 text-[0.95rem] leading-relaxed text-primary-foreground'
-    : 'px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground'
+    ? 'chat-bubble-user px-4 py-2.5 text-[0.95rem] leading-relaxed'
+    : 'chat-bubble-cat px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground'
 
   return (
     <div className={`relative ${isUser ? 'ml-auto max-w-[82%]' : 'max-w-[88%]'}`}>
@@ -421,6 +194,18 @@ export function ChatBubble({
           opacity: depthOpacity,
           filter: `saturate(${depthSaturate})`,
           transformOrigin: isUser ? 'right center' : 'left center',
+          // Переменные для SVG-хвостика: он всегда совпадает с пузырём.
+          // Значение должно зеркалить заливку .chat-bubble-cat в globals.css —
+          // когда контраст пузыря поднимали (0.16/0.62 → 0.4/0.9), эту
+          // константу забыли обновить, и хвостик разошёлся цветом с телом
+          // пузыря, к которому приклеен. Найдено сверкой с реальным
+          // скриншотом устройства.
+          ['--tail-fill' as string]: isUser
+            ? 'oklch(0.9 0.21 130)'
+            : 'oklch(0.4 0.02 150 / 0.9)',
+          ['--tail-stroke' as string]: isUser
+            ? 'transparent'
+            : 'oklch(1 0 0 / 0.2)',
         }}
         // Тянуть можно только к своей стороне: реплика уходит «в ответ», а не
         // болтается в обе стороны. dragElastic — упругое сопротивление за
@@ -451,16 +236,12 @@ export function ChatBubble({
         onPointerDown={startLongPress}
         onPointerUp={cancelLongPress}
         onPointerLeave={cancelLongPress}
-        className={`relative isolate select-none whitespace-pre-wrap ${bubbleClass}`}
+        className={`glass-shine relative select-none whitespace-pre-wrap rounded-2xl ${bubbleClass} ${isUser ? 'message-land' : ''}`}
       >
-        <BubbleShape
-          side={isUser ? 'right' : 'left'}
-          position={position}
-          landed={isUser}
-        />
-        <span className="relative z-[1]">
-          <EmphasisText text={text} />
-        </span>
+        {/* #10 · Настоящий хвостик — только у головы группы, как в реальных
+            мессенджерах: продолжение реплики хвоста не получает. */}
+        {isFirstOfGroup && <BubbleTail side={isUser ? 'right' : 'left'} />}
+        <EmphasisText text={text} />
       </motion.div>
 
       {/* Поставленная реакция живёт на кромке пузыря — она про эту реплику,
