@@ -1,11 +1,16 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { AnimatePresence, motion, useMotionValue, useTransform } from 'motion/react'
 import { Check, Copy, Heart, PawPrint, Reply, Sparkle } from 'lucide-react'
 import { SPRING_GESTURE, SPRING_SNAPPY } from '@/lib/motion'
 import { hapticDone, hapticReaction, hapticThreshold } from '@/lib/haptics'
 import { EmphasisText } from '@/components/emphasis-text'
+import {
+  makeTelegramBubbleGeometry,
+  TELEGRAM_IOS_BUBBLE_SOURCE,
+  type TelegramBubblePosition,
+} from '@/components/telegram-bubble-geometry'
 
 /**
  * Материал одной реплики. Вынесен из companion-chat (900 строк) отдельным
@@ -43,310 +48,261 @@ const REACTIONS: ReadonlyArray<{
   { key: 'heart', label: 'Тепло', Icon: Heart },
 ]
 
-/** Хвостик пузыря: оттяжка к говорящему, переходящая в тело кривой Безье.
-    Экспортирован — приветственный пузырь в companion-chat.tsx рендерится
-    отдельно от ChatBubble (он не часть messages[]) и раньше падал обратно на
-    rounded-tl-sm, ровно то приближение, которое этот компонент был написан
-    заменить (см. комментарий у #10 ниже). Один и тот же персонаж должен
-    говорить одним и тем же материалом с первой же реплики, не только
-    начиная со второй.
+type BubbleSide = 'left' | 'right'
 
-    #10b — ПЕРЕСОБРАН: прежняя версия была тонкой линией-«запятой», висящей
-    в воздухе НАД пузырём — потому что скругление угла пузыря (28.8px,
-    --radius-2xl) намного больше высоты самого хвостика (14px): угол
-    физически не долетал до места, где начинался хвостик, и между ними
-    была явная дыра (замерено рендером: у самого верха зазор ~25px).
-    В WhatsApp/Telegram/iMessage угол, из которого растёт хвостик, ПОЧТИ
-    прямой — именно поэтому там нет этого зазора. Компонент, который ставит
-    этот хвостик (ChatBubble/приветствие), теперь одновременно сжимает свой
-    же угол до 6px через инлайн-стиль — форма и угол проектируются вместе,
-    не двумя независимыми решениями.
-    Форма — один filled-path «сгиб» (сужается от угла к скруглённому
-    кончику), сдвинутый на 8px внутрь пузыря сверх видимого вылета — запас
-    прячет любую мелкую неточность стыка. Три прошлых варианта (тонкая
-    линия без нахлёста, circle-minus-circle по образцу маски фаз луны в
-    app-backdrop.tsx, путь без запаса внутрь) проверены рендером и
-    отброшены — либо висели в воздухе, либо читались отдельным кружком,
-    либо не доставали до края.
+function roundToDevicePixel(value: number): number {
+  const dpr = typeof window === 'undefined' ? 1 : window.devicePixelRatio || 1
+  return Math.round(value * dpr) / dpr
+}
 
-    #10c — ПЕРЕНЕСЁН СНИЗУ ВВЕРХ → СВЕРХУ ВНИЗ: пользователь сверил с
-    реальными скриншотами WhatsApp/Telegram/iMessage — там хвостик и
-    аватар растут из НИЖНЕГО угла ПОСЛЕДНЕЙ реплики группы, не из верхнего
-    угла первой. ChatBubble/companion-chat.tsx теперь считают isLastOfGroup,
-    не isFirstOfGroup, и сжимают нижний, а не верхний угол.
+/**
+ * Цельная векторная поверхность Telegram iOS: корпус, мост к хвосту, нижняя
+ * полуэллипса и вычитающая выемка рендерятся одной SVG-маской. В отличие от
+ * старого приклеенного BubbleTail здесь невозможно получить шов или другой
+ * цвет хвоста. Центральные прямые растягиваются, радиусы и хвост — никогда.
+ */
+export function BubbleShape({
+  side,
+  position,
+  landed = false,
+}: {
+  side: BubbleSide
+  position: TelegramBubblePosition
+  landed?: boolean
+}) {
+  const hostRef = useRef<HTMLSpanElement>(null)
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+  const reactId = useId().replace(/[^a-zA-Z0-9_-]/g, '')
 
-    #10d — ПЕРЕНЕСЁН ЗА .glass-shine: .glass-shine (см. className пузыря
-    ниже) несёт overflow:hidden ради диагонального блика — любой потомок
-    с отрицательным отступом обрезался по границе пузыря. Пять версий формы
-    до этого поэтому «выглядели» рабочими на рендере, но НИКОГДА не
-    высовывались за край — то, что казалось хвостиком, было видимым
-    остатком фигуры ВНУТРИ пузыря. Хвостик теперь отдельный элемент РЯДОМ
-    с .glass-shine (не внутри), с своим style={{x}} для синхронного
-    движения при swipe-to-reply, и --tail-fill/--tail-stroke подняты на
-    общего родителя (кастомные CSS-свойства не наследуются между соседями).
+  useLayoutEffect(() => {
+    const node = hostRef.current
+    if (!node) return
 
-    #10e — ФОРМА: не треугольник и не капля отдельной кривой — хвостик как
-    ПРОДОЛЖЕНИЕ прямых рёбер пузыря, с одной вогнутой (не выпуклой) кривой
-    только по внешнему краю. Технику подсказал сам пользователь: квадрат
-    20×20, два ребра (верхнее — вдоль низа пузыря, правое — вдоль его
-    левого края) остаются идеально прямыми и совпадают с рёбрами пузыря
-    БЕЗ зазора, а третья сторона — не прямая, а кубическая кривая от
-    верхне-правого угла к нижне-левому, вогнутая внутрь. Ровно поэтому угол
-    пузыря у последней реплики группы (ниже) сжат до 0 — острый угол, не
-    скруглённый: технике нужно, чтобы её прямые рёбра встречали ТАКИЕ ЖЕ
-    прямые рёбра пузыря, а не убегающую дугу.
+    const update = () => {
+      const rect = node.getBoundingClientRect()
+      const next = {
+        width: roundToDevicePixel(rect.width),
+        height: roundToDevicePixel(rect.height),
+      }
+      if (next.width <= 0 || next.height <= 0) return
+      setSize((current) =>
+        current && current.width === next.width && current.height === next.height
+          ? current
+          : next,
+      )
+    }
 
-    #10f — МАТЕРИАЛ ДОГНАН ДО ПУЗЫРЯ: форма была верна, но на реальном
-    рендере (вечер, тёплый угол ярче) виден горизонтальный шов ЦВЕТА — не
-    геометрии — там, где плоская заливка хвостика встречает градиентный,
-    подсвеченный очагом и застеклённый пузырь. Два отдельных огреха:
-    1) backdrop-filter (blur+saturate) стоит на пузыре, но не на хвостике —
-       пузырь стеклянный, хвостик плоский. Тот же фильтр теперь и на самом
-       SVG (он поддерживает backdrop-filter как обычный HTML-элемент).
-    2) warm — тёплое пятно очага у .chat-bubble-cat живёт в radial-gradient
-       на 18% 100% (нижний левый угол пузыря — ровно там, где начинается
-       хвостик), но обрывалось на границе пузыря. Радиальный градиент здесь
-       — не копия чужого CSS, а собственное приближение той же тёплой точки
-       (oklch(0.72 0.17 55)), угасающее к кончику: тепло теперь течёт из
-       пузыря в хвостик, а не обрывается на стыке. У пользовательской
-       стороны акцента нет — там градиент вертикальный (свет сверху/масса
-       снизу), не угловой, добавлять было бы нечего.
+    update()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(update)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
-    #10g — ХУК С ВЫЕМКОЙ (по референсу телеграм-скрина): прежняя форма была
-    ОДНОЙ гладкой вогнутой дугой — у Telegram-хвостика дуга составная, тело
-    хвостика выступает ниже и левее, с выемкой (cusp) на стыке с углом
-    пузыря, как при объединении двух окружностей.
+  const geometry = size
+    ? makeTelegramBubbleGeometry(size.width, size.height, position)
+    : null
+  const maskId = `telegram-bubble-mask-${reactId}`
+  const catGradientId = `telegram-bubble-cat-gradient-${reactId}`
+  const catWarmthId = `telegram-bubble-cat-warmth-${reactId}`
+  const userGradientId = `telegram-bubble-user-gradient-${reactId}`
+  const edgeFilterId = `telegram-bubble-edge-${reactId}`
+  const shineGradientId = `telegram-bubble-shine-${reactId}`
 
-    #10h — ЗАМЕНЕНО НА WHATSAPP-МАСШТАБ (по РЕАЛЬНОМУ скриншоту WhatsApp,
-    не мокапу): #10g был скопирован с Telegram-референса и вышел большим
-    круглым «шаром», нависающим заметно ниже линии пузыря. Пользователь
-    прислал настоящий скриншот WhatsApp — трассировка по пикселям (граница
-    светлого/тёмного построчно, y=0..58 в 70×70-кропе) показала СОВСЕМ
-    другую пропорцию: хвостик мелкий и плоский, тянется в основном
-    ГОРИЗОНТАЛЬНО, а не вниз.
-
-    #10i — КАСАТЕЛЬНАЯ В НАЧАЛЕ ПУТИ: #10h всё ещё читался «приклеенным» —
-    причина не в масштабе, а в стыке. Путь начинался в (20,20) с первым
-    control-point (13,20): направление ГОРИЗОНТАЛЬНОЕ. Но прямое ребро
-    пузыря НАД точкой (20,10)→(20,20) идёт ВЕРТИКАЛЬНО — на стыке кривая
-    заворачивала в сторону, не продолжая движение прямого ребра, отсюда и
-    видимый залом. Первый control-point стал (20,24) — строго ПОД стартовой
-    точкой.
-
-    #10j — ПОПЫТКА «ПАТЧ ВНУТРЬ ПУЗЫРЯ» (вьюбокс 20→32, заливка заходит на
-    12px в тело пузыря) БЫЛА ОТКАЧЕНА: геометрический шов действительно
-    исчез, но на его месте появился ХУДШИЙ — цветовой. `--tail-fill` это
-    плоское приближение (oklch(0.4 0.02 150/0.9)) реального градиента
-    пузыря (тёплый угловой glow + glass-блик); снаружи, на тёмном фоне,
-    разница была терпимой, а на 12px ВНУТРИ пузыря, рядом с его собственным
-    тёплым градиентом, стала прямоугольным серым пятном — заметнее, чем
-    исходный залом. Урок: заливать чужую площадь приближённым цветом хуже,
-    чем состыковать формы по касательной — CSS-заливка пузыря всегда
-    точная, SVG-приближение — никогда.
-
-    #10k — ТОНЬШЕ И ПЛАВНЕЕ БЕЗ ЗАХОДА ВНУТРЬ: возврат к вьюбоксу 20×20
-    (хвостик целиком СНАРУЖИ пузыря, как в #10i — там цветового риска нет).
-    Две правки внутри той же геометрии: (1) первый control-point отодвинут
-    дальше по вертикали — переход разворачивается медленнее, а не
-    заламывается сразу за угол; (2) кромки «туда» и «обратно» сведены
-    гораздо ближе друг к другу (было ~10 единиц зазора у корня, стало ~4) —
-    раньше хвостик у основания читался как толстый клин, теперь — как
-    тонкий язычок, сужающийся к кончику.
-
-    #10l — УГОЛ ПУЗЫРЯ РЕАЛЬНО СКРУГЛЁН, ХВОСТИК ЗАХОДИТ В ТУ ЖЕ ПОЛОСУ:
-    #10j показал, что заливать чужую площадь SVG-приближением — плохо
-    (виден цвет). Но пользователь прав, что 0px-угол (#10i/#10k) — это
-    ДРУГАЯ проблема: не цвет, а то, что хвостик и пузырь физически два
-    разных скругления, просто встречающиеся в одной точке. Развязка: у
-    пузыря теперь РЕАЛЬНЫЙ CSS-радиус 5px на этом углу (не 0) — эту дугу
-    рисует браузer САМ, точным градиентом. SVG-хвостик заходит внутрь ровно
-    на эти же 5px (вьюбокс расширен: было 20×20, стало 25×20) и в этой
-    узкой полосе кубической кривой (не точной дугой — см. комментарий у
-    самого path ниже, почему) продолжает то же скругление, без шва
-    перетекая в собственную кривую хвостика. Риск цветового пятна (#10j)
-    остался, но на полосе шириной 5px вместо 12px — на порядок меньше
-    площади, где приближение вообще видно. */
-export function BubbleTail({ side, warm = false }: { side: 'left' | 'right'; warm?: boolean }) {
-  const isLeft = side === 'left'
-  const wedgeGradientId = useId()
-  const bumpGradientId = useId()
-  const maskId = useId()
-  const boundsId = useId()
   return (
-    // backdrop-filter не применяется к корню <svg> в Chromium (проверено
-    // рендером: computed backdropFilter оставался "none" несмотря на
-    // инлайн-стиль на самом svg) — нужен обычный HTML-элемент с явным
-    // размером, оборачивающий SVG, а не сам svg-узел.
-    //
-    // #10m — координаты 1:1 из реального движка Telegram-iOS
-    // (ChatMessageBubbleImages.swift, messageBubbleImage): угол пузыря —
-    // квадрат 33×33 с radius=16 (mainRadius по умолчанию в их коде), сам
-    // хвостик — НЕ путь от руки, а «капля минус эллипс»: заливается нижняя
-    // половина эллипса bottomEllipse (union с прямоугольником-мостиком,
-    // чтобы не было щели у скругления угла), из неё БУЛЕВСКИ ВЫЧИТАЕТСЯ
-    // второй эллипс topEllipse, сдвинутый правее и с бóльшим radius Y —
-    // именно эта вычитающая окружность и создаёт ту самую выемку (cusp),
-    // которую пользователь опознал на референсе. Раньше (10g–10l) я
-    // подбирал форму от руки кривыми Безье — этого прочтения я не мог
-    // достать чистым подбором. Канонические координаты рисуют хвостик
-    // ВПРАВО (как у исходящего сообщения); левая сторона (кот) — та же
-    // форма, зеркалённая вокруг x=33 (место стыка с пузырём), не отдельная
-    // геометрия — это то же, что делает transformBy(scale: incoming ? -1
-    // : 1) в оригинале. Угол пузыря ниже (style ChatBubble) — тоже 16px,
-    // не произвольное число: это то же radius, что и в эллипсах, иначе
-    // радиус CSS-угла и радиус хвостика візуально не совпадут. */}
-    <>
-      {/* Мостик — 1:1 из оригинала (fixedMainDiameter/2, floor(main/2),
-          main/2, ceil(midY)-floor(main/2)) = прямоугольник (16.5,16,16.5,9),
-          БЕЗ отсебятины: первая версия (#10n/#10o) заменяла его на дугу
-          radius=16 «поточнее под наш CSS-радиус» — пользователь прямо
-          указал делать 1:1 по их же файлу, не переизобретать форму. У
-          Telegram это невидимо, потому что весь пузырь плоского цвета,
-          рисуется в один проход; у нас — приближение (см. --tail-fill).
-          НЕ несёт backdrop-filter: тот же div раньше покрывал всю высоту
-          угла (0..33) и размывал сам ТЕКСТ реплики под собой (blur(16px)
-          — не «под хвостиком», а буквально поверх букв, замечено на
-          рендере). Мостик лежит поверх уже непрозрачного пузыря — ему
-          нечего стекленить. */}
-      <div
-        className="absolute overflow-visible"
-        style={{
-          width: '16.5px',
-          height: '9px',
-          // Оба борта позиционируются ОДИНАКОВО (правый край локального
-          // бокса — на точке крепления): канонический путь всегда рисуется
-          // как для исходящего (хвостик вправо), зеркалка — отдельным
-          // transform ниже, а не сменой left/right — иначе пришлось бы
-          // пересчитывать смещение под каждую сторону отдельно (см. #10o).
-          left: '-16.5px',
-          // y:16..25 — не достаёт до низа пузыря (33) на 8px, потому что
-          // остаток (25..33 при x:24..33) закрывает сам bottomEllipse ниже
-          // (проверено — у Telegram та же арифметика). bottom:0 совместил
-          // бы низ ЭТОГО бокса (25) с низом пузыря (33) — неверно, тот же
-          // класс бага, что чинили в хвостике (#10o).
-          bottom: '8px',
-          transform: isLeft ? 'scaleX(-1)' : undefined,
-          transformOrigin: isLeft ? '16.5px center' : undefined,
-        }}
-      >
-        <svg aria-hidden="true" viewBox="16.5 16 16.5 9" className="size-full" style={{ overflow: 'visible' }}>
-          {/* Тёплый градиент — тот же id/координаты (userSpaceOnUse,
-              абсолютные — НЕ objectBoundingBox), что и во втором svg ниже:
-              иначе на стыке двух кусков виден шов не только по форме, но и
-              по цвету (проверено рендером — было заметно). */}
-          {warm && (
-            <defs>
-              <radialGradient id={wedgeGradientId} gradientUnits="userSpaceOnUse" cx="33" cy="22" r="26">
-                <stop offset="0%" stopColor="oklch(0.72 0.17 55 / 0.22)" />
-                <stop offset="100%" stopColor="oklch(0.72 0.17 55 / 0)" />
-              </radialGradient>
-            </defs>
-          )}
-          <rect x="16.5" y="16" width="16.5" height="9" fill="var(--tail-fill)" />
-          {warm && (
-            <rect x="16.5" y="16" width="16.5" height="9" fill={`url(#${wedgeGradientId})`} />
-          )}
-        </svg>
-      </div>
-      {/* Сам хвостик (x:33..58) — ЦЕЛИКОМ снаружи пузыря, на фоне страницы.
-          БЕЗ backdrop-filter: раньше он тут был («стеклянный» блик), а на
-          клине (соседний блок) — нет, потому что клин лежит поверх уже
-          непрозрачного пузыря и его размывать нельзя. Разная обработка на
-          двух половинках одной капли читалась швом ровно на стыке (видно
-          на рендере 800%) — сильнее, чем сам блик того стоил. Материал
-          важнее эффекта: убрал blur отсюда тоже, обе половинки теперь
-          рисуются одинаково.
-          #10m — координаты 1:1 из реального движка Telegram-iOS
-          (ChatMessageBubbleImages.swift, messageBubbleImage): «капля минус
-          эллипс» — заливается нижняя половина bottomEllipse, из неё
-          БУЛЕВСКИ ВЫЧИТАЕТСЯ topEllipse, сдвинутый правее и с бóльшим
-          radius Y — именно эта вычитающая окружность создаёт ту самую
-          выемку (cusp), которую пользователь опознал на референсе. Раньше
-          (10g–10l) я подбирал форму от руки кривыми Безье — этого прочтения
-          я не мог достать чистым подбором. */}
-      <div
-        className="absolute overflow-visible"
-        style={{
-          width: '25px',
-          height: '21px',
-          left: '0px',
-          // viewBox для клина — y:17..33 (низ=33=низ пузыря, bottom:0
-          // ложится ровно туда). У хвостика viewBox y:14..35 — низ вьюбокса
-          // (35) на 2 единицы НИЖЕ низа пузыря (33), потому что вычитающий
-          // эллипс своей нижней дугой уходит чуть глубже линии дна. При
-          // bottom:0 это 2px разъезжались: bottom:0 совмещал низ ВЬЮБОКСА
-          // (35) с низом пузыря, а не точку 33 — контур капли начинался на
-          // 2px выше, чем контур клина, и на 800%-зуме были видны два
-          // отдельных куска вместо одного (проверено рендером с временной
-          // заливкой red/blue по кускам — иначе на глаз не различить). */}
-          bottom: '-2px',
-          transform: isLeft ? 'scaleX(-1)' : undefined,
-          transformOrigin: isLeft ? '0px center' : undefined,
-        }}
-      >
-        <svg aria-hidden="true" viewBox="33 14 25 21" className="size-full" style={{ overflow: 'visible' }}>
+    <span
+      ref={hostRef}
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 z-0 block overflow-visible"
+    >
+      {!geometry && (
+        <span
+          className={`telegram-bubble-fallback absolute inset-0 rounded-2xl ${
+            side === 'right' ? 'telegram-bubble-fallback-user' : 'telegram-bubble-fallback-cat'
+          }`}
+        />
+      )}
+      {geometry && (
+        <svg
+          data-telegram-bubble="true"
+          data-bubble-position={position}
+          data-bubble-side={side}
+          data-body-width={geometry.bodyWidth}
+          data-body-height={geometry.bodyHeight}
+          data-draw-tail={geometry.drawTail ? 'true' : 'false'}
+          width={geometry.canvasWidth}
+          height={geometry.bodyHeight}
+          viewBox={`0 0 ${geometry.canvasWidth} ${geometry.bodyHeight}`}
+          preserveAspectRatio="none"
+          className={`telegram-bubble-vector absolute top-0 overflow-visible ${
+            side === 'left' ? 'telegram-bubble-vector-left' : 'telegram-bubble-vector-right'
+          } ${side === 'right' ? 'telegram-bubble-vector-user' : 'telegram-bubble-vector-cat'} ${
+            landed ? 'telegram-bubble-land' : ''
+          }`}
+          style={{
+            left: side === 'left' ? -TELEGRAM_IOS_BUBBLE_SOURCE.tailExtension : 0,
+          }}
+        >
           <defs>
-            <mask id={maskId}>
-              <path d="M24 24.5 Q24 33 37.5 33 Q51 33 51 24.5 Z" fill="white" />
-              <ellipse cx="44.5" cy="24.5" rx="11.5" ry="10.5" fill="black" />
+            <mask
+              id={maskId}
+              x={-20}
+              y={-20}
+              width={geometry.canvasWidth + 40}
+              height={geometry.bodyHeight + 40}
+              maskUnits="userSpaceOnUse"
+              maskContentUnits="userSpaceOnUse"
+            >
+              <rect
+                x={-20}
+                y={-20}
+                width={geometry.canvasWidth + 40}
+                height={geometry.bodyHeight + 40}
+                fill="black"
+              />
+              <g
+                transform={
+                  side === 'left'
+                    ? `translate(${geometry.canvasWidth} 0) scale(-1 1)`
+                    : undefined
+                }
+              >
+                <path d={geometry.bodyPath} fill="white" />
+                {geometry.bridgePath && <path d={geometry.bridgePath} fill="white" />}
+                {geometry.tailPath && <path d={geometry.tailPath} fill="white" />}
+                {geometry.cutout && (
+                  <ellipse
+                    cx={geometry.cutout.cx}
+                    cy={geometry.cutout.cy}
+                    rx={geometry.cutout.rx}
+                    ry={geometry.cutout.ry}
+                    fill="black"
+                  />
+                )}
+              </g>
             </mask>
-            {/* Без чёрного выреза — «где вообще есть капля» — нужна
-                обводке ниже, чтобы обрезать контур вычитающего эллипса
-                только видимой (вогнутой) дугой. */}
-            <mask id={boundsId}>
-              <path d="M24 24.5 Q24 33 37.5 33 Q51 33 51 24.5 Z" fill="white" />
-            </mask>
-            {warm && (
-              <radialGradient id={bumpGradientId} gradientUnits="userSpaceOnUse" cx="33" cy="22" r="26">
-                <stop offset="0%" stopColor="oklch(0.72 0.17 55 / 0.22)" />
-                <stop offset="100%" stopColor="oklch(0.72 0.17 55 / 0)" />
-              </radialGradient>
-            )}
+
+            <linearGradient
+              id={catGradientId}
+              x1="0"
+              y1="0"
+              x2={geometry.canvasWidth}
+              y2={geometry.bodyHeight}
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="white" stopOpacity="0.11" />
+              <stop offset="55%" stopColor="white" stopOpacity="0.045" />
+              <stop offset="100%" stopColor="white" stopOpacity="0.02" />
+            </linearGradient>
+            <radialGradient
+              id={catWarmthId}
+              cx="0"
+              cy="0"
+              r="1"
+              gradientUnits="userSpaceOnUse"
+              gradientTransform={`translate(${geometry.canvasWidth * 0.18} ${geometry.bodyHeight}) scale(${geometry.canvasWidth * 1.2} ${Math.max(1, geometry.bodyHeight * 0.7)})`}
+            >
+              <stop offset="0%" stopColor="oklch(0.72 0.17 55)" stopOpacity="0.22" />
+              <stop offset="60%" stopColor="oklch(0.72 0.17 55)" stopOpacity="0" />
+              <stop offset="100%" stopColor="oklch(0.72 0.17 55)" stopOpacity="0" />
+            </radialGradient>
+            <linearGradient
+              id={userGradientId}
+              x1="0"
+              y1="0"
+              x2="0"
+              y2={geometry.bodyHeight}
+              gradientUnits="userSpaceOnUse"
+            >
+              <stop offset="0%" stopColor="oklch(0.9 0.21 130)" />
+              <stop offset="55%" stopColor="var(--primary)" />
+              <stop offset="100%" stopColor="oklch(0.8 0.2 132)" />
+            </linearGradient>
+            <linearGradient
+              id={shineGradientId}
+              x1="0"
+              y1="0"
+              x2="1"
+              y2="0"
+            >
+              <stop offset="0%" stopColor="white" stopOpacity="0" />
+              <stop offset="50%" stopColor="oklch(0.92 0.02 95)" stopOpacity="0.13" />
+              <stop offset="100%" stopColor="white" stopOpacity="0" />
+            </linearGradient>
+            <filter
+              id={edgeFilterId}
+              x={-12}
+              y={-12}
+              width={geometry.canvasWidth + 24}
+              height={geometry.bodyHeight + 24}
+              filterUnits="userSpaceOnUse"
+              colorInterpolationFilters="sRGB"
+            >
+              <feMorphology in="SourceAlpha" operator="dilate" radius="0.55" result="dilated" />
+              <feComposite in="dilated" in2="SourceAlpha" operator="out" result="edge" />
+              <feFlood floodColor="white" floodOpacity="0.22" result="edgeColor" />
+              <feComposite in="edgeColor" in2="edge" operator="in" result="coloredEdge" />
+              <feMerge>
+                <feMergeNode in="SourceGraphic" />
+                <feMergeNode in="coloredEdge" />
+              </feMerge>
+            </filter>
           </defs>
-          <path
-            d="M24 24.5 Q24 33 37.5 33 Q51 33 51 24.5 Z"
-            fill="var(--tail-fill)"
+
+          <g
             mask={`url(#${maskId})`}
-          />
-          {warm && (
-            <path
-              d="M24 24.5 Q24 33 37.5 33 Q51 33 51 24.5 Z"
-              fill={`url(#${bumpGradientId})`}
-              mask={`url(#${maskId})`}
+            filter={side === 'left' ? `url(#${edgeFilterId})` : undefined}
+          >
+            {side === 'left' ? (
+              <>
+                <rect
+                  width={geometry.canvasWidth}
+                  height={geometry.bodyHeight}
+                  fill="oklch(0.4 0.02 150)"
+                  fillOpacity="0.9"
+                />
+                <rect
+                  width={geometry.canvasWidth}
+                  height={geometry.bodyHeight}
+                  fill={`url(#${catGradientId})`}
+                />
+                <rect
+                  width={geometry.canvasWidth}
+                  height={geometry.bodyHeight}
+                  fill={`url(#${catWarmthId})`}
+                />
+              </>
+            ) : (
+              <rect
+                width={geometry.canvasWidth}
+                height={geometry.bodyHeight}
+                fill={`url(#${userGradientId})`}
+              />
+            )}
+            <rect
+              className="telegram-bubble-shine-sweep"
+              x={-geometry.canvasWidth * 0.55}
+              y={0}
+              width={geometry.canvasWidth * 0.45}
+              height={geometry.bodyHeight}
+              fill={`url(#${shineGradientId})`}
+              style={
+                {
+                  '--telegram-bubble-shine-distance': `${geometry.canvasWidth * 3}px`,
+                } as CSSProperties
+              }
             />
-          )}
-          {/* Обводка: собственная (выпуклая) дуга капли — всегда видна; дуга
-              вычитающего эллипса — только там, где она реально режет каплю
-              (её кромка, обрезанная maskId без учёта чёрного выреза, и
-              есть видимая выемка). */}
-          <path
-            d="M24 24.5 Q24 33 37.5 33 Q51 33 51 24.5"
-            fill="none"
-            stroke="var(--tail-stroke)"
-            strokeWidth="0.7"
-            strokeLinecap="round"
-          />
-          <ellipse
-            cx="44.5"
-            cy="24.5"
-            rx="11.5"
-            ry="10.5"
-            fill="none"
-            stroke="var(--tail-stroke)"
-            strokeWidth="0.7"
-            mask={`url(#${boundsId})`}
-            strokeLinecap="round"
-          />
+          </g>
         </svg>
-      </div>
-    </>
+      )}
+    </span>
   )
 }
 
 type ChatBubbleProps = {
   text: string
   isUser: boolean
-  isLastOfGroup: boolean
+  position: TelegramBubblePosition
   /** 0 — свежая реплика у низа, 1 — уехала далеко вверх (#13) */
   depth: number
   reaction?: Reaction | null
@@ -358,7 +314,7 @@ type ChatBubbleProps = {
 export function ChatBubble({
   text,
   isUser,
-  isLastOfGroup,
+  position,
   depth,
   reaction,
   onReact,
@@ -444,38 +400,11 @@ export function ChatBubble({
    * возвращается точечно, только на словах в *звёздочках* (EmphasisText).
    */
   const bubbleClass = isUser
-    ? 'chat-bubble-user px-4 py-2.5 text-[0.95rem] leading-relaxed'
-    : 'chat-bubble-cat px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground'
+    ? 'px-4 py-2.5 text-[0.95rem] leading-relaxed text-primary-foreground'
+    : 'px-4 py-2.5 font-sans text-[0.95rem] leading-relaxed text-secondary-foreground'
 
   return (
-    <div
-      className={`relative ${isUser ? 'ml-auto max-w-[82%]' : 'max-w-[88%]'}`}
-      style={{
-        // Переменные для SVG-хвостика живут на ОБЩЕМ родителе пузыря и его
-        // хвостика (см. #10 ниже — хвостик теперь не внутри .glass-shine,
-        // а рядом с ней), а не на самой .glass-shine: кастомные CSS-свойства
-        // наследуются вниз по дереву, не между соседями — на внутреннем
-        // div'е они были бы невидимы хвостику-сиблингу (замерено рендером:
-        // computed --tail-fill на обёртке хвостика была пустой строкой,
-        // fill молча падал на чёрный по умолчанию).
-        // Значение должно зеркалить заливку .chat-bubble-cat в globals.css —
-        // когда контраст пузыря поднимали (0.16/0.62 → 0.4/0.9), эту
-        // константу забыли обновить, и хвостик разошёлся цветом с телом
-        // пузыря, к которому приклеен. Найдено сверкой с реальным
-        // скриншотом устройства.
-        //
-        // isUser: пузырь красится вертикальным градиентом (светлый верх →
-        // тёмный низ, .chat-bubble-user), а хвостик сидит СНИЗУ (#10c) —
-        // раньше здесь стоял ВЕРХНИЙ (0%) стоп градиента, оставшийся от
-        // старой версии, когда хвостик был сверху. Хвостик красился светлым,
-        // хотя рядом с ним самая тёмная часть пузыря (100%-стоп). Теперь —
-        // тот же нижний стоп, что реально граничит с хвостиком.
-        ['--tail-fill' as string]: isUser
-          ? 'oklch(0.8 0.2 132)'
-          : 'oklch(0.4 0.02 150 / 0.9)',
-        ['--tail-stroke' as string]: isUser ? 'transparent' : 'oklch(1 0 0 / 0.2)',
-      }}
-    >
+    <div className={`relative ${isUser ? 'ml-auto max-w-[82%]' : 'max-w-[88%]'}`}>
       {/* Иконка-цель ответа лежит ПОД пузырём и открывается протяжкой. */}
       <motion.span
         aria-hidden="true"
@@ -492,19 +421,6 @@ export function ChatBubble({
           opacity: depthOpacity,
           filter: `saturate(${depthSaturate})`,
           transformOrigin: isUser ? 'right center' : 'left center',
-          // Угол, из которого растёт хвостик, — 16px: то же mainRadius,
-          // что задаёт форму эллипсов хвостика в #10m (портировано из
-          // ChatMessageBubbleImages.swift, PresentationChatBubbleSettings
-          // .default = mainRadius: 16). Совпадение не косметическое —
-          // геометрия хвостика (bottomEllipse/topEllipse) в реальном
-          // Telegram считается ОТНОСИТЕЛЬНО этого же радиуса угла; другое
-          // значение здесь разошлось бы по кривизне с SVG-дугой. Только у
-          // ПОСЛЕДНЕЙ реплики группы (хвостик и аватар растут снизу, как
-          // в WhatsApp/Telegram/iMessage): более ранние реплики пачки
-          // остаются круглыми со всех сторон.
-          ...(isLastOfGroup
-            ? { [isUser ? 'borderBottomRightRadius' : 'borderBottomLeftRadius']: '16px' }
-            : {}),
         }}
         // Тянуть можно только к своей стороне: реплика уходит «в ответ», а не
         // болтается в обе стороны. dragElastic — упругое сопротивление за
@@ -535,30 +451,17 @@ export function ChatBubble({
         onPointerDown={startLongPress}
         onPointerUp={cancelLongPress}
         onPointerLeave={cancelLongPress}
-        className={`glass-shine relative select-none whitespace-pre-wrap rounded-2xl ${bubbleClass} ${isUser ? 'message-land' : ''}`}
+        className={`relative isolate select-none whitespace-pre-wrap ${bubbleClass}`}
       >
-        <EmphasisText text={text} />
+        <BubbleShape
+          side={isUser ? 'right' : 'left'}
+          position={position}
+          landed={isUser}
+        />
+        <span className="relative z-[1]">
+          <EmphasisText text={text} />
+        </span>
       </motion.div>
-
-      {/* #10 · Хвостик — СНАРУЖИ пузыря, не внутри. .glass-shine (см. выше)
-          несёт overflow:hidden ради diagonal-блика — любой ребёнок с
-          отрицательным отступом внутри неё обрезался по границе пузыря,
-          поэтому пять прошлых попыток формы визуально «работали», но на
-          самом деле никогда не высовывались за край: то, что казалось
-          хвостиком, было лишь видимым остатком фигуры ВНУТРИ пузыря.
-          Найдено не рендером формы, а проверкой — достаточно было
-          посмотреть, что оборачивает BubbleTail. style={{x}} — та же
-          motion-value, что двигает сам пузырь при swipe-to-reply: без неё
-          хвостик остался бы на месте, пока пузырь уезжает в протяжке. */}
-      {isLastOfGroup && (
-        <motion.div
-          aria-hidden="true"
-          style={{ x }}
-          className={`pointer-events-none absolute bottom-0 ${isUser ? 'right-0' : 'left-0'}`}
-        >
-          <BubbleTail side={isUser ? 'right' : 'left'} warm={!isUser} />
-        </motion.div>
-      )}
 
       {/* Поставленная реакция живёт на кромке пузыря — она про эту реплику,
           а не отдельная строка в ленте. */}
