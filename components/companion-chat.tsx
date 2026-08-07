@@ -746,7 +746,7 @@ export function CompanionChat({
             </div>
           ) : null}
           <motion.div
-            className="flex items-start gap-2"
+            className="flex items-end gap-2"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={SPRING_ITEM}
@@ -768,9 +768,14 @@ export function CompanionChat({
               style={{
                 ['--tail-fill' as string]: 'oklch(0.4 0.02 150 / 0.9)',
                 ['--tail-stroke' as string]: 'oklch(1 0 0 / 0.2)',
+                // Тот же острый угол, что и у последней реплики группы в
+                // ChatBubble (см. #10e в chat-bubble.tsx) — приветствие
+                // ВСЕГДА несёт хвостик, значит всегда «низ», и угол под
+                // ним всегда острый, не скруглённый.
+                borderBottomLeftRadius: '0px',
               }}
             >
-              <BubbleTail side="left" />
+              <BubbleTail side="left" warm />
               <EmphasisText text={greeting} />
             </div>
           </motion.div>
@@ -829,10 +834,11 @@ export function CompanionChat({
 
           {messages.map((message, mi) => {
             // Группировка подряд идущих реплик одного говорящего — то, что
-            // отличает переписку от списка блоков. Хвостик у пузыря здесь
-            // сверху (rounded-tl-sm/tr-sm), поэтому «голова» группы — ПЕРВОЕ
-            // сообщение: только оно получает хвост и аватар, остальные
-            // прижимаются к нему и идут с ровными углами.
+            // отличает переписку от списка блоков. Хвостик и аватар растут
+            // из НИЖНЕГО угла ПОСЛЕДНЕЙ реплики группы (как в WhatsApp/
+            // Telegram/iMessage) — так читатель видит, кто говорит, ровно
+            // там, где заканчивает читать пачку сообщений, а не в момент,
+            // когда она только начинается.
             const prev = messages[mi - 1]
             const next = messages[mi + 1]
             const isFirstOfGroup = !prev || prev.role !== message.role
@@ -903,7 +909,12 @@ export function CompanionChat({
                   return (
                     <motion.div
                       key={i}
-                      className="flex w-full items-start gap-2"
+                      // items-end на последней реплике группы: аватар и
+                      // хвостик теперь растут из НИЖНЕГО угла (как в
+                      // WhatsApp/Telegram/iMessage — референс от пользователя,
+                      // сверено с реальным скриншотом), значит аватар должен
+                      // сидеть у нижнего края пузыря, а не у верхнего.
+                      className={`flex w-full gap-2 ${isLastOfGroup ? 'items-end' : 'items-start'}`}
                       // Нюанс «своей стороны» (iMessage/Telegram): реплика
                       // едва подъезжает СО СТОРОНЫ своего отправителя (8px —
                       // в пределах 4-8px нормы для входа элемента, не рывок),
@@ -931,7 +942,7 @@ export function CompanionChat({
                       }
                     >
                       {!isUser &&
-                        (isFirstOfGroup ? (
+                        (isLastOfGroup ? (
                           <CompanionAvatar
                             reacting={reactingId === message.id}
                             expression={userIdle ? 'listening' : expression}
@@ -947,7 +958,7 @@ export function CompanionChat({
                       <ChatBubble
                         text={part.text}
                         isUser={isUser}
-                        isFirstOfGroup={isFirstOfGroup}
+                        isLastOfGroup={isLastOfGroup}
                         depth={depthOf(message.id)}
                         reaction={reactions[`${message.id}-${i}`] ?? null}
                         onReact={(r) =>
